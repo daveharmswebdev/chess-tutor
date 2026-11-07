@@ -102,6 +102,47 @@ over two lines} Nf6 $14 ; rest of line comment
     expect(() => parseRepertoirePgn("  \n\n \t\n", "w")).toThrow(/no games/);
   });
 
+  it("throws on a stray '}' in movetext, naming the character and the line", () => {
+    expect(() => parseRepertoirePgn('[Line "X"] 1. d4 } d5 *', "w")).toThrow(
+      /unexpected '\}'.*"X"/,
+    );
+  });
+
+  it("throws on a stray ']' in movetext, naming the character and the line", () => {
+    expect(() => parseRepertoirePgn('[Line "X"] 1. d4 ] d5 *', "w")).toThrow(
+      /unexpected '\]'.*"X"/,
+    );
+  });
+
+  it("a game with headers but no moves and no result is not merged into the next game", () => {
+    expect(() => parseRepertoirePgn('[Line "A"]\n\n[Line "B"]\n\n1. d4 d5 *', "w")).toThrow(
+      /"A".*no moves/,
+    );
+  });
+
+  it("a repeated [Event] in a header block also starts a new game", () => {
+    expect(() =>
+      parseRepertoirePgn('[Event "A"]\n[Event "B"]\n\n1. d4 d5 *', "w"),
+    ).toThrow(/"A".*no moves/);
+  });
+
+  it("a new game may follow movetext or a result without a blank line", () => {
+    const text = '[Line "A"]\n1. d4 d5\n[Line "B"]\n1. d4 Nf6 *\n[Line "C"]\n1. d4 e6 *';
+    expect(parseRepertoirePgn(text, "w").map((l) => l.name)).toEqual(["A", "B", "C"]);
+  });
+
+  it("passes a '3...' continuation marker through to a valid line", () => {
+    const text = `[Line "Cont"]\n\n1. d4 d5 2. Bf4 Nf6 3. e3 {idea} 3... e6 4. Nf3 *\n`;
+    const lines = parseRepertoirePgn(text, "w");
+    expect(lines[0]?.pgn).toBe("1. d4 d5 2. Bf4 Nf6 3. e3 3... e6 4. Nf3");
+    const rep = buildRepertoire(lines);
+    expect(
+      rep.continuations(["d2d4", "d7d5", "c1f4", "g8f6", "e2e3", "e7e6"], "w")?.moves.map(
+        (m) => m.san,
+      ),
+    ).toEqual(["Nf3"]);
+  });
+
   it("handles CRLF line endings and escaped quotes in header values", () => {
     const text = `[Line "London \\"main\\""]\r\n[Result "*"]\r\n\r\n1. d4 d5 *\r\n`;
     expect(parseRepertoirePgn(text, "w")).toEqual([

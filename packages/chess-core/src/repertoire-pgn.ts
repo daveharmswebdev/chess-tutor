@@ -26,22 +26,35 @@ export function parseRepertoirePgn(text: string, color: Color): RepertoireLineIn
     const name = nameOf(g.headers);
     return name === null ? `game ${games.indexOf(g) + 1}` : `"${name}"`;
   };
+  const where = () => (game ? label(game) : "game 1");
 
   let i = 0;
   const n = text.length;
   while (i < n) {
+    const start = i;
     const ch = text[i]!;
     if (/\s/.test(ch)) {
       i++;
     } else if (ch === "[") {
-      // A header after movetext (or a result) begins the next game.
-      if (game === null || game.tokens.length > 0 || game.ended) game = newGame();
-      const end = readHeader(text, i, game.headers);
-      i = end;
+      // A header begins the next game when it follows movetext or a result, or when its
+      // tag already appears in the current header block (a game with no moves).
+      const header = readHeader(text, i);
+      if (
+        game === null ||
+        game.tokens.length > 0 ||
+        game.ended ||
+        game.headers.has(header.tag)
+      ) {
+        game = newGame();
+      }
+      game.headers.set(header.tag, header.value);
+      i = header.end;
     } else if (ch === "{") {
       const close = text.indexOf("}", i + 1);
-      if (close === -1) throw new Error(`repertoire PGN: unclosed comment in ${(game ? label(game) : "game 1")}`);
+      if (close === -1) throw new Error(`repertoire PGN: unclosed comment in ${where()}`);
       i = close + 1;
+    } else if (ch === "}" || ch === "]") {
+      throw new Error(`repertoire PGN: unexpected '${ch}' in movetext of line ${where()}`);
     } else if (ch === ";") {
       const nl = text.indexOf("\n", i);
       i = nl === -1 ? n : nl + 1;
@@ -50,7 +63,7 @@ export function parseRepertoirePgn(text: string, color: Color): RepertoireLineIn
       i = nl === -1 ? n : nl + 1;
     } else if (ch === "(" || ch === ")") {
       throw new Error(
-        `repertoire line ${(game ? label(game) : "game 1")}: variations "( ... )" are not supported; ` +
+        `repertoire line ${where()}: variations "( ... )" are not supported; ` +
           `write one mainline per game`,
       );
     } else {
@@ -66,6 +79,8 @@ export function parseRepertoirePgn(text: string, color: Color): RepertoireLineIn
       }
       game.tokens.push(token);
     }
+    // Every branch either consumes input or throws; guard against a future regression.
+    if (i <= start) throw new Error(`repertoire PGN: parser stalled at offset ${start}`);
   }
 
   if (games.length === 0) throw new Error("repertoire PGN: no games found");
@@ -91,8 +106,8 @@ function nameOf(headers: Map<string, string>): string | null {
   return null;
 }
 
-/** Reads `[Tag "value"]` starting at `start` (the "["). Returns the index after "]". */
-function readHeader(text: string, start: number, headers: Map<string, string>): number {
+/** Reads `[Tag "value"]` starting at `start` (the "["); `end` is the index after "]". */
+function readHeader(text: string, start: number): { tag: string; value: string; end: number } {
   const m = /^\[\s*([A-Za-z0-9_]+)\s*"/.exec(text.slice(start, start + 256));
   if (!m) throw new Error(`repertoire PGN: malformed header at offset ${start}`);
   let i = start + m[0].length;
@@ -106,6 +121,5 @@ function readHeader(text: string, start: number, headers: Map<string, string>): 
   if (i >= text.length || close === -1) {
     throw new Error(`repertoire PGN: unterminated header [${m[1]}] at offset ${start}`);
   }
-  headers.set(m[1]!, value);
-  return close + 1;
+  return { tag: m[1]!, value, end: close + 1 };
 }
