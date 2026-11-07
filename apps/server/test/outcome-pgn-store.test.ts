@@ -56,6 +56,48 @@ describe("toPgn", () => {
     expect(pgn).toMatch(/\n\n1\. e4 e5 1-0\s*$/);
   });
 
+  /** MoveViews for a UCI sequence; `firstBy` played the first move, then sides alternate. */
+  function movesOf(ucis: string[], firstBy: "player" | "bot"): GameView["moves"] {
+    const chess = new Chess();
+    const other = firstBy === "player" ? "bot" : "player";
+    return ucis.map((uci, i) => {
+      const m = chess.move({ from: uci.slice(0, 2), to: uci.slice(2, 4), ...(uci[4] ? { promotion: uci[4] } : {}) });
+      return { uci, san: m.san, by: i % 2 === 0 ? firstBy : other };
+    });
+  }
+  const tagsOf = (pgn: string) => Object.fromEntries([...pgn.matchAll(/^\[(\w+) "([^"]*)"\]$/gm)].map((m) => [m[1], m[2]]));
+  const movetextOf = (pgn: string) => pgn.split("\n\n")[1]!.trim();
+
+  it("writes castling as O-O", () => {
+    const moves = movesOf(["e2e4", "e7e5", "g1f3", "b8c6", "f1c4", "g8f6", "e1g1"], "player");
+    const pgn = toPgn(view({ moves, status: "abandoned", result: "*", endReason: "abandoned" }), new Date());
+    expect(movetextOf(pgn)).toBe("1. e4 e5 2. Nf3 Nc6 3. Bc4 Nf6 4. O-O *");
+  });
+
+  it("writes a promotion as =Q", () => {
+    const moves = movesOf(["e2e4", "d7d5", "e4d5", "c7c6", "d5c6", "g8f6", "c6b7", "b8d7", "b7a8q"], "player");
+    const pgn = toPgn(view({ moves, status: "abandoned", result: "*", endReason: "abandoned" }), new Date());
+    expect(movetextOf(pgn)).toBe("1. e4 d5 2. exd5 c6 3. dxc6 Nf6 4. cxb7 Nbd7 5. bxa8=Q *");
+  });
+
+  it("writes a checkmate with # and its Result and Termination", () => {
+    const moves = movesOf(["e2e4", "e7e5", "f1c4", "b8c6", "d1h5", "g8f6", "h5f7"], "player");
+    const pgn = toPgn(view({ moves, result: "1-0", endReason: "checkmate" }), new Date());
+    expect(tagsOf(pgn)).toMatchObject({ White: "Player", Black: "Sparring bot", Result: "1-0", Termination: "checkmate" });
+    expect(movetextOf(pgn)).toBe("1. e4 e5 2. Bc4 Nc6 3. Qh5 Nf6 4. Qxf7# 1-0");
+  });
+
+  it("writes a game started as Black, the bot's move first", () => {
+    const moves = movesOf(["d2d4", "g8f6", "c2c4"], "bot");
+    expect(moves.map((m) => m.by)).toEqual(["bot", "player", "bot"]);
+    const pgn = toPgn(
+      view({ playerColor: "b", moves, status: "abandoned", result: "*", endReason: "abandoned" }),
+      new Date(),
+    );
+    expect(tagsOf(pgn)).toMatchObject({ White: "Sparring bot", Black: "Player", Result: "*", Termination: "abandoned" });
+    expect(movetextOf(pgn)).toBe("1. d4 Nf6 2. c4 *");
+  });
+
   it("round-trips through chess.js", () => {
     const pgn = toPgn(view({ status: "abandoned", result: "*", endReason: "abandoned" }), new Date());
     const chess = new Chess();

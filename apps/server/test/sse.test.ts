@@ -118,6 +118,42 @@ describe("GET /api/games/:id/events (real socket)", () => {
     expect(again[0]!.data).toMatchObject({ type: "state", game: { moves: [{ uci: "e2e4" }, { uci: "e7e5" }] } });
   });
 
+  // Review 019 (major): after a bot failure the client must learn botThinking is false.
+  // "state" comes before "error": the web reducer clears its message on state and sets it on error.
+  for (const [name, arrange] of [
+    ["the bot rejects", (bot: FakeBot) => bot.failNext("engine crashed")],
+    ["the bot returns an illegal move", (bot: FakeBot) => bot.illegalNext("e2e5")],
+  ] as const) {
+    it(`when ${name}: state (botThinking false) then error, and a takeback works afterwards`, async () => {
+      const bot = createFakeBot();
+      await start(bot);
+      const game = (await (await postJson("/api/games", { playerColor: "w" })).json()) as GameView;
+      arrange(bot);
+
+      const messages = await readEvents(
+        `/api/games/${game.id}/events`,
+        (m) => m.event === "error",
+        async () => {
+          const res = await postJson(`/api/games/${game.id}/moves`, { uci: "e2e4" });
+          expect(res.status).toBe(200);
+        },
+      );
+      const afterMove = messages.slice(1).map((m) => m.event);
+      expect(afterMove.slice(-2)).toEqual(["state", "error"]);
+      const state = messages.at(-2)!.data;
+      expect(state).toMatchObject({
+        type: "state",
+        game: { botThinking: false, status: "playing", moves: [{ uci: "e2e4", by: "player" }] },
+      });
+      if (state.type === "state") expect(state.game.moves).toHaveLength(1);
+      expect(messages.at(-1)!.data).toMatchObject({ type: "error", message: expect.stringMatching(/bot/i) });
+
+      const takeback = await fetch(`${base}/api/games/${game.id}/takeback`, { method: "POST" });
+      expect(takeback.status).toBe(200);
+      expect(((await takeback.json()) as GameView).moves).toEqual([]);
+    });
+  }
+
   it("404s events for an unknown game", async () => {
     await start(createFakeBot());
     const res = await fetch(`${base}/api/games/nope/events`);

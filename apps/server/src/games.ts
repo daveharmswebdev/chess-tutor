@@ -183,6 +183,17 @@ export function createGameManager(opts: GameManagerOptions): GameManager {
     emit(g, { type: "game_over", game: viewOf(g) });
   }
 
+  /**
+   * After a bot failure: "state" (botThinking false, so the board unlocks) and then
+   * "error". The order matters: the web reducer clears its message on state.
+   */
+  function botFailed(g: Game, message: string): void {
+    g.botThinking = false;
+    g.version++;
+    emit(g, { type: "state", game: viewOf(g) });
+    emit(g, { type: "error", message });
+  }
+
   function startBot(g: Game): void {
     g.botThinking = true;
     const version = g.version;
@@ -202,7 +213,7 @@ export function createGameManager(opts: GameManagerOptions): GameManager {
         if (!move) {
           g.botThinking = false;
           log.error({ gameId: g.id, uci: botMove.uci, fen }, "bot returned an illegal move");
-          emit(g, { type: "error", message: `The bot returned an illegal move (${botMove.uci}).` });
+          botFailed(g, `The bot returned an illegal move (${botMove.uci}).`);
           return;
         }
         g.moves.push({ uci: toUci(move), san: move.san, by: "bot" });
@@ -220,10 +231,7 @@ export function createGameManager(opts: GameManagerOptions): GameManager {
         if (stale()) return;
         g.botThinking = false;
         log.error({ gameId: g.id, fen, err }, "bot failed to choose a move");
-        emit(g, {
-          type: "error",
-          message: `The bot could not choose a move: ${err instanceof Error ? err.message : String(err)}`,
-        });
+        botFailed(g, `The bot could not choose a move: ${err instanceof Error ? err.message : String(err)}`);
       },
     ).finally(() => {
       if (g.pending === pending) g.pending = null;
