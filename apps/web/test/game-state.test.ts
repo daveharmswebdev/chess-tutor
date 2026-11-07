@@ -138,6 +138,40 @@ describe("game reducer: moves and snap-back", () => {
     expect(isPlayersTurn(s)).toBe(true);
   });
 
+  it("keeps the SSE state and error when a bot failure overtakes the move response (#23)", () => {
+    const failed = view({ fen: AFTER_D4_FEN, moves: [D4] });
+    let s = gameReducer(started(), { type: "move_attempted", uci: "d2d4", fen: AFTER_D4_FEN });
+    s = gameReducer(s, { type: "server_event", event: { type: "state", game: failed } });
+    s = gameReducer(s, { type: "server_event", event: { type: "error", message: "engine crashed" } });
+    s = gameReducer(s, { type: "move_accepted", game: thinkingAfterD4 });
+    expect(s.game).toEqual(failed);
+    expect(s.error).toBe("engine crashed");
+    expect(s.busy).toBe(false);
+    expect(s.pendingFen).toBeNull();
+    expect(canRetryBot(s)).toBe(true);
+  });
+
+  it("keeps the SSE state and error when they overtake a request's reply (#23)", () => {
+    const failed = view({ playerColor: "b" });
+    let s = started({ playerColor: "b" });
+    s = gameReducer(s, { type: "request_started" });
+    s = gameReducer(s, { type: "server_event", event: { type: "state", game: failed } });
+    s = gameReducer(s, { type: "server_event", event: { type: "error", message: "engine crashed" } });
+    s = gameReducer(s, { type: "request_succeeded", game: view({ playerColor: "b", botThinking: true }) });
+    expect(s.game).toEqual(failed);
+    expect(s.error).toBe("engine crashed");
+    expect(s.busy).toBe(false);
+    expect(canRetryBot(s)).toBe(true);
+  });
+
+  it("applies the reply when SSE events came only before the request started", () => {
+    let s = started({ playerColor: "b" });
+    s = gameReducer(s, { type: "server_event", event: { type: "state", game: view({ playerColor: "b" }) } });
+    s = gameReducer(s, { type: "request_started" });
+    s = gameReducer(s, { type: "request_succeeded", game: view({ playerColor: "b", botThinking: true }) });
+    expect(s.game?.botThinking).toBe(true);
+  });
+
   it("ignores a late move response from a previous game", () => {
     const s0 = started({ id: "g2" });
     const s = gameReducer(s0, { type: "move_accepted", game: thinkingAfterD4 });

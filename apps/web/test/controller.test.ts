@@ -2,7 +2,15 @@ import type { GameView } from "@chess-tutor/chess-core";
 import { describe, expect, it } from "vitest";
 import { ApiRequestError, type ApiClient } from "../src/api.ts";
 import { createGameController, type EventSourceLike } from "../src/controller.ts";
-import { boardFen, gameReducer, initialGameState, type GameAction, type GameState } from "../src/game-state.ts";
+import {
+  boardFen,
+  canRetryBot,
+  gameReducer,
+  initialGameState,
+  isPlayersTurn,
+  type GameAction,
+  type GameState,
+} from "../src/game-state.ts";
 import { AFTER_D4_D5_FEN, AFTER_D4_FEN, D4, D5, START_FEN, view } from "./fixtures.ts";
 
 class FakeEventSource implements EventSourceLike {
@@ -295,5 +303,126 @@ describe("game controller", () => {
     expect(calls).toBe(1);
     expect(h.state().error).toBe("Not possible right now: not the bot's turn");
     expect(h.state().busy).toBe(false);
+  });
+
+  describe("SSE events that overtake the HTTP reply win (#23)", () => {
+    const blackFresh = view({ playerColor: "b" });
+    const blackThinking = view({ playerColor: "b", botThinking: true });
+    const e4 = { uci: "e2e4", san: "e4", by: "bot" as const };
+    const afterE4 = view({ playerColor: "b", fen: AFTER_D4_FEN.replace("3P4/8/PPP1PPPP", "4P3/8/PPPP1PPP"), moves: [e4] });
+
+    async function failedBlackGame(botRetry: ApiClient["botRetry"]) {
+      const h = harness(fakeApi({ newGame: async () => blackThinking, botRetry }));
+      await h.controller.newGame("b");
+      const es = h.sources[0]!;
+      es.emit("state", { type: "state", game: blackFresh });
+      es.emit("error", { type: "error", message: "engine crashed" });
+      return { h, es };
+    }
+
+    it("(a) retry: state{botThinking:false} and error before the reply leave Retry available", async () => {
+      let es: FakeEventSource | undefined;
+      const { h, es: source } = await failedBlackGame(async () => {
+        es!.emit("state", { type: "state", game: blackFresh });
+        es!.emit("error", { type: "error", message: "engine crashed again" });
+        return blackThinking;
+      });
+      es = source;
+      await h.controller.retryBot();
+      expect(h.state().game?.botThinking).toBe(false);
+      expect(h.state().error).toBe("engine crashed again");
+      expect(h.state().busy).toBe(false);
+      expect(canRetryBot(h.state())).toBe(true);
+    });
+
+    it("(b) retry: a bot_move before the reply keeps the bot's move", async () => {
+      let es: FakeEventSource | undefined;
+      const { h, es: source } = await failedBlackGame(async () => {
+        es!.emit("bot_move", { type: "bot_move", move: e4, game: afterE4 });
+        return blackThinking;
+      });
+      es = source;
+      await h.controller.retryBot();
+      expect(h.state().game).toEqual(afterE4);
+      expect(h.state().error).toBeNull();
+      expect(isPlayersTurn(h.state())).toBe(true);
+    });
+
+    it("(c) player move: state and error before the reply do not leave the board stuck", async () => {
+      let es: FakeEventSource | undefined;
+      const h = harness(
+        fakeApi({
+          newGame: async () => view(),
+          playMove: async () => {
+            es!.emit("state", { type: "state", game: view({ fen: AFTER_D4_FEN, moves: [D4] }) });
+            es!.emit("error", { type: "error", message: "engine crashed" });
+            return view({ fen: AFTER_D4_FEN, moves: [D4], botThinking: true });
+          },
+        }),
+      );
+      await h.controller.newGame("w");
+      es = h.sources[0]!;
+      expect(await h.controller.play("d2", "d4")).toBe(true);
+      expect(h.state().game?.botThinking).toBe(false);
+      expect(h.state().game?.moves).toEqual([D4]);
+      expect(h.state().error).toBe("engine crashed");
+      expect(h.state().pendingFen).toBeNull();
+      expect(canRetryBot(h.state())).toBe(true);
+    });
+
+    it("takeback and resign: an SSE event before the reply wins too", async () => {
+      let es: FakeEventSource | undefined;
+      const over = view({ fen: AFTER_D4_D5_FEN, moves: [D4, D5], status: "finished", result: "0-1", endReason: "resigned" });
+      const h = harness(
+        fakeApi({
+          newGame: async () => view({ fen: AFTER_D4_D5_FEN, moves: [D4, D5] }),
+          takeback: async () => {
+            es!.emit("state", { type: "state", game: view({ moves: [] }) });
+            return view({ fen: AFTER_D4_D5_FEN, moves: [D4, D5] }); // deliberately stale
+          },
+          resign: async () => {
+            es!.emit("game_over", { type: "game_over", game: over });
+            return view();
+          },
+        }),
+      );
+      await h.controller.newGame("w");
+      es = h.sources[0]!;
+      await h.controller.takeback();
+      expect(h.state().game?.moves).toEqual([]);
+      expect(h.state().busy).toBe(false);
+      await h.controller.resign();
+      expect(h.state().game).toEqual(over);
+    });
+
+    it("(d) HTTP then SSE still works for moves, takeback, resign and retry", async () => {
+      const h = harness(
+        fakeApi({
+          newGame: async () => view(),
+          playMove: async () => view({ fen: AFTER_D4_FEN, moves: [D4], botThinking: true }),
+          takeback: async () => view(),
+          resign: async () => view({ status: "finished", result: "0-1", endReason: "resigned" }),
+          botRetry: async () => view({ fen: AFTER_D4_FEN, moves: [D4], botThinking: true }),
+        }),
+      );
+      await h.controller.newGame("w");
+      const es = h.sources[0]!;
+      expect(await h.controller.play("d2", "d4")).toBe(true);
+      expect(h.state().game?.botThinking).toBe(true);
+      es.emit("state", { type: "state", game: view({ fen: AFTER_D4_FEN, moves: [D4] }) });
+      es.emit("error", { type: "error", message: "engine crashed" });
+      expect(canRetryBot(h.state())).toBe(true);
+
+      await h.controller.retryBot();
+      expect(h.state().game?.botThinking).toBe(true);
+      expect(h.state().error).toBeNull();
+      es.emit("bot_move", { type: "bot_move", move: D5, game: view({ fen: AFTER_D4_D5_FEN, moves: [D4, D5] }) });
+      expect(h.state().game?.moves).toEqual([D4, D5]);
+
+      await h.controller.takeback();
+      expect(h.state().game?.moves).toEqual([]);
+      await h.controller.resign();
+      expect(h.state().game?.endReason).toBe("resigned");
+    });
   });
 });
