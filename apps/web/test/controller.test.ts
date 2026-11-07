@@ -41,6 +41,7 @@ function fakeApi(overrides: Partial<ApiClient> = {}): ApiClient {
     playMove: unexpected,
     takeback: unexpected,
     resign: unexpected,
+    botRetry: unexpected,
     eventsUrl: (id) => `/api/games/${id}/events`,
     ...overrides,
   };
@@ -245,5 +246,54 @@ describe("game controller", () => {
     await h.controller.newGame("w");
     expect(h.state().error).toBe("Cannot reach the game server.");
     expect(h.sources).toEqual([]);
+  });
+
+  it("retries the bot after a failure and shows the bot thinking; the move then arrives over SSE (#23)", async () => {
+    const retried: string[] = [];
+    const h = harness(
+      fakeApi({
+        newGame: async () => view({ playerColor: "b", botThinking: true }),
+        botRetry: async (id) => {
+          retried.push(id);
+          return view({ playerColor: "b", botThinking: true });
+        },
+      }),
+    );
+    await h.controller.newGame("b");
+    const es = h.sources[0]!;
+    es.emit("state", { type: "state", game: view({ playerColor: "b" }) });
+    es.emit("error", { type: "error", message: "engine crashed" });
+    expect(h.state().error).toBe("engine crashed");
+
+    await h.controller.retryBot();
+    expect(retried).toEqual(["g1"]);
+    expect(h.actions.at(-1)).toEqual({ type: "request_succeeded", game: view({ playerColor: "b", botThinking: true }) });
+    expect(h.state().game?.botThinking).toBe(true);
+    expect(h.state().error).toBeNull();
+
+    const e4 = { uci: "e2e4", san: "e4", by: "bot" as const };
+    es.emit("bot_move", { type: "bot_move", move: e4, game: view({ playerColor: "b", fen: AFTER_D4_FEN, moves: [e4] }) });
+    expect(h.state().game?.moves).toEqual([e4]);
+  });
+
+  it("does not call bot-retry when no retry is needed, and shows a 409 as an error", async () => {
+    let calls = 0;
+    const h = harness(
+      fakeApi({
+        newGame: async () => view(),
+        botRetry: async () => {
+          calls++;
+          throw new ApiRequestError(409, "Not possible right now: not the bot's turn");
+        },
+      }),
+    );
+    await h.controller.newGame("w");
+    await h.controller.retryBot(); // player's turn: no request
+    expect(calls).toBe(0);
+    h.sources[0]!.emit("state", { type: "state", game: view({ fen: AFTER_D4_FEN, moves: [D4] }) });
+    await h.controller.retryBot();
+    expect(calls).toBe(1);
+    expect(h.state().error).toBe("Not possible right now: not the bot's turn");
+    expect(h.state().busy).toBe(false);
   });
 });

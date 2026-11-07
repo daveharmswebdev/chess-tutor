@@ -17,6 +17,8 @@ export interface ApiClient {
   playMove(id: string, uci: string): Promise<GameView>;
   takeback(id: string): Promise<GameView>;
   resign(id: string): Promise<GameView>;
+  /** Asks the bot to try its move again after a failure (#23). */
+  botRetry(id: string): Promise<GameView>;
   eventsUrl(id: string): string;
 }
 
@@ -83,6 +85,7 @@ export function createApiClient(options: ApiClientOptions = {}): ApiClient {
     playMove: (id, uci) => request(`${gameUrl(id)}/moves`, "POST", { uci } satisfies PlayMoveRequest),
     takeback: (id) => request(`${gameUrl(id)}/takeback`, "POST"),
     resign: (id) => request(`${gameUrl(id)}/resign`, "POST"),
+    botRetry: (id) => request(`${gameUrl(id)}/bot-retry`, "POST"),
     eventsUrl: (id) => `${gameUrl(id)}/events`,
   };
 }

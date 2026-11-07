@@ -1,19 +1,13 @@
-// Board UI: choose a color, play the sparring bot, take back, resign. FR-1, FR-4, IR-5.
+// Board UI: choose a color, play the sparring bot, take back, resign, retry a failed bot move.
+// FR-1, FR-4, IR-5, #23.
 import type { Color, MoveView } from "@chess-tutor/chess-core";
 import { useEffect, useMemo, useState, useSyncExternalStore, type CSSProperties } from "react";
 import { Chessboard, type ChessboardOptions } from "react-chessboard";
 import { createApiClient } from "./api.ts";
 import { isOwnPiece, legalTargets, moveToUci } from "./chess-rules.ts";
 import { createGameController } from "./controller.ts";
-import {
-  boardFen,
-  canResign,
-  canTakeback,
-  gameReducer,
-  initialGameState,
-  isPlayersTurn,
-  statusText,
-} from "./game-state.ts";
+import { GameActions } from "./GameActions.tsx";
+import { boardFen, gameReducer, initialGameState, isPlayersTurn, statusText } from "./game-state.ts";
 import { createStore } from "./store.ts";
 
 const SELECTED: CSSProperties = { background: "rgba(255, 213, 79, 0.55)" };
@@ -162,14 +156,7 @@ export function App() {
           <div className="panel">
             <h2>Moves</h2>
             <MoveList moves={game?.moves ?? []} />
-            <div className="actions">
-              <button type="button" data-testid="takeback" disabled={!canTakeback(state)} onClick={() => void controller.takeback()}>
-                Takeback
-              </button>
-              <button type="button" data-testid="resign" disabled={!canResign(state)} onClick={() => void controller.resign()}>
-                Resign
-              </button>
-            </div>
+            <GameActions state={state} controller={controller} />
           </div>
 
           <div className="panel tutor" data-testid="tutor-panel">

@@ -125,6 +125,22 @@ export function canTakeback(state: GameState): boolean {
   );
 }
 
+/**
+ * True when the bot should move but is not thinking: the state a bot failure leaves behind
+ * (#23). The player can then ask the server to retry (POST /api/games/:id/bot-retry).
+ */
+export function canRetryBot(state: GameState): boolean {
+  const g = state.game;
+  return (
+    g !== null &&
+    g.status === "playing" &&
+    !g.botThinking &&
+    !state.busy &&
+    state.pendingFen === null &&
+    sideToMove(g.fen) !== g.playerColor
+  );
+}
+
 export function canResign(state: GameState): boolean {
   const g = state.game;
   return g !== null && g.status === "playing" && !state.busy;
@@ -161,5 +177,6 @@ export function statusText(state: GameState): string {
   if (g.status === "finished") return resultText(g);
   if (g.botThinking || state.pendingFen !== null) return "Bot is thinking...";
   if (isPlayersTurn(state)) return "Your move.";
+  if (canRetryBot(state)) return "The bot did not move. Retry the bot move.";
   return "Waiting for the server...";
 }

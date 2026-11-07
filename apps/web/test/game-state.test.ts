@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   boardFen,
   canResign,
+  canRetryBot,
   canTakeback,
   gameReducer,
   initialGameState,
@@ -180,5 +181,41 @@ describe("game reducer: result texts", () => {
   ];
   it.each(cases)("%o -> %s", (overrides, text) => {
     expect(statusText(started(overrides))).toBe(text);
+  });
+});
+
+describe("game reducer: retrying the bot after a failure (#23)", () => {
+  const failedFirstMove = { playerColor: "b" as const, fen: START_FEN, moves: [] };
+
+  it("allows a retry when playing, the bot is not thinking and it is the bot's turn", () => {
+    expect(canRetryBot(started(failedFirstMove))).toBe(true); // fresh Black game, zero moves
+    expect(canRetryBot(started({ fen: AFTER_D4_FEN, moves: [D4] }))).toBe(true); // mid-game failure
+  });
+
+  it("does not allow a retry before a game, while the bot thinks, on the player's turn or after the game", () => {
+    expect(canRetryBot(initialGameState)).toBe(false);
+    expect(canRetryBot(started({ ...failedFirstMove, botThinking: true }))).toBe(false);
+    expect(canRetryBot(started({ fen: AFTER_D4_FEN, moves: [D4], botThinking: true }))).toBe(false);
+    expect(canRetryBot(started())).toBe(false); // White, player's turn
+    expect(canRetryBot(started({ fen: AFTER_D4_D5_FEN, moves: [D4, D5] }))).toBe(false);
+    expect(canRetryBot(started({ ...failedFirstMove, status: "finished", result: "1-0", endReason: "resigned" }))).toBe(false);
+    expect(canRetryBot(started({ ...failedFirstMove, status: "abandoned", endReason: "abandoned" }))).toBe(false);
+  });
+
+  it("does not allow a retry while another request is in flight", () => {
+    const s = gameReducer(started(failedFirstMove), { type: "request_started" });
+    expect(canRetryBot(s)).toBe(false);
+  });
+
+  it("tells the player the bot did not move after a failure, and clears the error on retry", () => {
+    let s = started(failedFirstMove);
+    s = gameReducer(s, { type: "server_event", event: { type: "error", message: "engine crashed" } });
+    expect(statusText(s)).toBe("The bot did not move. Retry the bot move.");
+    expect(s.error).toBe("engine crashed");
+    s = gameReducer(s, { type: "request_started" });
+    s = gameReducer(s, { type: "request_succeeded", game: view({ ...failedFirstMove, botThinking: true }) });
+    expect(s.error).toBeNull();
+    expect(statusText(s)).toBe("Bot is thinking...");
+    expect(canRetryBot(s)).toBe(false);
   });
 });
