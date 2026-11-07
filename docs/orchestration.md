@@ -83,16 +83,24 @@ verify: git diff == files_changed · re-run gate · read brief_defects → merge
 
 Briefs are kept in `.claude/orchestration/briefs/` (tracked), so every round can be replayed.
 
-## Workflow
+## Workflow and visibility
 
-The `/delegate` skill walks through the steps:
-1. decide whether to delegate;
-2. decompose against the requirement IDs;
-3. commit the base and check every premise;
-4. write the brief;
-5. render and launch it;
-6. verify the return;
-7. record the verdict.
+The user tracks progress on **GitHub**, not in code:
+[issues](https://github.com/daveharmswebdev/chess-tutor/issues) and the
+[project board](https://github.com/users/daveharmswebdev/projects/5), with columns
+Needs you → Todo → In Progress → In Review → Done, a Kind field and a Priority field.
+Dependencies are GitHub "blocked by" links, so a card shows why it hasn't started.
+
+| Skill | What it does |
+|---|---|
+| `/cycle [parallel] [rounds]` | The usual loop: orient, triage gaps, pick READY issues, work them in parallel worktrees, ship, repeat. Keeps a ledger in `.git/cycle-ledger.md` |
+| `/orient` | A read-only snapshot (forked agent): in flight, landed, READY, blocked, untracked gaps |
+| `/triage` | Files gaps and findings as readable issues: deduped, clustered, on the board, with blocked-by links |
+| `/delegate` | One issue, one spoke: claim, brief, launch, verify |
+| `/ship` | A PR written for the user, CI green, squash merge, board to Done, worktree cleanup |
+
+Scripts: `.claude/scripts/board.ts` (set Status, Kind and Priority; P0/P1 need the user's
+approval) and `.claude/scripts/ready.ts` (which issues are unblocked and unclaimed).
 
 ## Known limits
 

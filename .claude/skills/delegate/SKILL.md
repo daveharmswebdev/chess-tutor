@@ -1,6 +1,6 @@
 ---
 name: delegate
-description: Hand a scoped task to one of chess-tutor's spokes (engine/core/explorer/tutor/server/web-agent, reviewer, researcher): decide whether to delegate, check the premises, write a schema-checked brief, render it, launch it in a worktree, then verify the hook-checked return. Use for every delegation in this repo.
+description: Hand one scoped task to one of chess-tutor's spokes (engine/core/explorer/tutor/server/web-agent, reviewer, researcher): decide whether to delegate, check the premises, write a schema-checked brief, render it, launch it in a worktree, then verify the hook-checked return. Use for every delegation in this repo.
 argument-hint: "[agent] [task]"
 ---
 
@@ -29,6 +29,7 @@ and the board, not code). The board is project 5.
 
 ```bash
 node .claude/scripts/board.ts <n> --status "In Progress"
+gh issue edit <n> --add-label in-progress
 gh issue comment <n> --body "Started: <agent> is building this (brief <brief_id>)."
 ```
 
@@ -71,23 +72,11 @@ The hooks have already checked the shape, and `post-agent` tells you the verdict
      inside the brief's `scope`.
   2. Re-run the gate (`pnpm test && pnpm typecheck`) on that commit yourself.
   3. Read `brief_defects` and `contract_gaps`: these are *your* errors to fix.
-- Only after verification passes: push the spoke's branch as `issue-<n>-<slug>` and open the PR:
-
-  ```bash
-  gh pr create --title "<issue title>" --body-file <scratch>/pr.md   # body: Closes #<n>
-  node .claude/scripts/board.ts <n> --status "In Review"
-  gh pr checks <pr> --watch                                          # CI must be green
-  ```
-
-  The PR body is written **for the user**, who reads it instead of the code. Sections:
-  *What changed (plain language)*, *How to try it*, *Tests* (counts from your own re-run,
-  and the CI check), and a *Delegation record* (brief IDs, rounds, verdicts).
-- Run the reviewer (if the change warrants it) before merging. Blocking findings mean
-  another round, not a merge.
-- Merge with a squash once CI is green: `gh pr merge <pr> --squash --delete-branch`.
-  The merge closes the issue. Then `node .claude/scripts/board.ts <n> --status Done`
-  (the project's own automation is off; enable "Item closed → Done" in the project's
-  settings to make this automatic).
+- Only after verification passes, run the reviewer if the change warrants it (anything
+  beyond a trivial change does). Blocking findings mean another round, not a merge.
+  Non-blocking findings go to `/triage`.
+- Then `/ship <n>`: PR written for the user, board to In Review, CI green, squash merge,
+  board to Done, worktree cleanup.
 
 ## 7. Record
 
