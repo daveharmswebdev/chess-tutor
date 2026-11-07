@@ -1,5 +1,5 @@
-import { Chess } from "chess.js";
-import { playUci } from "./moves.ts";
+import { Chess, type Move } from "chess.js";
+import { playUci, toUci } from "./moves.ts";
 
 /*
  * Sparring bot (FR-1, FR-2, FR-3, architecture §3.3).
@@ -11,6 +11,7 @@ import { playUci } from "./moves.ts";
 
 /** Subset of @chess-tutor/explorer ExplorerMove that the bot reads. */
 export interface BotExplorerMove {
+  /** May spell castling as king-takes-rook (e1h1); the bot then falls back to san. */
   uci: string;
   san: string;
   games: number;
@@ -59,7 +60,12 @@ export interface BotMove {
   uci: string;
   san: string;
   source: "explorer" | "engine";
-  /** Present when source is "explorer". share = games / totalGames. */
+  /**
+   * Present when source is "explorer". share = games / totalGames: how often
+   * real players chose this move in the position. It is not the sampling
+   * probability, which is games / (sum of games over the listed moves), since
+   * the explorer lists only the top moves.
+   */
   explorer?: { games: number; totalGames: number; share: number };
   /** Present when source is "engine": why the explorer was not used. */
   fallbackReason?: BotFallbackReason;
@@ -107,6 +113,24 @@ function loadPosition(fen: string): Chess {
     throw new Error(`game over in position ${fen}: the bot has no move to make`);
   }
   return chess;
+}
+
+/**
+ * The legal chess.js move for an explorer entry, or null if it is not legal.
+ * Tries the UCI first, then the SAN: Lichess may spell castling as
+ * king-takes-own-rook (e8h8), which playUci rejects but "O-O" resolves.
+ */
+function resolveExplorerMove(fen: string, entry: BotExplorerMove): Move | null {
+  try {
+    return playUci(new Chess(fen), entry.uci);
+  } catch {
+    // fall through to SAN
+  }
+  try {
+    return new Chess(fen).move(entry.san);
+  } catch {
+    return null;
+  }
 }
 
 /** Weighted pick by games; candidates must all have games > 0. */
@@ -162,21 +186,21 @@ export function createSparringBot(options: SparringBotOptions): SparringBot {
       while (candidates.length > 0) {
         const index = pickWeighted(candidates, random);
         const picked = candidates[index]!;
-        try {
-          const move = playUci(new Chess(fen), picked.uci);
-          return {
-            uci: picked.uci,
-            san: move.san,
-            source: "explorer",
-            explorer: {
-              games: picked.games,
-              totalGames: result.totalGames,
-              share: picked.games / result.totalGames,
-            },
-          };
-        } catch {
+        const move = resolveExplorerMove(fen, picked);
+        if (move === null) {
           candidates.splice(index, 1); // never return an unchecked move (FR-10)
+          continue;
         }
+        return {
+          uci: toUci(move),
+          san: move.san,
+          source: "explorer",
+          explorer: {
+            games: picked.games,
+            totalGames: result.totalGames,
+            share: picked.games / result.totalGames,
+          },
+        };
       }
       return engineMove(fen, "illegal_explorer_move");
     },

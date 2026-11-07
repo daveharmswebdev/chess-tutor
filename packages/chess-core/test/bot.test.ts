@@ -173,6 +173,90 @@ describe("createSparringBot: explorer sampling (FR-2)", () => {
     expect(move.uci).toBe("d2d4");
     expect(move.source).toBe("explorer");
   });
+
+  it("recomputes weights over the remaining moves after dropping an illegal one", async () => {
+    const moves = [mv("e2e5", 50), mv("d2d4", 25), mv("c2c4", 25)];
+    // After the splice the remaining total is 50: 0.6 * 50 = 30 >= 25 -> c2c4,
+    // and 0.4 * 50 = 20 < 25 -> d2d4 (a stale total of 100 would give 40 -> c2c4).
+    for (const [r, expected] of [
+      [0.6, "c2c4"],
+      [0.4, "d2d4"],
+    ] as const) {
+      const bot = createSparringBot({
+        explorer: fakeExplorer(result(moves)),
+        engine: fakeEngine(),
+        config: CONFIG,
+        random: fixedRandom(0, r),
+      });
+      const move = await bot.chooseMove(START);
+      expect(move.uci, `second random ${r}`).toBe(expected);
+      expect(move.source).toBe("explorer");
+    }
+  });
+});
+
+describe("createSparringBot: castling spelled king-takes-rook (FR-2, FR-10)", () => {
+  const CASTLE_W = "r3k2r/8/8/8/8/8/8/R3K2R w KQkq - 0 1";
+  const CASTLE_B = "r3k2r/8/8/8/8/8/8/R3K2R b KQkq - 0 1";
+  /** 1.d4 Nf6 2.Bf4 g6 3.e3 Bg7 4.Nf3 d6 5.Be2: Black to move, O-O legal. */
+  const KID_LONDON = "rnbqk2r/ppp1ppbp/3p1np1/8/3P1B2/4PN2/PPP1BPPP/RN1QK2R b KQkq - 1 5";
+
+  it.each([
+    ["White O-O", "e1h1", CASTLE_W, "O-O", "e1g1"],
+    ["White O-O-O", "e1a1", CASTLE_W, "O-O-O", "e1c1"],
+    ["Black O-O", "e8h8", CASTLE_B, "O-O", "e8g8"],
+    ["Black O-O-O", "e8a8", CASTLE_B, "O-O-O", "e8c8"],
+    ["standard Black O-O", "e8g8", CASTLE_B, "O-O", "e8g8"],
+  ])("%s given as %s returns standard UCI", async (_label, uci, fen, san, expected) => {
+    const bot = createSparringBot({
+      explorer: fakeExplorer(result([{ uci, san, games: 50 }])),
+      engine: fakeEngine(),
+      config: CONFIG,
+      random: fixedRandom(0),
+    });
+    const move = await bot.chooseMove(fen);
+    expect(move.uci).toBe(expected);
+    expect(move.san).toBe(san);
+    expect(move.source).toBe("explorer");
+  });
+
+  it("plays book castling in the reviewer's London vs KID position", async () => {
+    const bot = createSparringBot({
+      explorer: fakeExplorer(
+        result(
+          [
+            { uci: "e8h8", san: "O-O", games: 600 },
+            { uci: "c7c5", san: "c5", games: 100 },
+          ],
+          900,
+        ),
+      ),
+      engine: fakeEngine(),
+      config: CONFIG,
+      random: fixedRandom(0),
+    });
+    expect(await bot.chooseMove(KID_LONDON)).toEqual({
+      uci: "e8g8",
+      san: "O-O",
+      source: "explorer",
+      explorer: { games: 600, totalGames: 900, share: 600 / 900 },
+    });
+  });
+
+  it("still drops a move whose uci and san are both illegal", async () => {
+    const bot = createSparringBot({
+      explorer: fakeExplorer(
+        result([
+          { uci: "e2e5", san: "e5", games: 90 },
+          { uci: "d2d4", san: "d4", games: 10 },
+        ]),
+      ),
+      engine: fakeEngine(),
+      config: CONFIG,
+      random: fixedRandom(0),
+    });
+    expect((await bot.chooseMove(START)).uci).toBe("d2d4");
+  });
 });
 
 describe("createSparringBot: engine fallback (FR-3)", () => {

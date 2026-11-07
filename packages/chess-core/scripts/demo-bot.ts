@@ -56,7 +56,7 @@ function loadBotConfig(): BotConfig {
 function describeBotMove(move: BotMove, elo: number): string {
   if (move.source === "explorer" && move.explorer) {
     const { games, totalGames, share } = move.explorer;
-    return `from explorer (${games} of ${totalGames} games, ${(share * 100).toFixed(1)}%)`;
+    return `from explorer (${games} of ${totalGames} games, ${(share * 100).toFixed(1)}% of players)`;
   }
   return `from engine (~${elo}) - ${move.fallbackReason ?? "out of book"}`;
 }
@@ -75,22 +75,26 @@ async function main(): Promise<number> {
   }
 
   const config = loadBotConfig();
-  const cache = createSqliteExplorerCache(":memory:");
-  const explorer = createExplorerClient({ token, cache });
-  const engine = createEngineFromEnv();
-  const bot = createSparringBot({ explorer, engine, config });
-
-  const chess = new Chess();
-  const humanColor = as === "white" ? "w" : "b";
-  const script = [...(as === "white" ? LONDON : KID)];
-
-  console.log(`You (scripted) play ${as}; the bot plays ${as === "white" ? "black" : "white"}.`);
-  console.log(
-    `Bot: explorer ratings ${config.explorerRatings.join("/")}, speeds ${config.explorerSpeeds.join("/")}, ` +
-      `min ${config.minGames} games, then engine ~${config.outOfBookElo}.\n`,
-  );
-
+  // Everything that holds a resource is created inside the try, so a bad
+  // config (thrown by createSparringBot) still quits the engine and closes the cache.
+  let cache: ReturnType<typeof createSqliteExplorerCache> | undefined;
+  let engine: ReturnType<typeof createEngineFromEnv> | undefined;
   try {
+    cache = createSqliteExplorerCache(":memory:");
+    const explorer = createExplorerClient({ token, cache });
+    engine = createEngineFromEnv();
+    const bot = createSparringBot({ explorer, engine, config });
+
+    const chess = new Chess();
+    const humanColor = as === "white" ? "w" : "b";
+    const script = [...(as === "white" ? LONDON : KID)];
+
+    console.log(`You (scripted) play ${as}; the bot plays ${as === "white" ? "black" : "white"}.`);
+    console.log(
+      `Bot: explorer ratings ${config.explorerRatings.join("/")}, speeds ${config.explorerSpeeds.join("/")}, ` +
+        `min ${config.minGames} games, then engine ~${config.outOfBookElo}.\n`,
+    );
+
     for (let ply = 0; ply < fullMoves * 2 && !chess.isGameOver(); ply++) {
       const fen = chess.fen();
       const moveNo = chess.moveNumber();
@@ -125,8 +129,8 @@ async function main(): Promise<number> {
     console.log(`PGN: ${chess.pgn()}`);
     return 0;
   } finally {
-    await engine.quit();
-    cache.close();
+    await engine?.quit();
+    cache?.close();
   }
 }
 
