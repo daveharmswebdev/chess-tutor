@@ -1,3 +1,7 @@
+import { mkdtempSync, rmSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
+import { DatabaseSync } from "node:sqlite";
 import { afterEach, describe, expect, it } from "vitest";
 import { createSqliteExplorerCache, type ExplorerResult } from "../src/index.ts";
 
@@ -40,6 +44,27 @@ describe("createSqliteExplorerCache", () => {
     const updated = { ...RESULT, totalGames: 1 };
     c.set("k", updated, 1000);
     expect(c.get("k", 1500)).toEqual(updated);
+  });
+
+  it("treats a corrupt row (bad JSON or wrong shape) as a miss, and a later set repairs it", () => {
+    const dir = mkdtempSync(join(tmpdir(), "explorer-cache-"));
+    try {
+      const path = join(dir, "cache.db");
+      const c = createSqliteExplorerCache(path);
+      open.push(c);
+      const raw = new DatabaseSync(path);
+      const insert = raw.prepare("INSERT OR REPLACE INTO explorer_cache (key, body, fetched_at) VALUES (?, ?, ?)");
+      insert.run("bad-json", "{not json", 0);
+      insert.run("bad-shape", JSON.stringify({ moves: "nope" }), 0);
+      raw.close();
+      expect(c.get("bad-json", 1)).toBeUndefined();
+      expect(c.get("bad-shape", 1)).toBeUndefined();
+      c.set("bad-json", RESULT, 2);
+      expect(c.get("bad-json", 3)).toEqual(RESULT);
+    } finally {
+      for (const c of open.splice(0)) c.close();
+      rmSync(dir, { recursive: true, force: true });
+    }
   });
 
   it("refuses to store an unavailable result", () => {

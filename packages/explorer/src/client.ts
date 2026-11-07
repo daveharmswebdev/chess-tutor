@@ -11,10 +11,21 @@ export interface ExplorerClientOptions {
   /** Lichess personal token (no permissions needed). The caller reads it from LICHESS_TOKEN. */
   token: string;
   cache: ExplorerCache;
+  /**
+   * Injected fetch (tests, proxies). It must honour the AbortSignal it is given: on a
+   * timeout the client aborts and moves on to the next queued request, so a fetch that
+   * ignores the signal would leave a request running and break one-request-at-a-time.
+   */
   fetch?: typeof fetch;
   now?: () => number;
-  /** Per-request timeout, covering the response body. Default 3000 ms. */
+  /** Per-request timeout, covering the response body. Default 1500 ms (NFR-3: bot replies within 2 s). */
   timeoutMs?: number;
+  /**
+   * After a timeout, network error or 5xx, lookups that need the network return
+   * unavailable (same reason) without fetching for this long. Default 30000 ms.
+   * A 429 uses Retry-After instead; bad_response starts no cooldown.
+   */
+  failureCooldownMs?: number;
   /** Default https://explorer.lichess.ovh */
   baseUrl?: string;
   /** How many candidate moves to ask for. Default 12. */
@@ -26,7 +37,8 @@ export interface ExplorerClient {
 }
 
 const DEFAULT_BASE_URL = "https://explorer.lichess.ovh";
-const DEFAULT_TIMEOUT_MS = 3000;
+export const DEFAULT_TIMEOUT_MS = 1500;
+export const DEFAULT_FAILURE_COOLDOWN_MS = 30_000;
 const DEFAULT_MOVES = 12;
 const DEFAULT_RETRY_AFTER_MS = 60_000;
 
@@ -62,8 +74,12 @@ function retryAfterMs(header: string | null, nowMs: number): number {
   if (header === null || header.trim() === "") return DEFAULT_RETRY_AFTER_MS;
   const v = header.trim();
   if (/^\d+$/.test(v)) return Number(v) * 1000;
-  const date = Date.parse(v);
-  if (Number.isFinite(date)) return Math.max(0, date - nowMs);
+  // Only something that looks like an HTTP-date ("Wed, 21 Oct 2026 07:28:00 GMT") is
+  // parsed as one; "1.5" or "-5" would otherwise parse as odd dates in the past.
+  if (/[a-z]/i.test(v)) {
+    const date = Date.parse(v);
+    if (Number.isFinite(date)) return Math.max(0, date - nowMs);
+  }
   return DEFAULT_RETRY_AFTER_MS;
 }
 
@@ -90,10 +106,29 @@ export function createExplorerClient(opts: ExplorerClientOptions): ExplorerClien
   const timeoutMs = opts.timeoutMs ?? DEFAULT_TIMEOUT_MS;
   const baseUrl = (opts.baseUrl ?? DEFAULT_BASE_URL).replace(/\/+$/, "");
   const movesParam = opts.moves ?? DEFAULT_MOVES;
+  const failureCooldownMs = opts.failureCooldownMs ?? DEFAULT_FAILURE_COOLDOWN_MS;
 
   let queue: Promise<unknown> = Promise.resolve();
   const inFlight = new Map<string, Promise<ExplorerResult>>();
   let cooldownUntil = 0;
+  let cooldownReason: OutOfBookReason = "rate_limited";
+
+  /** A cache fault is a local problem, never a reason to fail a lookup: get failing is a miss. */
+  function cacheGet(key: string): ExplorerResult | undefined {
+    try {
+      return cache.get(key, now());
+    } catch {
+      return undefined;
+    }
+  }
+  /** set failing is ignored: the fetched result is still returned. */
+  function cacheSet(key: string, value: ExplorerResult): void {
+    try {
+      cache.set(key, value, now());
+    } catch {
+      // ignored on purpose
+    }
+  }
 
   async function request(fen: string, options: LookupOptions): Promise<Outcome> {
     const { ratings, speeds } = sortedOptions(options);
@@ -121,8 +156,10 @@ export function createExplorerClient(opts: ExplorerClientOptions): ExplorerClien
         headers: { Authorization: `Bearer ${token}`, Accept: "application/json" },
         signal: controller.signal,
       });
-      const body = res.ok ? await res.text() : undefined;
-      return { res, body };
+      if (res.ok) return { res, body: await res.text() };
+      // Release the connection: we never read the body of a non-ok response.
+      await res.body?.cancel().catch(() => {});
+      return { res, body: undefined };
     })();
     exchange.catch(() => {}); // may settle after the timeout won the race
 
@@ -159,23 +196,34 @@ export function createExplorerClient(opts: ExplorerClientOptions): ExplorerClien
   }
 
   async function run(key: string, fen: string, options: LookupOptions): Promise<ExplorerResult> {
-    const cached = cache.get(key, now());
+    const cached = cacheGet(key);
     if (cached) return cached;
-    if (now() < cooldownUntil) return outOfBook("rate_limited");
+    if (now() < cooldownUntil) return outOfBook(cooldownReason);
 
     const outcome = await request(fen, options);
     if (outcome.kind === "unavailable") {
-      if (outcome.retryAfterMs !== undefined) cooldownUntil = now() + outcome.retryAfterMs;
+      const pause =
+        outcome.retryAfterMs ?? (outcome.reason === "bad_response" ? undefined : failureCooldownMs);
+      if (pause !== undefined) {
+        cooldownUntil = now() + pause;
+        cooldownReason = outcome.reason;
+      }
       return outOfBook(outcome.reason);
     }
-    cache.set(key, outcome.result, now());
+    cacheSet(key, outcome.result);
     return outcome.result;
   }
 
   return {
     lookup(fen, options) {
-      const key = cacheKey(fen, options);
-      const cached = cache.get(key, now());
+      // Always a Promise: nothing in here may throw synchronously at the caller.
+      let key: string;
+      try {
+        key = cacheKey(fen, options);
+      } catch (e) {
+        return Promise.reject(e);
+      }
+      const cached = cacheGet(key);
       if (cached) return Promise.resolve(cached);
       const existing = inFlight.get(key);
       if (existing) return existing;

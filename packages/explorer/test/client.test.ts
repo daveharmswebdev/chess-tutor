@@ -1,9 +1,10 @@
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
-import { afterEach, describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import {
   cacheKey,
   createExplorerClient,
+  DEFAULT_TIMEOUT_MS,
   createSqliteExplorerCache,
   ExplorerConfigError,
   type ExplorerCache,
@@ -281,17 +282,172 @@ describe("out of book", () => {
   ];
 
   for (const [name, respond, reason, timeoutMs] of cases) {
-    it(`${name} returns unavailable ${reason} and is not cached`, async () => {
+    const cools = reason !== "bad_response";
+    it(`${name} returns unavailable ${reason}, is not cached, and ${cools ? "starts a 30 s cooldown" : "starts no cooldown"}`, async () => {
       let broken = true;
-      const { client, calls } = setup(
+      const { client, calls, clock } = setup(
         (c, init) => (broken ? respond(c, init) : new Response(FIXTURE)),
         timeoutMs === undefined ? {} : { timeoutMs },
       );
       expect(await client.lookup(FEN, OPTS)).toEqual({ ...OUT, unavailable: reason });
       broken = false;
+      if (cools) {
+        // Within the cooldown: another uncached lookup gets the same reason without fetching.
+        clock.t += 29_999;
+        expect(await client.lookup(OTHER_FEN, OPTS)).toEqual({ ...OUT, unavailable: reason });
+        expect(calls).toHaveLength(1);
+        clock.t += 1;
+      }
       const r = await client.lookup(FEN, OPTS);
       expect(r.unavailable).toBeUndefined();
       expect(r.moves).toHaveLength(6);
+      expect(calls).toHaveLength(2);
+    });
+  }
+
+  it("the failure cooldown is configurable through failureCooldownMs", async () => {
+    let broken = true;
+    const clock = { t: 0 };
+    const { fetch, calls } = fakeFetch(() => (broken ? new Response("", { status: 502 }) : new Response(FIXTURE)));
+    const client = createExplorerClient({ token: TOKEN, cache: memoryCache(), fetch, now: () => clock.t, failureCooldownMs: 5_000 });
+    expect((await client.lookup(FEN, OPTS)).unavailable).toBe("server_error");
+    broken = false;
+    clock.t = 4_999;
+    expect((await client.lookup(FEN, OPTS)).unavailable).toBe("server_error");
+    clock.t = 5_000;
+    expect((await client.lookup(FEN, OPTS)).unavailable).toBeUndefined();
+    expect(calls).toHaveLength(2);
+  });
+
+  it("cache hits are still served during a cooldown", async () => {
+    let broken = false;
+    const { client, calls } = setup(() => (broken ? new Response("", { status: 500 }) : new Response(FIXTURE)));
+    await client.lookup(FEN, OPTS);
+    broken = true;
+    expect((await client.lookup(OTHER_FEN, OPTS)).unavailable).toBe("server_error");
+    expect((await client.lookup(FEN, OPTS)).moves).toHaveLength(6);
+    expect(calls).toHaveLength(2);
+  });
+
+  for (const header of ["1.5", "-5"]) {
+    it(`a 429 with an unparseable Retry-After "${header}" falls back to 60 s`, async () => {
+      let first = true;
+      const { client, calls, clock } = setup(() => {
+        if (first) {
+          first = false;
+          return new Response("", { status: 429, headers: { "Retry-After": header } });
+        }
+        return new Response(FIXTURE);
+      });
+      expect((await client.lookup(FEN, OPTS)).unavailable).toBe("rate_limited");
+      clock.t += 59_999;
+      expect((await client.lookup(FEN, OPTS)).unavailable).toBe("rate_limited");
+      expect(calls).toHaveLength(1);
+      clock.t += 1;
+      expect((await client.lookup(FEN, OPTS)).unavailable).toBeUndefined();
+    });
+  }
+
+  for (const status of [401, 404, 429, 500]) {
+    it(`cancels the body of a ${status} response`, async () => {
+      let cancelled = false;
+      const body = new ReadableStream({
+        pull() {},
+        cancel() {
+          cancelled = true;
+        },
+      });
+      const { client } = setup(() => new Response(body, { status }));
+      await client.lookup(FEN, OPTS).catch(() => undefined);
+      expect(cancelled).toBe(true);
+    });
+  }
+
+  it("parses a response with the opening field missing (not null) as opening null", async () => {
+    const raw = JSON.parse(FIXTURE) as Record<string, unknown>;
+    delete raw["opening"];
+    const { client } = setup(() => new Response(JSON.stringify(raw)));
+    const r = await client.lookup(FEN, OPTS);
+    expect(r.opening).toBeNull();
+    expect(r.moves).toHaveLength(6);
+  });
+});
+
+describe("default timeout (NFR-3)", () => {
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
+  it("is 1500 ms", async () => {
+    expect(DEFAULT_TIMEOUT_MS).toBe(1500);
+    vi.useFakeTimers({ toFake: ["setTimeout", "clearTimeout"] });
+    const { fetch } = fakeFetch(() => new Promise<Response>(() => {}));
+    const client = createExplorerClient({ token: TOKEN, cache: memoryCache(), fetch });
+    let result: unknown;
+    void client.lookup(FEN, OPTS).then((r) => (result = r));
+    await vi.advanceTimersByTimeAsync(1499);
+    expect(result).toBeUndefined();
+    await vi.advanceTimersByTimeAsync(1);
+    expect(result).toEqual({ moves: [], totalGames: 0, opening: null, unavailable: "timeout" });
+  });
+});
+
+describe("a faulty cache never breaks a lookup", () => {
+  const throwing: ExplorerCache = {
+    get() {
+      throw new Error("disk I/O error");
+    },
+    set() {
+      throw new Error("database is locked");
+    },
+  };
+
+  it("lookup returns a promise, treats a get failure as a miss and ignores a set failure", async () => {
+    const { client, calls } = setup(undefined, { cache: throwing });
+    let p: Promise<unknown> | undefined;
+    expect(() => {
+      p = client.lookup(FEN, OPTS);
+    }).not.toThrow();
+    expect(p).toBeInstanceOf(Promise);
+    const r = (await p) as { moves: unknown[]; unavailable?: string };
+    expect(r.unavailable).toBeUndefined();
+    expect(r.moves).toHaveLength(6);
+    expect(calls).toHaveLength(1);
+  });
+});
+
+describe("same-key waiters on a failing request", () => {
+  const failures: [string, Responder, string, number, number?][] = [
+    ["429", () => new Response("", { status: 429, headers: { "Retry-After": "10" } }), "rate_limited", 10_000],
+    [
+      "timeout",
+      (_c, init) =>
+        new Promise<Response>((_r, reject) => {
+          init?.signal?.addEventListener("abort", () => reject(new DOMException("aborted", "AbortError")));
+        }),
+      "timeout",
+      30_000,
+      20,
+    ],
+  ];
+  for (const [name, respond, reason, cooldown, timeoutMs] of failures) {
+    it(`all waiters get unavailable ${reason} on a ${name}, and can refetch after the cooldown`, async () => {
+      let broken = true;
+      const { client, calls, clock } = setup(
+        (c, init) => (broken ? respond(c, init) : new Response(FIXTURE)),
+        timeoutMs === undefined ? {} : { timeoutMs },
+      );
+      const results = await Promise.all([
+        client.lookup(FEN, OPTS),
+        client.lookup(FEN, OPTS),
+        client.lookup(FEN, { ratings: [1400, 1200], speeds: ["rapid", "blitz"] }),
+      ]);
+      for (const r of results) expect(r).toEqual({ moves: [], totalGames: 0, opening: null, unavailable: reason });
+      expect(calls).toHaveLength(1);
+      broken = false;
+      clock.t += cooldown;
+      const after = await client.lookup(FEN, OPTS);
+      expect(after.moves).toHaveLength(6);
       expect(calls).toHaveLength(2);
     });
   }
