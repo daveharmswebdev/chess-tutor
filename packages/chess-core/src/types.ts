@@ -37,6 +37,12 @@ export interface KeyMomentThresholds {
   blunderCp: number;
   missedWinCp: number;
   punishCp: number;
+  /**
+   * The player's own drops stay quiet (no player_blunder or missed_win) while the
+   * player's evaluation after the move is strictly above this, unless a forced mate
+   * for the player was missed (#16). Opponent moves are not affected.
+   */
+  stillWinningCp: number;
 }
 
 export interface RepertoireLineInput {
