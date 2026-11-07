@@ -184,6 +184,13 @@ importers:
       chess.js:
         specifier: ^1.4.0
         version: 1.4.0
+    devDependencies:
+      '@chess-tutor/engine':
+        specifier: workspace:*
+        version: link:../engine
+      '@chess-tutor/explorer':
+        specifier: workspace:*
+        version: link:../explorer
 
   packages/engine:
     dependencies:

@@ -9,7 +9,8 @@
   "scripts": {
     "test": "vitest run",
     "typecheck": "pnpm -r typecheck && tsc -p .claude/hooks --noEmit",
-    "spike:engine": "pnpm --filter @chess-tutor/engine spike"
+    "spike:engine": "pnpm --filter @chess-tutor/engine spike",
+    "demo:bot": "pnpm --filter @chess-tutor/chess-core demo:bot"
   },
   "devDependencies": {
     "@types/node": "^26.6.6",
