@@ -170,6 +170,12 @@ export function postAgent(input: HookInput, ownership: Ownership): object | null
     log("agent_complete", entry);
     return null;
   }
+  // A background launch returns before the spoke has reported anything: there is no verdict yet.
+  if (tr.status === "async_launched") {
+    log("agent_complete", { ...entry, contract: "pending" });
+    const note = `Contract: ${type} (brief ${briefId}) was launched in the background, so there is no return to check yet. When it hands back, pre-handback or subagent-stop logs the verdict (return_valid / return_invalid / contract_failed) for agent ${agentId} in .claude/orchestration/log.jsonl; read it there before using the return.`;
+    return { hookSpecificOutput: { hookEventName: "PostToolUse", additionalContext: note } };
+  }
   // The return was checked by pre-handback or subagent-stop; report the latest verdict.
   const verdict = [...readLog()].reverse().find(
     (e) => e.agent_id === agentId && ["return_valid", "return_invalid", "contract_failed"].includes(String(e.event)),

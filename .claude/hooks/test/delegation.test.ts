@@ -142,6 +142,12 @@ describe("return gates", () => {
     expect(JSON.stringify(ok)).toMatch(/passed schema validation/);
     const unchecked = postAgent({ tool_input: { subagent_type: "core-agent", prompt: "" }, tool_response: { agentId: "zz" } }, ownership);
     expect(JSON.stringify(unchecked)).toMatch(/UNCHECKED/);
+    const launched = postAgent(
+      { tool_input: { subagent_type: "core-agent", prompt: "" }, tool_response: { agentId: "bg1", status: "async_launched" } },
+      ownership,
+    );
+    expect(JSON.stringify(launched)).toMatch(/launched in the background/);
+    expect(JSON.stringify(launched)).not.toMatch(/UNCHECKED|round as failed/);
   });
 });
 
