@@ -1,0 +1,20 @@
+{"ts":"2026-11-07T19:05:06.475Z","event":"dispatch","subagent_type":"core-agent","brief_id":"003-key-moment-detector-r1","base_sha":"05c2776","spoke":true}
+{"ts":"2026-11-07T19:05:29.889Z","event":"dispatch","subagent_type":"explorer-agent","brief_id":"004-opening-explorer-r1","base_sha":"05c2776","spoke":true}
+{"ts":"2026-11-07T19:05:30.041Z","event":"agent_complete","subagent_type":"core-agent","brief_id":"003-key-moment-detector-r1","agent_id":"af2e828c671863965","status":"async_launched","contract":"unchecked"}
+{"ts":"2026-11-07T19:05:30.089Z","event":"agent_complete","subagent_type":"explorer-agent","brief_id":"004-opening-explorer-r1","agent_id":"a43f865fccded9dac","status":"async_launched","contract":"unchecked"}
+{"ts":"2026-11-07T19:08:45.438Z","event":"return_valid","agent_id":"a43f865fccded9dac","agent_type":"explorer-agent","via":"handback"}
+{"ts":"2026-11-07T19:09:29.481Z","event":"return_valid","agent_id":"af2e828c671863965","agent_type":"core-agent","via":"handback"}
+{"ts":"2026-11-07T19:09:31.059Z","event":"dispatch","subagent_type":"reviewer","brief_id":"005-review-explorer-r1","base_sha":"05c2776","spoke":true}
+{"ts":"2026-11-07T19:09:31.317Z","event":"agent_complete","subagent_type":"reviewer","brief_id":"005-review-explorer-r1","agent_id":"a79893d6a78254243","status":"async_launched","contract":"unchecked"}
+{"ts":"2026-11-07T19:10:19.419Z","event":"dispatch","subagent_type":"reviewer","brief_id":"006-review-detector-r1","base_sha":"05c2776","spoke":true}
+{"ts":"2026-11-07T19:10:19.602Z","event":"agent_complete","subagent_type":"reviewer","brief_id":"006-review-detector-r1","agent_id":"a2d7fc03466f04859","status":"async_launched","contract":"unchecked"}
+{"ts":"2026-11-07T19:11:38.071Z","event":"return_valid","agent_id":"a79893d6a78254243","agent_type":"reviewer","via":"handback"}
+{"ts":"2026-11-07T19:12:37.762Z","event":"coordinator_verdict","brief_id":"004-opening-explorer-r1","verdict":"re-delegated","reason":"verified (55 passed); review: 2 major (cache fault crash path, 3 s timeout over NFR-3) + minors, fixed in round 2 brief 007"}
+{"ts":"2026-11-07T19:13:40.114Z","event":"return_valid","agent_id":"a2d7fc03466f04859","agent_type":"reviewer","via":"handback"}
+{"ts":"2026-11-07T19:14:15.270Z","event":"return_valid","agent_id":"a43f865fccded9dac","agent_type":"explorer-agent","via":"handback"}
+{"ts":"2026-11-07T19:15:45.706Z","event":"coordinator_verdict","brief_id":"007-opening-explorer-r2","verdict":"accepted","reason":"verified 69 passed, review findings fixed"}
+{"ts":"2026-11-07T19:15:45.707Z","event":"shipped","issue":4,"pr":14}
+{"ts":"2026-11-07T19:15:53.301Z","event":"return_valid","agent_id":"af2e828c671863965","agent_type":"core-agent","via":"handback"}
+{"ts":"2026-11-07T19:17:24.371Z","event":"coordinator_verdict","brief_id":"003-key-moment-detector-r1","verdict":"re-delegated","reason":"review 006: blocking best-move eval drift"}
+{"ts":"2026-11-07T19:17:24.371Z","event":"coordinator_verdict","brief_id":"008-key-moment-detector-r2","verdict":"accepted","reason":"verified 138 passed after rebase; blocking fixed with reviewer probes as tests"}
+{"ts":"2026-11-07T19:17:24.371Z","event":"shipped","issue":3,"pr":15}

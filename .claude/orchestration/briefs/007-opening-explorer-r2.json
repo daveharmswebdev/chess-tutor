@@ -1,0 +1,31 @@
+{
+  "brief_id": "007-opening-explorer-r2",
+  "agent": "explorer-agent",
+  "issue": 4,
+  "base_sha": "3c182c8",
+  "scratch_dir": "/private/tmp/claude-501/-Users-daveharms-personal-workspace-chess-tutor/703e5c1b-071a-4aec-b8b0-200bbfb5337e/scratchpad/007-opening-explorer-r2",
+  "objective": "Round 2 on top of your round-1 commit 3c182c8 (same worktree and branch worktree-agent-a43f865fccded9dac): fix the reviewer findings listed in the contract so a slow Lichess stays inside the bot latency budget and a local cache fault never crashes or rejects a lookup. Commit on the same branch.",
+  "requirements": [
+    "FR-2",
+    "FR-18",
+    "IR-8"
+  ],
+  "contract": "State: round 1 (3c182c8) is verified: pnpm test 6 files 55 passed, typecheck clean, files only under packages/explorer. Reviewer verdict: no blocking defects; fix these.\n\nCoordinator decisions (architecture §3.2 will say this):\n- NFR-3: the bot replies within 2 s. So DEFAULT_TIMEOUT_MS = 1500 (still overridable via timeoutMs).\n- After a timeout, network error or server_error (5xx), start a 30 s cooldown (new option failureCooldownMs, default 30000). During any cooldown, lookups that need the network return unavailable without fetching, with the reason of the failure that started the cooldown (rate_limited for 429). Cache hits are still served during a cooldown. bad_response (malformed body, unmapped 4xx) starts no cooldown.\n\nFindings to fix (reviewer, file:line at 3c182c8):\n1. client.ts:178/171: cache.get throwing makes lookup throw synchronously; cache.set throwing rejects a good result. Fix: lookup always returns a Promise; a get failure is a cache miss; a set failure is ignored (the fetched result is still returned). Test with a cache whose get and set throw.\n2. client.ts:29 + cooldown: as decided above. Test: timeout, network and 5xx each suppress the next uncached lookup within 30 s and allow it after; bad_response does not.\n3. client.ts:65: Retry-After that is not a non-negative integer must only be parsed as an HTTP-date if it looks like one (contains a letter); otherwise use the 60 s default. Test with \"1.5\" and \"-5\".\n4. client.ts:124: cancel or drain the body of non-ok responses (await res.body?.cancel()).\n5. client.ts:127: document on the fetch option that an injected fetch must honour AbortSignal for one-request-at-a-time to hold. No code change needed.\n6. Tests: same-key waiters on a request that ends 429 or timeout all receive the unavailable result and can refetch after the cooldown; missing (not null) opening field parses to null; a corrupt cache row is treated as a miss.",
+  "scope": [
+    "packages/explorer/**"
+  ],
+  "negative": [
+    "Do not edit anything outside packages/explorer (config/, docs/, root files, other packages). Report needed changes in contract_gaps.",
+    "No dependency changes.",
+    "No live network in tests; src reads no env.",
+    "Do not redo round-1 work beyond these fixes."
+  ],
+  "rubric": [
+    "Tests for each fix written first and recorded red then green.",
+    "pnpm test and pnpm typecheck clean from the repo root.",
+    "files_changed in your return lists every file changed in 3c182c8..your new head.",
+    "Commit message references FR-2, FR-18, IR-8, NFR-3 and #4."
+  ],
+  "concurrency": "core-agent work on issue #3 (packages/chess-core) is under review in another worktree. No overlap.",
+  "round": 2
+}

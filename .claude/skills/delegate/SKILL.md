@@ -75,6 +75,12 @@ The hooks have already checked the shape, and `post-agent` tells you the verdict
 - Only after verification passes, run the reviewer if the change warrants it (anything
   beyond a trivial change does). Blocking findings mean another round, not a merge.
   Non-blocking findings go to `/triage`.
+  The reviewer's own worktree starts at the coordinator's HEAD, not at the spoke's commit,
+  and the scope guard blocks git commands in another agent's worktree. So the review brief
+  names the range and says to read it with `git show <sha>:<path>` / `git diff <base>..<head>`
+  (shared object store), with `base_sha` set to the coordinator's HEAD.
+- Round 2 on the same branch: render a fresh brief (`round + 1`, `base_sha` = the spoke's
+  last commit) and send it with SendMessage to the same spoke, which keeps its worktree.
 - Then `/ship <n>`: PR written for the user, board to In Review, CI green, squash merge,
   board to Done, worktree cleanup.
 

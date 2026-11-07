@@ -1,0 +1,28 @@
+{
+  "brief_id": "005-review-explorer-r1",
+  "agent": "reviewer",
+  "issue": 4,
+  "base_sha": "05c2776",
+  "scratch_dir": "/private/tmp/claude-501/-Users-daveharms-personal-workspace-chess-tutor/703e5c1b-071a-4aec-b8b0-200bbfb5337e/scratchpad/005-review-explorer-r1",
+  "objective": "Review commit range 05c2776..3c182c8 (branch worktree-agent-a43f865fccded9dac, worktree /Users/daveharms/personal-workspace/chess-tutor/.claude/worktrees/agent-a43f865fccded9dac) for correctness bugs, coverage of FR-2, FR-18, IR-8 and the issue #4 acceptance criteria, and violations of the contract below. Classify each finding blocking / non-blocking / minor.",
+  "requirements": [
+    "FR-2",
+    "FR-18",
+    "IR-8"
+  ],
+  "contract": "Issue #4 Done when: given a position, returns the moves club players chose, how often, how each scored, plus the opening name; responses cached 30 days so each position is fetched once; if Lichess is slow, down or rate-limiting the answer is out of book and the game carries on (no crash); the token comes from LICHESS_TOKEN, never from code; tests pass in CI.\n\nArchitecture §3.2: ExplorerClient.lookup(fen, { ratings, speeds }); SQLite cache keyed by (fen, ratings, speeds), 30 days; one request at a time; 401 throws a configuration error with a clear message; 429 honors Retry-After and that lookup is out of book; 5xx or network error is out of book. Lichess JSON parsed with zod into our own ExplorerResult.\n\nDesigned types: ExplorerMove { uci, san, games, white, draws, black, averageRating }; OutOfBookReason = rate_limited|server_error|network|timeout|bad_response; ExplorerResult { moves sorted by games desc, totalGames = white+draws+black, opening {eco,name}|null, unavailable? (then moves [] and totalGames 0) }; unavailable results never cached; concurrent lookups serialised and same-key lookups deduplicated; token never logged or included in errors; src reads no env or .env; no new dependencies (node:sqlite, zod only); no live network in tests.\n\nThe spoke reported these deliberate choices (judge them): cache key uses the first four FEN fields; cache hits bypass the queue; unmapped HTTP statuses (400/403/404) give bad_response; fixture rows other than g6 were reconstructed from spike percentages. Coordinator gate on 3c182c8: pnpm test 6 files 55 passed, pnpm typecheck clean.",
+  "scope": [],
+  "negative": [
+    "Read-only: do not edit, commit, or run anything that writes to the repo.",
+    "Do not review packages/chess-core or anything outside the commit range.",
+    "No live network calls to Lichess."
+  ],
+  "rubric": [
+    "Every finding cites file:line and a concrete failure scenario.",
+    "Check the 429 cooldown, timeout and dedup logic for races, and that a failed in-flight request does not poison later lookups.",
+    "Check zod parsing tolerance (null opening, extra fields) and the cache TTL boundary.",
+    "Say explicitly if the acceptance criteria are all met."
+  ],
+  "concurrency": "core-agent is still working issue #3 in packages/chess-core in another worktree.",
+  "round": 1
+}

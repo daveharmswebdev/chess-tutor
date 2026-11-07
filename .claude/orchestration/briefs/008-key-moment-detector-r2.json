@@ -1,0 +1,30 @@
+{
+  "brief_id": "008-key-moment-detector-r2",
+  "agent": "core-agent",
+  "issue": 3,
+  "base_sha": "0c4fd73",
+  "scratch_dir": "/private/tmp/claude-501/-Users-daveharms-personal-workspace-chess-tutor/703e5c1b-071a-4aec-b8b0-200bbfb5337e/scratchpad/008-key-moment-detector-r2",
+  "objective": "Round 2 on top of your round-1 commit 0c4fd73 (same worktree and branch worktree-agent-af2e828c671863965): fix the reviewer findings below so the detector never claims a mistake for the engine-best move and stays silent in already-decided mates. Commit on the same branch.",
+  "requirements": [
+    "FR-6",
+    "FR-7",
+    "FR-10"
+  ],
+  "contract": "State: round 1 (0c4fd73) verified: pnpm test 6 files 83 passed, typecheck clean, src has no I/O and no 150 literal. Reviewer: 1 blocking, 2 major (one fixed here, one deferred to a separate issue), 3 minor.\n\nCoordinator decisions (these amend the round-1 evaluation rules):\nA. playedEval source (fixes BLOCKING finding, detector.ts:34). If the played move is the first move of any line in before.lines (multi-PV), playedEval = that line score from the mover view (same search as bestEval, no drift). Otherwise playedEval = after.lines[0] as before. Consequence: playing before.bestMove always gives loss 0, so never missed_win/player_blunder/punish_opponent. Apply to opponent moves too (punish_opponent). Probe to pin: FEN r1bqkbnr/pppp1ppp/2n5/4p3/4P3/5N2/PPPP1PPP/RNBQKB1R w KQkq - 2 3, playerColor w, move f1b5, before.bestMove f1b5, before cp(300) / after cp(100) currently returns missed_win played Bb5 best Bb5; must return null. Same with before cp(30) / after cp(-150) (currently player_blunder).\nB. Decided mates (major, score.ts:22). If bestEval-source score and playedEval-source score are both mate scores with the same sign (the same side is mating before and after), return null for player_blunder, missed_win and punish_opponent (opponent_left_book still applies). Replace the test \"a slower mate (2 -> 4) ... fires\" with one asserting null. Mate for the mover turning into a cp score or into mate for the other side still fires as before.\nC. Not in this round: scaling thresholds in already-won positions (+1200 -> +1040 = missed_win). Leave the behaviour as is; it is being filed as a separate issue.\n\nMinor fixes:\n1. repertoire.ts:40: line = the first matching line that still has a continuation; if none has one, the first matching line. Probe: lines [Short \"1. e4 e5 2. Nf3\", Italian \"1. e4 e5 2. Nf3 Nc6 3. Bc4\"], history e2e4 e7e5 g1f3, opponent f7f6 -> line must be \"Italian\".\n2. moves.ts:13: a UCI move with a promotion suffix that is not a promotion (e.g. e2e4q from the start) must throw.\n3. Tests for scoreToCp mate 0 (with and without sideToMove) and the -0 normalisation.",
+  "scope": [
+    "packages/chess-core/**"
+  ],
+  "negative": [
+    "Do not edit anything outside packages/chess-core (config/, docs/, repertoire/, root files, other packages). Report needed changes in contract_gaps.",
+    "No dependency changes. No I/O in src.",
+    "Do not change threshold semantics beyond decisions A and B (C is deferred)."
+  ],
+  "rubric": [
+    "Tests for A, B and each minor fix written first and recorded red then green, including both probes from A and the repertoire probe.",
+    "pnpm test and pnpm typecheck clean from the repo root.",
+    "files_changed lists every file changed in 0c4fd73..your new head.",
+    "Commit message references FR-6, FR-7, FR-10 and #3."
+  ],
+  "concurrency": "explorer-agent is doing round 2 of issue #4 in packages/explorer in another worktree. No overlap.",
+  "round": 2
+}
