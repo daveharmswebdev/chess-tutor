@@ -1,5 +1,5 @@
 import { DatabaseSync } from "node:sqlite";
-import { cachedResultSchema } from "./schema.ts";
+import { cachedResultSchema, normalizeResultCastling } from "./schema.ts";
 import type { ExplorerCache, ExplorerResult } from "./types.ts";
 
 export const DEFAULT_TTL_MS = 30 * 24 * 60 * 60 * 1000;
@@ -31,7 +31,8 @@ export function createSqliteExplorerCache(
       if (!(nowMs - fetchedAt < ttlMs)) return undefined;
       try {
         const parsed = cachedResultSchema.safeParse(JSON.parse(String(row["body"])));
-        return parsed.success ? (parsed.data satisfies ExplorerResult) : undefined;
+        // Rows written before #17 may carry king-takes-rook castling; normalize on read.
+        return parsed.success ? normalizeResultCastling(parsed.data satisfies ExplorerResult) : undefined;
       } catch {
         return undefined;
       }

@@ -1,0 +1,15 @@
+{
+  "white": 120000, "draws": 9000, "black": 111000,
+  "moves": [
+    { "uci": "e8h8", "san": "O-O", "averageRating": 1410,
+      "white": 90000, "draws": 7000, "black": 85000, "game": null, "opening": null },
+    { "uci": "c7c5", "san": "c5", "averageRating": 1405,
+      "white": 15000, "draws": 1000, "black": 14000, "game": null, "opening": null },
+    { "uci": "b8d7", "san": "Nbd7", "averageRating": 1380,
+      "white": 10000, "draws": 700, "black": 8000, "game": null, "opening": null },
+    { "uci": "e8f8", "san": "Kf8", "averageRating": 1100,
+      "white": 5000, "draws": 300, "black": 4000, "game": null, "opening": null }
+  ],
+  "recentGames": [], "topGames": [],
+  "opening": { "eco": "A48", "name": "Indian Defense: London System" }
+}
