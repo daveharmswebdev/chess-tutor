@@ -126,7 +126,7 @@ These follow from the functional requirements plus the proposed architecture: a 
 | Q-2 | **Resolved 2026-11-07:** Lichess bands 1200 and 1400, blitz and rapid (`config/tutor.json` `bot.explorerRatings`). Lichess ratings run roughly 300–400 above Chess.com, so this matches the player's ~1000 Chess.com opponents. |
 | Q-3 | Which tutor model, Opus 5.5 or Sonnet 5.5? Decide by running the eval suite on both at equal effort settings (NFR-6, NFR-7) and comparing cost per game (NFR-4). |
 | Q-4 | **Resolved 2026-11-07** (#13, PR #18): London against …d5, …Nf6 and …c5; KID Classical, against the London, and against the Fianchetto; 8–9 moves deep. Stored as one PGN game per line in `repertoire/london.pgn` and `repertoire/kid.pgn`. |
-| Q-5 | What is the default reduced Stockfish strength for FR-3? |
+| Q-5 | **Resolved 2026-11-07** (#5, PR #19): Stockfish at UCI_Elo 1400 once the position has fewer than 20 explorer games (`config/tutor.json` `bot.outOfBookElo`, `bot.minGames`). |
 
 ## 9. Traceability matrix
 

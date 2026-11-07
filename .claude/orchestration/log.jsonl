@@ -42,3 +42,4 @@
 {"ts":"2026-11-07T19:41:51.720Z","event":"coordinator_verdict","brief_id":"014-repertoire-lines-r2","verdict":"accepted","reason":"5a31122: files match, gate 178, coordinator probes of 6 bad inputs all throw clearly"}
 {"ts":"2026-11-07T19:41:51.738Z","event":"coordinator_verdict","brief_id":"013-sparring-bot-r2","verdict":"accepted","reason":"dde4a8f: files match, gate 169, typecheck clean; castling SAN fallback read and accepted"}
 {"ts":"2026-11-07T19:42:38.102Z","event":"shipped","issue":13,"pr":18}
+{"ts":"2026-11-07T19:44:08.886Z","event":"shipped","issue":5,"pr":19}
