@@ -34,6 +34,7 @@ import {
 interface Brief {
   brief_id: string;
   agent: string;
+  issue: number | null;
   base_sha: string;
   scratch_dir: string;
   objective: string;
@@ -78,7 +79,7 @@ export function renderBrief(b: Brief, sha256: string): string {
 
 Follow your preloaded spoke-protocol skill. You have no memory of earlier work: everything you need is below or in the repository.
 
-**Base commit:** \`${b.base_sha}\`  ·  **Scratch dir:** \`${b.scratch_dir}\`  ·  **Requirements:** ${b.requirements.join(", ") || "none"}
+**Issue:** ${b.issue ? `#${b.issue}` : "none"}  ·  **Base commit:** \`${b.base_sha}\`  ·  **Scratch dir:** \`${b.scratch_dir}\`  ·  **Requirements:** ${b.requirements.join(", ") || "none"}
 
 ## Objective
 ${b.objective}

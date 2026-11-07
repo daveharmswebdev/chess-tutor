@@ -22,6 +22,16 @@ List every case the requirement IDs name (e.g. FR-6 (a)–(d)) and make sure eac
 in some brief's objective or rubric. A category missing from the work traces back to this
 step, not to a spoke. Split parallel rounds so their `scope`s don't overlap.
 
+## 2b. Claim the issue
+
+Every round belongs to a GitHub issue (file one first if needed: the user reads issues
+and the board, not code). The board is project 5.
+
+```bash
+node .claude/scripts/board.ts <n> --status "In Progress"
+gh issue comment <n> --body "Started: <agent> is building this (brief <brief_id>)."
+```
+
 ## 3. Prepare the base
 
 - Commit anything the spoke depends on **first** (contract types, dependencies added to
@@ -61,8 +71,23 @@ The hooks have already checked the shape, and `post-agent` tells you the verdict
      inside the brief's `scope`.
   2. Re-run the gate (`pnpm test && pnpm typecheck`) on that commit yourself.
   3. Read `brief_defects` and `contract_gaps`: these are *your* errors to fix.
-- Merge the spoke's branch into `main` (fast-forward or `--no-ff`) only after it passes
-  verification. Then the reviewer, if the change warrants it.
+- Only after verification passes: push the spoke's branch as `issue-<n>-<slug>` and open the PR:
+
+  ```bash
+  gh pr create --title "<issue title>" --body-file <scratch>/pr.md   # body: Closes #<n>
+  node .claude/scripts/board.ts <n> --status "In Review"
+  gh pr checks <pr> --watch                                          # CI must be green
+  ```
+
+  The PR body is written **for the user**, who reads it instead of the code. Sections:
+  *What changed (plain language)*, *How to try it*, *Tests* (counts from your own re-run,
+  and the CI check), and a *Delegation record* (brief IDs, rounds, verdicts).
+- Run the reviewer (if the change warrants it) before merging. Blocking findings mean
+  another round, not a merge.
+- Merge with a squash once CI is green: `gh pr merge <pr> --squash --delete-branch`.
+  The merge closes the issue. Then `node .claude/scripts/board.ts <n> --status Done`
+  (the project's own automation is off; enable "Item closed → Done" in the project's
+  settings to make this automatic).
 
 ## 7. Record
 

@@ -6,7 +6,7 @@ A chess tutor for club players. You play against a sparring bot that leaves the 
 the way real 1000-rated players do, and a Claude-powered tutor coaches you at the key
 moments. Every concrete chess claim comes from the Stockfish engine, which the tutor calls as a tool.
 
-- **Progress:** the [Chess Tutor project board](https://github.com/users/daveharmswebdev/projects) and the [issues](https://github.com/daveharmswebdev/chess-tutor/issues)
+- **Progress:** the [Chess Tutor project board](https://github.com/users/daveharmswebdev/projects/5) and the [issues](https://github.com/daveharmswebdev/chess-tutor/issues)
 - **Specs:** [requirements](docs/requirements.md) · [architecture](docs/architecture.md) · [how development is orchestrated](docs/orchestration.md)
 
 ## Run locally

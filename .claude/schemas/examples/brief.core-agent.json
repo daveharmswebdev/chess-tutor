@@ -1,14 +1,26 @@
 {
   "brief_id": "001-key-moment-detector-r1",
   "agent": "core-agent",
+  "issue": 3,
   "base_sha": "751b6bd",
   "scratch_dir": "/tmp/chess-tutor-scratch/001-key-moment-detector-r1",
   "objective": "Create packages/chess-core with a pure detect(input): KeyMoment | null that implements FR-6 (a)-(d) with thresholds passed in, no I/O.",
-  "requirements": ["FR-6", "FR-7"],
-  "contract": "Analysis type from packages/engine/src/types.ts (scores from White's point of view):\n...\nKeyMoment union from docs/architecture.md §3.4:\n...",
-  "scope": ["packages/chess-core/**"],
-  "negative": ["Do not edit packages/engine (engine-agent) or root config (coordinator): report needed changes as findings.", "No LLM calls, no network, no file I/O in chess-core."],
-  "rubric": ["Tests first: table-driven FEN fixtures for each KeyMoment kind and for 'no key moment', recorded red then green.", "pnpm test and pnpm typecheck clean (phase gate)."],
+  "requirements": [
+    "FR-6",
+    "FR-7"
+  ],
+  "contract": "Analysis type from packages/engine/src/types.ts (scores from White's point of view):\n...\nKeyMoment union from docs/architecture.md \u00a73.4:\n...",
+  "scope": [
+    "packages/chess-core/**"
+  ],
+  "negative": [
+    "Do not edit packages/engine (engine-agent) or root config (coordinator): report needed changes as findings.",
+    "No LLM calls, no network, no file I/O in chess-core."
+  ],
+  "rubric": [
+    "Tests first: table-driven FEN fixtures for each KeyMoment kind and for 'no key moment', recorded red then green.",
+    "pnpm test and pnpm typecheck clean (phase gate)."
+  ],
   "concurrency": null,
   "round": 1
 }
