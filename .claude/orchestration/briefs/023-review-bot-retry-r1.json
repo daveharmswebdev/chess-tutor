@@ -1,0 +1,27 @@
+{
+  "brief_id": "023-review-bot-retry-r1",
+  "agent": "reviewer",
+  "issue": 23,
+  "base_sha": "f7ee999",
+  "scratch_dir": "/private/tmp/claude-501/-Users-daveharms-personal-workspace-chess-tutor/7c4c11ee-ffa3-4c97-92ae-6c65009464c3/scratchpad/023",
+  "objective": "Review commit range f7ee999..6d5a280 (branch issue-23-bot-retry: server commit c926be2 adds POST /api/games/:id/bot-retry, web commit 6d5a280 adds a Retry bot move action) for correctness bugs, coverage of FR-1, FR-4 and the issue #23 acceptance criteria, and conformance of both apps to packages/chess-core/src/api.ts. Your worktree may not be at the reviewed commit, and you may not run git in another agent's worktree: read the change with `git diff f7ee999..6d5a280` and `git show 6d5a280:<path>` (shared object store). Classify each finding blocking / major / minor.",
+  "requirements": [
+    "FR-1",
+    "FR-4"
+  ],
+  "contract": "Issue #23 Done when: after a bot failure on the bot's turn, the game offers a way forward (the bot retries automatically once, or a 'Retry bot move' action is available) (FR-1, FR-4); a test covers a game as Black whose first bot move fails, then recovers.\n\nContract addition (api.ts at f7ee999, read with git show): POST /api/games/:id/bot-retry -> 200 GameView with botThinking true; the bot's move then arrives over SSE as usual. 409 while the bot is thinking, when the game is not 'playing', or when it is the player's turn; 404 unknown game. The web shows 'Retry bot move' whenever the game is 'playing', botThinking is false and it is the bot's turn. On a bot failure the server sends 'state' (botThinking false) then 'error'.\n\nBrief rubric given to the server spoke: retry must go through startBot so the stale-result guard applies (a retry followed by takeback/resign/new game must not apply a late bot move).\n\nSpoke-reported choices to judge: server botRetry bumps the game version and emits 'state' with botThinking true; web moved Takeback/Resign into a new hook-free GameActions.tsx component and tests it with react-dom/server renderToStaticMarkup plus direct onClick calls (no DOM test library in the repo); statusText says 'The bot did not move. Retry the bot move.' in that state; canRetryBot is also false while a request is in flight or a move is pending.\n\nCoordinator gate on 6d5a280: pnpm test 367 passed (25 files); pnpm typecheck exit 0; CI=1 pnpm test:e2e 1 passed; each spoke's git diff matched its files_changed and stayed in apps/server/** or apps/web/**.",
+  "scope": [],
+  "negative": [
+    "Read-only: do not edit, commit, or run anything that writes to the repo.",
+    "Do not run the e2e or start servers; reason from code and tests.",
+    "Do not review anything outside the commit range; the tutor skeleton in f7ee999 is not under review."
+  ],
+  "rubric": [
+    "Every finding cites file:line and a concrete failure scenario (request sequence, event order).",
+    "Check races: retry while a stale bot search from before is still running; double retry; retry then takeback/resign/new game; retry on a finished game.",
+    "Check the web: the button shows exactly in the contract state, the error clears on success, Takeback/Resign behaviour and test ids are unchanged after the refactor.",
+    "Say explicitly whether every issue #23 acceptance criterion is met."
+  ],
+  "concurrency": "None running.",
+  "round": 1
+}

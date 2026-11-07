@@ -1,0 +1,28 @@
+{
+  "brief_id": "024-bot-retry-web-r2",
+  "agent": "web-agent",
+  "issue": 23,
+  "base_sha": "f15ed41",
+  "scratch_dir": "/private/tmp/claude-501/-Users-daveharms-personal-workspace-chess-tutor/7c4c11ee-ffa3-4c97-92ae-6c65009464c3/scratchpad/024",
+  "requirements": [
+    "FR-1",
+    "FR-4"
+  ],
+  "round": 2,
+  "objective": "Round 2 on your own branch (you start at your round-1 commit f15ed41). Fix a race the reviewer found: when SSE events from a request arrive before that request's HTTP reply, the late HTTP GameView overwrites the newer SSE state and the UI is stuck on 'Bot is thinking...'. Make SSE win, for both Retry bot move and a normal player move.",
+  "contract": "Review 023 of your branch (combined with the server endpoint) found:\n\nBLOCKING, apps/web/src/controller.ts ~162 / game-state.ts ~69-71: retryBot goes through simpleRequest, whose request_succeeded handler always replaces state.game with the HTTP view and clears error. If the engine is dead, the server's startBot rejection runs in a microtask before Fastify writes the 200. The SSE order is then state{botThinking:false} then error{...}, and the HTTP {botThinking:true} arrives after both. The UI then shows botThinking true for good with no error, Retry hidden, Takeback disabled and the board locked. A fast bot_move (a cached book move) has the same race: its move is overwritten by the pre-move view. controller.test.ts only tests HTTP-then-SSE.\n\nMAJOR (pre-existing), game-state.ts ~58-61 move_accepted: `const game = isPrefix(action.game, state.game) ? state.game : action.game;`. A bot failure adds no move, so after the player plays e2e4 with a dead engine, SSE state{botThinking:false, moves:[e2e4]} plus error arrive first. The HTTP reply {botThinking:true, moves:[e2e4]} then wins the isPrefix check, and the UI is stuck.\n\nCoordinator decision, now in packages/chess-core/src/api.ts (commit f066eaa on the integration branch; your worktree does not have it, do not edit packages):\n *   Ordering (#23): an HTTP reply can arrive after SSE events caused by the same request (a bot\n *        that fails or answers within microtasks). SSE is the newer source: once a client has\n *        received any SSE event for the game after it sent a request, it keeps its SSE-derived\n *        game state and ignores the GameView in that request's HTTP reply.\n\nImplement that rule in the reducer and controller for every request that returns a GameView (moves, takeback, resign, bot-retry), for example by recording in state that an SSE event arrived since request_started and having the success actions keep state.game (and the SSE-set error) in that case. If no SSE event arrived, the HTTP view still applies as today. busy and pendingFen still clear on the reply. The reviewer's minor note (Retry hidden rather than disabled while busy) is acceptable as is.\n\nCoordinator gate on the combined branch at 6d5a280: pnpm test 367 passed, typecheck 0, CI=1 pnpm test:e2e 1 passed.",
+  "scope": [
+    "apps/web/**"
+  ],
+  "negative": [
+    "Do not edit packages/**, apps/server, docs, config, .github, root files or the lockfile.",
+    "No new dependencies.",
+    "Do not change the existing SSE-then-HTTP behaviour beyond the ordering rule."
+  ],
+  "rubric": [
+    "Tests first, red then green: (a) retry where SSE state{botThinking:false} and error arrive before botRetry resolves: the final state has botThinking false, the error shown, and Retry available; (b) retry where bot_move arrives before botRetry resolves: the bot's move stays; (c) player move with SSE state+error before the HTTP reply: not stuck, Retry available; (d) the existing HTTP-then-SSE order still works for moves, takeback, resign and retry.",
+    "pnpm test and pnpm typecheck clean from the repo root; CI=1 pnpm test:e2e passes.",
+    "files_changed lists every file changed in f15ed41..your head. Commit message references FR-1, FR-4 and #23."
+  ],
+  "concurrency": "None running."
+}
