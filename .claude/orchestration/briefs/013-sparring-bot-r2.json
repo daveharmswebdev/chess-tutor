@@ -1,0 +1,24 @@
+{
+  "brief_id": "013-sparring-bot-r2",
+  "agent": "core-agent",
+  "issue": 5,
+  "base_sha": "50e47dc",
+  "scratch_dir": "/private/tmp/claude-501/-Users-daveharms-personal-workspace-chess-tutor/2c4af807-332d-4ac0-b223-b9f6f756da63/scratchpad/013-sparring-bot-r2",
+  "objective": "Round 2 on top of your round-1 commit 50e47dc (same worktree and branch worktree-agent-a65a9a31b49c86442): make the bot accept book castling moves however the explorer spells them, and fix the three minor reviewer findings below. Commit on the same branch.",
+  "requirements": ["FR-2", "FR-3", "FR-10"],
+  "contract": "State: round 1 (50e47dc) verified by the coordinator: pnpm test 9 files 161 passed, typecheck clean, files match. Reviewer: 0 blocking, 1 major, 3 minor.\n\nMAJOR (bot.ts:166): the Lichess opening explorer very likely spells castling as king-takes-own-rook (e1h1, e1a1, e8h8, e8a8), and packages/explorer passes ExplorerMove.uci through unchanged (packages/explorer/src/schema.ts parseExplorerResponse maps uci: m.uci). playUci rejects e8h8, so book castling is silently dropped, skewing FR-2 proportions, and castling-only results fall back to the engine with illegal_explorer_move. It is not verified against live data, so the fix must work for both spellings.\nCoordinator decision A: when an explorer move's uci is not legal in the FEN, try its san with chess.js (chess.move(san) on a fresh Chess(fen)); if that is legal, use that move and return the standard UCI from toUci (e8g8, e1c1, ...) and chess.js's SAN. Only when both fail is the move treated as illegal (spliced, resample as now). The returned BotMove.uci is always standard UCI that playUci accepts. Tests: White O-O given as e1h1/'O-O', White O-O-O as e1a1/'O-O-O', Black O-O as e8h8/'O-O', all returning e1g1 / e1c1 / e8g8 with source 'explorer'; standard e8g8 still works; a move whose uci AND san are both illegal is still dropped. Use the reviewer's scenario: FEN after 1.d4 Nf6 2.Bf4 g6 3.e3 Bg7 4.Nf3 d6 5.Be2 (Black to move, castling legal), moves [{uci:'e8h8', san:'O-O', games:600}, {uci:'c7c5', san:'c5', games:100}], totalGames 900, random 0 -> must return e8g8 from explorer (currently returns c7c5).\n(The explorer package will also be made to normalize in a separate issue; the bot must not depend on that.)\n\nMINOR 1 (scripts/demo-bot.ts:81): createEngineFromEnv (line 80) and createSparringBot (line 81) run before the try/finally at line 93, so a bad bot config throws without engine.quit()/cache.close(). Fix: create the bot (which validates config) before starting the engine, and/or move both inside the try so cleanup runs on every path.\nMINOR 2 (demo label, bot.ts:174): share = games/totalGames is how often real players chose the move, not the sampling probability (games / sum of listed games). Keep share as is; document it in the BotMove doc comment, and label it in the demo as e.g. 'from explorer (60 of 120 games, 50.0% of players)'.\nMINOR 3 (test/bot.test.ts:165): the resample test can't show weights are recomputed. Add a three-move case: moves [illegal 50, a 25, b 25], random 0.6 after the splice must pick b (0.6 * 50 = 30 >= 25).",
+  "scope": ["packages/chess-core/**"],
+  "negative": [
+    "Do not edit anything outside packages/chess-core (packages/explorer is out of scope: its normalization is a separate issue). Report needed changes in contract_gaps.",
+    "No dependency changes. No I/O in src.",
+    "Do not touch repertoire.ts, repertoire-pgn.ts or repertoire/ (issue #13, another branch)."
+  ],
+  "rubric": [
+    "Tests for A and minor 3 written first and recorded red then green, including the reviewer's e8h8 scenario.",
+    "pnpm test and pnpm typecheck clean from the repo root.",
+    "files_changed lists every file changed in 50e47dc..your new head.",
+    "Commit message references FR-2, FR-10 and #5."
+  ],
+  "concurrency": "Issue #13 (repertoire/**, packages/chess-core/src/repertoire-pgn.ts, test/repertoire-*.test.ts) is under review on another branch. Stay out of those paths.",
+  "round": 2
+}

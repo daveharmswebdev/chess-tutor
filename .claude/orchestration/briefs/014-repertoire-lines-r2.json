@@ -1,0 +1,24 @@
+{
+  "brief_id": "014-repertoire-lines-r2",
+  "agent": "core-agent",
+  "issue": 13,
+  "base_sha": "5b188f7",
+  "scratch_dir": "/private/tmp/claude-501/-Users-daveharms-personal-workspace-chess-tutor/2c4af807-332d-4ac0-b223-b9f6f756da63/scratchpad/014-repertoire-lines-r2",
+  "objective": "Round 2 on top of your round-1 commit 5b188f7 (same worktree and branch worktree-agent-ae5f6c64818cbcdc3): fix the reviewer's blocking and major parser findings so a typo in a repertoire file always gives a clear error, never a hang or a silently lost line. Commit on the same branch.",
+  "requirements": ["FR-6", "BR-1"],
+  "contract": "State: round 1 (5b188f7) verified by the coordinator: pnpm test 10 files 172 passed, typecheck clean, files match. Reviewer: files and detector tests accepted; 1 blocking, 1 major, 2 minor.\n\nBLOCKING (src/repertoire-pgn.ts:57): a stray '}' or ']' in movetext loops forever. The token scan (line 58) stops at once on these characters, the token is empty, i never advances, and \"\" is pushed onto game.tokens until out of memory. Repro: parseRepertoirePgn('[Line \"X\"] 1. d4 } d5 *', 'w') and the same with ']' -> heap out of memory. Required: throw an Error naming the character and the game's line name (e.g. unexpected '}' in line \"X\"). Also make the loop structurally unable to stall (every pass advances i or throws).\n\nMAJOR (src/repertoire-pgn.ts:38): a game with headers but no moves and no result token is merged into the next game; the next headers overwrite the first. Repro: '[Line \"A\"]\\n\\n[Line \"B\"]\\n\\n1. d4 d5 *' returns only [{name:'B', ...}] with no error. Required: this input throws the existing 'no moves' error for line \"A\". Coordinator decision: a header tag that repeats within the current game's header block (e.g. a second [Line] or [Event]) starts a new game; keep the behaviour that a new game may follow without a blank line after a result token or after movetext.\n\nMINOR (tests): add tests for the two repros above, a ']' in movetext, and a '3...' continuation marker passing through to a valid line.\nMINOR (file-order naming): reviewer judged no change needed; leave it.",
+  "scope": ["repertoire/**", "packages/chess-core/src/repertoire-pgn.ts", "packages/chess-core/test/repertoire-files.test.ts", "packages/chess-core/test/repertoire-pgn.test.ts"],
+  "negative": [
+    "Do not edit packages/chess-core/src/index.ts, tsconfig.json, package.json or bot files: issue #5's branch owns them.",
+    "Do not change buildRepertoire, detect or any other existing src file.",
+    "No dependency changes. No I/O in src."
+  ],
+  "rubric": [
+    "Tests for the blocking and major repros written first and recorded red then green (run the hang repro with a timeout or --max-old-space-size so the red run ends).",
+    "The real files still load and all round-1 tests still pass.",
+    "pnpm test and pnpm typecheck clean from the repo root.",
+    "files_changed lists every file changed in 5b188f7..your new head. Commit message references FR-6 and #13."
+  ],
+  "concurrency": "Issue #5 round 2 (core-agent) runs in parallel on another branch in packages/chess-core/src/bot.ts, test/bot.test.ts and scripts/demo-bot.ts. Stay out of those.",
+  "round": 2
+}

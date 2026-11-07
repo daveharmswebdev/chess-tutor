@@ -73,9 +73,11 @@ The hooks have already checked the shape, and `post-agent` tells you the verdict
   2. Re-run the gate (`pnpm test && pnpm typecheck`) on that commit yourself.
   3. Read `brief_defects` and `contract_gaps`: these are *your* errors to fix.
 - Only after verification passes, run the reviewer if the change warrants it (anything
-  beyond a trivial change does). Blocking findings mean another round, not a merge.
+  beyond a trivial change does). Blocking findings mean another round, not a merge. Ask for severities as
+  `blocking` / `major` / `minor` (the return schema's values), not "non-blocking".
   Non-blocking findings go to `/triage`.
-  The reviewer's own worktree starts at the coordinator's HEAD, not at the spoke's commit,
+  The reviewer's own worktree is not at the spoke's commit (and may not even be at the
+  coordinator's HEAD: one review in cycle 2026-11-07 started on a parallel spoke's commit),
   and the scope guard blocks git commands in another agent's worktree. So the review brief
   names the range and says to read it with `git show <sha>:<path>` / `git diff <base>..<head>`
   (shared object store), with `base_sha` set to the coordinator's HEAD.
