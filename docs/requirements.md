@@ -125,7 +125,7 @@ These follow from the functional requirements plus the proposed architecture: a 
 | Q-1 | **Resolved 2026-11-07** ([spike 002](spikes/002-lichess-explorer-auth.md)): a personal token with no permissions works. Rate limits aren't published, so the client sends one request at a time and backs off on a 429. |
 | Q-2 | **Resolved 2026-11-07:** Lichess bands 1200 and 1400, blitz and rapid (`config/tutor.json` `bot.explorerRatings`). Lichess ratings run roughly 300–400 above Chess.com, so this matches the player's ~1000 Chess.com opponents. |
 | Q-3 | Which tutor model, Opus 5.5 or Sonnet 5.5? Decide by running the eval suite on both at equal effort settings (NFR-6, NFR-7) and comparing cost per game (NFR-4). |
-| Q-4 | **Decided 2026-11-07, lands with #13:** London against …d5, …Nf6 and …c5; KID Classical, against the London, and against the Fianchetto; 8–10 moves deep. Stored as PGN in `repertoire/`. |
+| Q-4 | **Resolved 2026-11-07** (#13, PR #18): London against …d5, …Nf6 and …c5; KID Classical, against the London, and against the Fianchetto; 8–9 moves deep. Stored as one PGN game per line in `repertoire/london.pgn` and `repertoire/kid.pgn`. |
 | Q-5 | What is the default reduced Stockfish strength for FR-3? |
 
 ## 9. Traceability matrix

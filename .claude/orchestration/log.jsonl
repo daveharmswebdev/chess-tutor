@@ -18,3 +18,27 @@
 {"ts":"2026-11-07T19:17:24.371Z","event":"coordinator_verdict","brief_id":"003-key-moment-detector-r1","verdict":"re-delegated","reason":"review 006: blocking best-move eval drift"}
 {"ts":"2026-11-07T19:17:24.371Z","event":"coordinator_verdict","brief_id":"008-key-moment-detector-r2","verdict":"accepted","reason":"verified 138 passed after rebase; blocking fixed with reviewer probes as tests"}
 {"ts":"2026-11-07T19:17:24.371Z","event":"shipped","issue":3,"pr":15}
+{"ts":"2026-11-07T19:31:11.706Z","event":"dispatch","subagent_type":"core-agent","brief_id":"009-sparring-bot-r1","base_sha":"30a1ab7","spoke":true}
+{"ts":"2026-11-07T19:31:30.996Z","event":"dispatch","subagent_type":"core-agent","brief_id":"010-repertoire-lines-r1","base_sha":"30a1ab7","spoke":true}
+{"ts":"2026-11-07T19:31:31.186Z","event":"agent_complete","subagent_type":"core-agent","brief_id":"009-sparring-bot-r1","agent_id":"a65a9a31b49c86442","status":"async_launched","contract":"pending"}
+{"ts":"2026-11-07T19:31:31.210Z","event":"agent_complete","subagent_type":"core-agent","brief_id":"010-repertoire-lines-r1","agent_id":"ae5f6c64818cbcdc3","status":"async_launched","contract":"pending"}
+{"ts":"2026-11-07T19:34:15.461Z","event":"return_valid","agent_id":"a65a9a31b49c86442","agent_type":"core-agent","via":"handback"}
+{"ts":"2026-11-07T19:34:33.001Z","event":"return_invalid","agent_id":"ae5f6c64818cbcdc3","agent_type":"core-agent","attempt":1,"errors":["/findings/0: must have required property 'severity'","/findings/0: must have required property 'evidence'"]}
+{"ts":"2026-11-07T19:34:46.872Z","event":"return_invalid","agent_id":"ae5f6c64818cbcdc3","agent_type":"core-agent","attempt":2,"errors":["/findings/0/severity: must be equal to one of the allowed values [\"blocking\",\"major\",\"minor\"]"]}
+{"ts":"2026-11-07T19:35:00.750Z","event":"return_valid","agent_id":"ae5f6c64818cbcdc3","agent_type":"core-agent","via":"handback"}
+{"ts":"2026-11-07T19:35:01.847Z","event":"coordinator_verdict","brief_id":"009-sparring-bot-r1","verdict":"accepted","reason":"files match, gate 161 passed + typecheck clean on 50e47dc; src pure; to reviewer"}
+{"ts":"2026-11-07T19:35:28.211Z","event":"dispatch","subagent_type":"reviewer","brief_id":"011-review-sparring-bot-r1","base_sha":"30a1ab7","spoke":true}
+{"ts":"2026-11-07T19:35:28.405Z","event":"agent_complete","subagent_type":"reviewer","brief_id":"011-review-sparring-bot-r1","agent_id":"aaed20060b1e5184d","status":"async_launched","contract":"pending"}
+{"ts":"2026-11-07T19:35:52.189Z","event":"coordinator_verdict","brief_id":"010-repertoire-lines-r1","verdict":"accepted","reason":"files match, gate 172 passed + typecheck clean on 5b188f7; parser pure; to reviewer"}
+{"ts":"2026-11-07T19:36:12.865Z","event":"dispatch","subagent_type":"reviewer","brief_id":"012-review-repertoire-lines-r1","base_sha":"30a1ab7","spoke":true}
+{"ts":"2026-11-07T19:36:13.072Z","event":"agent_complete","subagent_type":"reviewer","brief_id":"012-review-repertoire-lines-r1","agent_id":"a383a4882365f6a01","status":"async_launched","contract":"pending"}
+{"ts":"2026-11-07T19:38:03.807Z","event":"return_valid","agent_id":"aaed20060b1e5184d","agent_type":"reviewer","via":"handback"}
+{"ts":"2026-11-07T19:38:37.028Z","event":"return_valid","agent_id":"a383a4882365f6a01","agent_type":"reviewer","via":"handback"}
+{"ts":"2026-11-07T19:38:40.317Z","event":"coordinator_verdict","brief_id":"011-review-sparring-bot-r1","verdict":"re-delegated","reason":"major: explorer castling spelled e1h1 likely dropped; round 2 (013) accepts by SAN; 3 minors folded in"}
+{"ts":"2026-11-07T19:39:02.430Z","event":"coordinator_verdict","brief_id":"012-review-repertoire-lines-r1","verdict":"re-delegated","reason":"blocking: stray } or ] loops forever; major: header-only game merged; round 2 (014)"}
+{"ts":"2026-11-07T19:40:47.357Z","event":"return_valid","agent_id":"ae5f6c64818cbcdc3","agent_type":"core-agent","via":"handback"}
+{"ts":"2026-11-07T19:41:00.501Z","event":"return_invalid","agent_id":"a65a9a31b49c86442","agent_type":"core-agent","attempt":1,"errors":["/tests_run: a 'gate' check failed, so this is not a success"]}
+{"ts":"2026-11-07T19:41:13.763Z","event":"return_valid","agent_id":"a65a9a31b49c86442","agent_type":"core-agent","via":"handback"}
+{"ts":"2026-11-07T19:41:51.720Z","event":"coordinator_verdict","brief_id":"014-repertoire-lines-r2","verdict":"accepted","reason":"5a31122: files match, gate 178, coordinator probes of 6 bad inputs all throw clearly"}
+{"ts":"2026-11-07T19:41:51.738Z","event":"coordinator_verdict","brief_id":"013-sparring-bot-r2","verdict":"accepted","reason":"dde4a8f: files match, gate 169, typecheck clean; castling SAN fallback read and accepted"}
+{"ts":"2026-11-07T19:42:38.102Z","event":"shipped","issue":13,"pr":18}
