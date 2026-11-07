@@ -109,6 +109,41 @@ describe("briefs and the dispatch gate", () => {
     expect(deny({ subagent_type: "core-agent", prompt, isolation: "worktree" })).toMatch(/changed after it was rendered/);
   });
 
+  it("inlines contract_files from git at base_sha, and rejects a missing one", () => {
+    const { prompt, brief, file } = writeBrief({ contract_files: ["packages/chess-core/src/api.ts"] });
+    expect(prompt).toContain(`### \`packages/chess-core/src/api.ts\` at \`${HEAD}\``);
+    expect(prompt).toContain(git(["show", `${HEAD}:packages/chess-core/src/api.ts`]).split("\n")[0]);
+    const errors = validateBrief({ ...brief, contract_files: ["no/such/file.ts"] }, file, ownership).join();
+    expect(errors).toMatch(/contract_files\/0: 'no\/such\/file.ts' does not exist/);
+  });
+
+  it("rejects a brief that still carries TODO placeholders", () => {
+    const { brief, file } = writeBrief();
+    const errors = validateBrief({ ...brief, objective: "TODO", rubric: ["TODO: tests"] }, file, ownership).join();
+    expect(errors).toMatch(/objective: still contains a TODO/);
+    expect(errors).toMatch(/rubric\/0: still contains a TODO/);
+  });
+
+  it("renders a return template that, once filled in, passes the return schema", () => {
+    for (const agent of ["core-agent", "reviewer"]) {
+      const readOnly = agent === "reviewer";
+      const { prompt } = writeBrief({ agent, scope: readOnly ? [] : ["packages/chess-core/**"] });
+      const block = prompt.slice(prompt.indexOf("## Your final message"));
+      const shape = block.slice(block.indexOf("Shape of a success"), block.indexOf("Allowed values"));
+      const { data, errors } = extractJsonBlock(shape.slice(shape.indexOf("```json")).trim());
+      expect(errors).toEqual([]);
+      const filled = JSON.parse(
+        JSON.stringify(data)
+          .replace(/"<every file you changed>"/, '"packages/chess-core/src/x.ts"')
+          .replace(/"<git rev-parse HEAD[^"]*>"|"<the commit holding your work>"/g, `"${HEAD}"`)
+          .replace(/"<[^"]*>"/g, '"x"'),
+      );
+      expect(validateReturn(filled, agent, ownership)).toEqual([]);
+      expect(block).toMatch(/findings\[\]\.owner: "engine-agent" .*"coordinator"/);
+      expect(block).not.toMatch(/owner: [^\n]*"reviewer"/);
+    }
+  });
+
   it("ignores agents that are not spokes", () => {
     expect(preAgent({ tool_input: { subagent_type: "Explore", prompt: "find x" } }, ownership)).toBeNull();
   });

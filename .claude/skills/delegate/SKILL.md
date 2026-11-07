@@ -44,10 +44,20 @@ gh issue comment <n> --body "Started: <agent> is building this (brief <brief_id>
 
 ## 4. Write the brief
 
-`.claude/orchestration/briefs/<NNN>-<slug>-r<round>.json`, against
-`.claude/schemas/brief.schema.json` (example: `.claude/schemas/examples/brief.core-agent.json`).
-`contract` must be **self-contained**: paste the actual interfaces, types and measured
-numbers. The spoke cannot see this conversation.
+Start it with the scaffold, which picks the next sequence number, sets `base_sha` to HEAD
+and fills the mechanical fields:
+
+```bash
+node --no-warnings .claude/scripts/new-brief.ts <agent> <slug> --issue <n> --scratch <scratchpad> \
+  [--round <k> --base <spoke's last commit>] [--contract-file <path>]...
+```
+
+Then edit the TODO fields (validation refuses a brief that still has one) against
+`.claude/schemas/brief.schema.json`. `contract` must be **self-contained**, because the
+spoke can't see this conversation. Put whole files (e.g. `api.ts`) in `contract_files`, and
+render-brief will inline them from git at `base_sha`; don't paste them. `contract` then holds
+the excerpts, decisions and measured numbers. The rendered brief already ends with a return
+template generated from the schema, so don't restate the return format.
 
 ## 5. Render and launch
 
@@ -76,11 +86,11 @@ The hooks have already checked the shape, and `post-agent` tells you the verdict
   beyond a trivial change does). Blocking findings mean another round, not a merge. Ask for severities as
   `blocking` / `major` / `minor` (the return schema's values), not "non-blocking".
   Non-blocking findings go to `/triage`.
-  The reviewer's own worktree is not at the spoke's commit (and may not even be at the
-  coordinator's HEAD: one review in cycle 2026-11-07 started on a parallel spoke's commit),
-  and the scope guard blocks git commands in another agent's worktree. So the review brief
-  names the range and says to read it with `git show <sha>:<path>` / `git diff <base>..<head>`
-  (shared object store), with `base_sha` set to the coordinator's HEAD.
+  **Launch the reviewer from the branch under review.** Check out the integration branch
+  (or the spoke's commit) in the main checkout first, so the reviewer's worktree starts at the
+  reviewed head, and set the review brief's `base_sha` to that head. The range to review goes
+  in the objective (`git diff <base>..<head>`). The scope guard still blocks git commands in
+  another agent's worktree, so the brief says to read with `git diff` / `git show <sha>:<path>`.
 - Round 2 on the same branch: render a fresh brief (`round + 1`, `base_sha` = the spoke's
   last commit) and send it with SendMessage to the same spoke, which keeps its worktree.
 - Then `/ship <n>`: PR written for the user, board to In Review, CI green, squash merge,
@@ -89,8 +99,14 @@ The hooks have already checked the shape, and `post-agent` tells you the verdict
 ## 7. Record
 
 `.claude/orchestration/log.jsonl` is written by the hooks (dispatch, verdict, tokens,
-duration). Append the coordinator's own decision for the round:
+duration). Append the coordinator's own decision for the round. Include the cost from the spoke's
+completion notification (`<usage>`: `subagent_tokens`, `duration_ms`). The hooks can't see
+it, because background spokes report it only when they finish, and without it the log has
+no cost data:
 
 ```bash
-node -e 'require("fs").appendFileSync(".claude/orchestration/log.jsonl", JSON.stringify({ts:new Date().toISOString(),event:"coordinator_verdict",brief_id:"<id>",verdict:"accepted|rejected|re-delegated",reason:"<one line>"})+"\n")'
+node -e 'require("fs").appendFileSync(".claude/orchestration/log.jsonl", JSON.stringify({ts:new Date().toISOString(),event:"coordinator_verdict",brief_id:"<id>",verdict:"accepted|rejected|re-delegated",reason:"<one line>",tokens:<subagent_tokens>,duration_ms:<duration_ms>})+"\n")'
 ```
+
+Log a reviewer's cost the same way, under its own brief_id, even though it has no verdict of
+its own: `verdict:"review"`.

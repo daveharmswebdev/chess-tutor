@@ -12,8 +12,9 @@ through the coordinator**; spokes never talk to each other.
 ## Principles
 
 1. **Isolation.** A spoke inherits none of the coordinator's conversation and remembers
-   nothing between runs. Everything it needs is in its brief: interfaces pasted verbatim
-   and measured facts. Two calls to the same spoke are two independent briefs.
+   nothing between runs. Everything it needs is in its brief: contract files inlined from
+   git at the brief's base commit (`contract_files`), excerpts and measured facts, and a
+   return template generated from the schema. Two calls to the same spoke are two independent briefs.
 2. **Contracts as JSON Schema, enforced by code.**
    - `brief.schema.json` (coordinator → spoke) is checked when the brief is rendered, and
      again when it is dispatched.
@@ -78,10 +79,12 @@ verify: git diff == files_changed · re-run gate · read brief_defects → merge
 | `dispatch`, `dispatch_denied` | pre-agent |
 | `return_valid`, `return_invalid`, `contract_failed` | pre-handback / subagent-stop |
 | `edit_denied` | guard-edit-scope |
-| `agent_complete` (tokens, duration, contract verdict) | post-agent |
-| `coordinator_verdict` | the coordinator, by hand (accepted / rejected / re-delegated) |
+| `agent_complete` (contract verdict; tokens and duration only for foreground runs) | post-agent |
+| `coordinator_verdict` | the coordinator, by hand (accepted / rejected / re-delegated / review), with `tokens` and `duration_ms` from the spoke's completion notification |
 
 Briefs are kept in `.claude/orchestration/briefs/` (tracked), so every round can be replayed.
+Start one with `node --no-warnings .claude/scripts/new-brief.ts <agent> <slug> --scratch <dir>`;
+a brief that still contains a TODO placeholder fails validation.
 
 ## Workflow and visibility
 

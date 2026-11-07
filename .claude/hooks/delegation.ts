@@ -16,6 +16,7 @@ import { existsSync, readFileSync, writeFileSync } from "node:fs";
 import { basename, join, resolve } from "node:path";
 import {
   briefsDir,
+  CLAUDE_DIR,
   MAX_RETURN_RETRIES,
   bumpRetries,
   emit,
@@ -45,7 +46,12 @@ interface Brief {
   rubric: string[];
   concurrency: string | null;
   round?: number;
+  /** Repo paths inlined verbatim from git at base_sha when the brief is rendered. */
+  contract_files?: string[];
 }
+
+/** Placeholder text left by .claude/scripts/new-brief.ts; a brief carrying it is not finished. */
+const PLACEHOLDER = /\bTODO\b/;
 
 const MARKER = /<!-- brief_id: (\S+) sha256: ([0-9a-f]{64}) -->/;
 
@@ -64,15 +70,86 @@ export function validateBrief(data: unknown, fileName: string | null, ownership:
   b.scope.forEach((s, i) => {
     if (!scopeWithin(def.owns, s)) errors.push(`/scope/${i}: '${s}' is outside ${b.agent}'s ownership (${def.owns.join(", ")})`);
   });
+  let baseOk = true;
   try {
     git(["cat-file", "-e", `${b.base_sha}^{commit}`]);
   } catch {
+    baseOk = false;
     errors.push(`/base_sha: '${b.base_sha}' is not a commit in this repository`);
   }
+  if (baseOk) {
+    (b.contract_files ?? []).forEach((f, i) => {
+      try {
+        git(["cat-file", "-e", `${b.base_sha}:${f}`]);
+      } catch {
+        errors.push(`/contract_files/${i}: '${f}' does not exist at ${b.base_sha}`);
+      }
+    });
+  }
+  const texts: [string, string][] = [
+    ["objective", b.objective],
+    ["contract", b.contract],
+    ...b.rubric.map((r, i): [string, string] => [`rubric/${i}`, r]),
+    ...b.negative.map((n, i): [string, string] => [`negative/${i}`, n]),
+  ];
+  for (const [where, text] of texts) if (PLACEHOLDER.test(text)) errors.push(`/${where}: still contains a TODO placeholder`);
   return errors;
 }
 
-export function renderBrief(b: Brief, sha256: string): string {
+/** The contract files, verbatim at base_sha (fixed content, so the brief hash still pins them). */
+function renderContractFiles(b: Brief): string {
+  const files = b.contract_files ?? [];
+  if (!files.length) return "";
+  const blocks = files.map((f) => {
+    const ext = f.split(".").pop() ?? "";
+    return `### \`${f}\` at \`${b.base_sha}\`\n\n\`\`\`\`${ext}\n${git(["show", `${b.base_sha}:${f}`]).replace(/\n$/, "")}\n\`\`\`\``;
+  });
+  return `\n\n### Contract files (verbatim)\n\n${blocks.join("\n\n")}`;
+}
+
+type JsonSchema = { properties: Record<string, { enum?: string[] } & Record<string, unknown>>; $defs: { finding: { properties: Record<string, { enum?: string[] }> } } };
+
+/**
+ * A filled-in return for this agent, with every allowed value taken from the schema and
+ * ownership.json, so the spoke does not have to guess enum spellings or owner names.
+ */
+export function renderReturnTemplate(b: Brief, ownership: Ownership): string {
+  const schema = JSON.parse(readFileSync(join(CLAUDE_DIR, "schemas", "return.schema.json"), "utf8")) as JsonSchema;
+  const readOnly = ownership.agents[b.agent]?.kind === "read-only";
+  const testsRun = schema.properties.tests_run as { items: { properties: Record<string, { enum?: string[] }> } };
+  const enumOf = (xs: string[] | undefined) => (xs ?? []).map((x) => `"${x}"`).join(" | ");
+  const owners = [...Object.entries(ownership.agents).filter(([, d]) => d.kind === "implementation").map(([n]) => n), "coordinator"];
+  const example = {
+    status: "success",
+    agent: b.agent,
+    brief_id: b.brief_id,
+    base_sha: "<git rev-parse HEAD before you changed anything>",
+    head_sha: readOnly ? null : "<the commit holding your work>",
+    summary: "<one paragraph: what was actually produced>",
+    files_changed: readOnly ? [] : ["<every file you changed>"],
+    tests_run: [
+      ...(readOnly ? [] : [{ command: "<test command>", phase: "red", result: "fail", summary: "<the failing assertion>" }]),
+      { command: "pnpm test && pnpm typecheck", phase: "gate", result: "pass", summary: "<N passed; exit 0>" },
+    ],
+    contract_gaps: [],
+    brief_defects: [],
+    findings: [{ severity: "minor", owner: owners[0], file: "<path>", line: 1, summary: "<the defect>", evidence: "<command output or code quote>" }],
+  };
+  return `Exactly one fenced \`\`\`json block matching \`.claude/schemas/return.schema.json\`, with \`"brief_id": "${b.brief_id}"\` and \`"base_sha"\` set to the commit you started from. Nothing outside the block. A hook validates it and will send back errors to fix.
+
+Shape of a success (replace every <...>; use [] for empty lists, never omit a field):
+
+\`\`\`json
+${JSON.stringify(example, null, 2)}
+\`\`\`
+
+Allowed values (exact spelling):
+- tests_run[].phase: ${enumOf(testsRun.items.properties.phase?.enum)}; tests_run[].result: ${enumOf(testsRun.items.properties.result?.enum)}. Each entry has exactly command, phase, result, summary.
+- findings[].severity: ${enumOf(schema.$defs.finding.properties.severity?.enum)}; findings[].owner: ${enumOf(owners)}. Each finding needs severity, owner, summary, evidence; file and line are optional.
+- On failure instead: status "failure", failure_type ${enumOf(schema.properties.failure_type?.enum)}, plus retryable, attempted, alternatives, findings (and no head_sha/files_changed/tests_run requirement).`;
+}
+
+export function renderBrief(b: Brief, sha256: string, ownership: Ownership = loadOwnership()): string {
   const list = (xs: string[]) => xs.map((x) => `- ${x}`).join("\n");
   return `<!-- brief_id: ${b.brief_id} sha256: ${sha256} -->
 # Brief ${b.brief_id}${b.round ? ` (round ${b.round})` : ""} for ${b.agent}
@@ -85,7 +162,7 @@ Follow your preloaded spoke-protocol skill. You have no memory of earlier work: 
 ${b.objective}
 
 ## Contract (interfaces and facts you can rely on)
-${b.contract}
+${b.contract}${renderContractFiles(b)}
 
 ## Scope (the only paths you may change)
 ${b.scope.length ? list(b.scope) : "- none: you are read-only"}
@@ -100,7 +177,7 @@ ${list(b.rubric)}
 ${b.concurrency ?? "Nothing else is running."}
 
 ## Your final message
-Exactly one fenced \`\`\`json block matching \`.claude/schemas/return.schema.json\`, with \`"brief_id": "${b.brief_id}"\` and \`"base_sha"\` set to the commit you started from. Nothing outside the block. A hook validates it and will send back errors to fix.
+${renderReturnTemplate(b, ownership)}
 `;
 }
 
@@ -269,7 +346,7 @@ async function main(argv: string[]): Promise<number> {
       console.log("brief OK");
       return 0;
     }
-    const prompt = renderBrief(JSON.parse(text) as Brief, sha256(text));
+    const prompt = renderBrief(JSON.parse(text) as Brief, sha256(text), ownership);
     const outIdx = rest.indexOf("--out");
     if (outIdx >= 0 && rest[outIdx + 1]) {
       writeFileSync(rest[outIdx + 1]!, prompt);

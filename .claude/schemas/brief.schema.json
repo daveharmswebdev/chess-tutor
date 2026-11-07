@@ -63,7 +63,7 @@
     "contract": {
       "type": "string",
       "minLength": 1,
-      "description": "Every interface, type, schema excerpt and measured number the spoke depends on, pasted verbatim. The spoke cannot see the coordinator's context."
+      "description": "Every interface, type, schema excerpt and measured number the spoke depends on. Files go in contract_files (inlined at base_sha); paste only excerpts and facts here. The spoke cannot see the coordinator's context."
     },
     "scope": {
       "type": "array",
@@ -102,6 +102,15 @@
       "type": "integer",
       "minimum": 1,
       "description": "Review round, starting at 1."
+    },
+    "contract_files": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "minLength": 1
+      },
+      "uniqueItems": true,
+      "description": "Repo-relative files the spoke depends on (e.g. packages/chess-core/src/api.ts). render-brief inlines each verbatim from git at base_sha, so don't paste them into contract; contract says what matters about them."
     }
   }
 }

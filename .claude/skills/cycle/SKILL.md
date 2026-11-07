@@ -49,6 +49,11 @@ then P2, then P3. Skip an issue when:
 - it needs a decision only the user makes (it should be in `Needs you`).
 - it needs a dependency added or a shared contract changed first. Then do that inline
   (it's coordinator territory), commit it to `main`, and pick the issue next round.
+  **Exception:** if the contract change would break a branch already in flight (a new
+  required field, a changed signature), don't put it on `main` yet, and don't keep it as
+  a patch in the session scratchpad, which is lost when the session ends. Commit it on a
+  pushed branch `contract-<issue>` and record that branch in the ledger. The pick's spokes
+  later branch from it (`base_sha` = its head), and it merges together with them.
 
 An Epic isn't a pick. Nothing ready is a valid answer: say why each candidate was skipped.
 

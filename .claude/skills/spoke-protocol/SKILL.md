@@ -34,6 +34,11 @@ not something to guess.
 
 - **Test first.** Write the failing test, run it and record it (`phase: "red"`,
   `result: "fail"`), then implement until it passes (`phase: "green"`).
+- **Test both orders.** When one action's effect reaches the other side by two paths (an
+  HTTP reply and an SSE event, a promise and a callback, a cache and the network), test
+  each arrival order, not just the usual one. Fake the slow path so the "impossible" order
+  happens: a dependency that fails or answers at once is the normal case for a dead
+  engine or a cache hit. Two rounds were lost to this class (#6, #23).
 - Finish with the full gate, `pnpm test && pnpm typecheck` (`phase: "gate"`). A failing
   gate is not a success.
 - Implementation spokes **commit** their work in the worktree (a clear message that names

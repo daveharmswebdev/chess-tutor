@@ -41,7 +41,11 @@ CI on main: !`gh run list --branch main --limit 3`
    `docs/`, `CLAUDE.md` and `packages/`, `apps/`, plus open questions (`Q-n`) in
    `docs/requirements.md` §8 that aren't resolved and have no issue. Confirm with
    `gh issue list --state all --search "<keywords>"` before calling one untracked.
-4. Check that the readiness data is consistent: an issue whose blockers are all closed
+4. Read the cycle ledger (`.git/cycle-ledger.md`, if it exists) and collect every gap listed
+   under **Not filed** in any cycle, with its reason. A gap from step 2 or 3 that matches one
+   is not an untracked gap: list it under **Known, not filed** in one line, and skip it unless
+   you found new evidence (a new PR or file:line that changes the picture), which you then name.
+5. Check that the readiness data is consistent: an issue whose blockers are all closed
    but that is still marked blocked, an issue missing from the board, a closed issue not
    in Done.
 
@@ -68,6 +72,9 @@ branch touching a shared file (root package.json, pnpm-lock.yaml, config/*, docs
 **Blocked:** count, and the one or two blockers that unblock the most work
 
 **Untracked gaps:** each with evidence (file:line or PR #) — recommend filing via /triage
+
+**Known, not filed:** gaps the ledger already decided against, one line total, e.g. "bot.ts
+castling fallback, promotion picker (ledger)". Only re-raise one with new evidence.
 
 **Suggested next:** 1–3 READY items that don't collide, each with a one-line reason
 ```
