@@ -105,7 +105,7 @@ it, because background spokes report it only when they finish, and without it th
 no cost data:
 
 ```bash
-node -e 'require("fs").appendFileSync(".claude/orchestration/log.jsonl", JSON.stringify({ts:new Date().toISOString(),event:"coordinator_verdict",brief_id:"<id>",verdict:"accepted|rejected|re-delegated",reason:"<one line>",tokens:<subagent_tokens>,duration_ms:<duration_ms>})+"\n")'
+node -e 'require("fs").appendFileSync(".claude/orchestration/log.jsonl", JSON.stringify({ts:new Date().toISOString(),event:"coordinator_verdict",brief_id:"<id>",agent:"<spoke>",verdict:"accepted|rejected|re-delegated",reason:"<one line>",tokens:<subagent_tokens>,duration_ms:<duration_ms>})+"\n")'
 ```
 
 Log a reviewer's cost the same way, under its own brief_id, even though it has no verdict of
