@@ -167,6 +167,8 @@ That makes FR-8 cheap and instant.
 
 The server calls `messages.stream(...)` and forwards **progress events** to the browser over SSE: "Tutor is looking at the position…" and "Checking Nf3…" (taken from the `tool_use` names and inputs). The validated `TutorReply` arrives as the final event.
 
+**Game API contract:** `packages/chess-core/src/api.ts` defines the REST endpoints (`/api/games`, moves, takeback, resign) and the SSE `GameEvent` types (`state`, `bot_move`, `game_over`, `error`) shared by `apps/server` and `apps/web`. Tutor events (`tutor_thinking`, `tutor_progress`, `tutor_reply`) are added to `GameEvent` when the tutor is wired in.
+
 The reply is a schema-checked JSON object, so streaming raw tokens to the UI would mean showing text that hasn't been validated yet. NFR-1 is therefore measured as time to the first progress event, plus the total time to the reply. **Proposed amendment A1 (below).**
 
 ### 3.7 Chat, covering FR-13 and FR-14

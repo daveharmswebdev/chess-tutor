@@ -1,0 +1,24 @@
+{
+  "brief_id": "016-explorer-castling-r1",
+  "agent": "explorer-agent",
+  "issue": 17,
+  "base_sha": "02395bb",
+  "scratch_dir": "/private/tmp/claude-501/-Users-daveharms-personal-workspace-chess-tutor/2f0df5b4-ae41-4178-abe7-c0149ae57e5d/scratchpad/016-explorer-castling-r1",
+  "objective": "Make every ExplorerResult that leaves packages/explorer use standard UCI for castling (e1g1, e1c1, e8g8, e8c8), whether it came from a fresh Lichess response or from the SQLite cache (entries written before this fix may carry Lichess's king-takes-rook spelling e1h1/e1a1/e8h8/e8a8). Non-castling moves, including other king moves from e1/e8, must pass through unchanged.",
+  "requirements": ["FR-2", "FR-10"],
+  "contract": "Current code at base 02395bb:\n\npackages/explorer/src/schema.ts parseExplorerResponse(raw) maps each Lichess move as { uci: m.uci, san: m.san, games: white+draws+black, white, draws, black, averageRating } and sorts by games desc. cachedResultSchema validates our own ExplorerResult shape on cache read.\n\npackages/explorer/src/cache.ts createSqliteExplorerCache(path, ttlMs).get(key, nowMs) parses the row body with cachedResultSchema and returns parsed.data; set() stores { moves, totalGames, opening } and never stores results with 'unavailable'.\n\npackages/explorer/src/types.ts:\n  export interface ExplorerMove { uci: string; san: string; games: number; white: number; draws: number; black: number; averageRating: number; }\n  export interface ExplorerResult { moves: ExplorerMove[]; totalGames: number; opening: { eco: string; name: string } | null; unavailable?: OutOfBookReason; }\n\nRule (from issue #17): rewrite uci only when san is O-O or O-O-O (optionally followed by + or #) AND uci is the king-to-own-rook form: e1h1->e1g1, e1a1->e1c1, e8h8->e8g8, e8a8->e8c8. If uci is already standard, leave it. A move like Kf1 (e1f1) or a king capture that is not castling stays untouched. Apply on parse AND on cache read (either normalize in get(), or route both through one exported-internally helper; do not bump the cache key, existing rows must still be served).\n\nLichess spelling is not confirmed offline: the recorded fixture test/fixtures/london-after-bf4.json and spike 002 contain no castling move, and no LICHESS_TOKEN is available to agents. Add a new fixture (e.g. test/fixtures/castling-synthetic.json) shaped exactly like london-after-bf4.json, clearly named/commented as synthetic (hand-written, not recorded), containing O-O with e8h8 (and one with already-standard e8g8 to prove idempotence). Position suggestion: after 1.d4 Nf6 2.Bf4 g6 3.e3 Bg7 4.Nf3 d6 5.Be2, Black to move, where O-O is a popular book move. The live confirmation is the user's job via pnpm demo:bot; note that in contract_gaps, don't attempt network calls.\n\nMeasured at base 02395bb from the repo root: pnpm test -> 11 files, 220 passed (220); pnpm typecheck exit 0.\n\nDownstream: packages/chess-core/src/bot.ts currently falls back to san when uci is king-takes-rook. Leave it; the coordinator will decide on removing that workaround separately.",
+  "scope": ["packages/explorer/**"],
+  "negative": [
+    "Do not edit packages/chess-core (including the bot's castling fallback), other packages, apps, docs, config or root files. Report anything needed there in contract_gaps.",
+    "No network calls to Lichess, no new dependencies, no cache key/version bump.",
+    "Do not change ExplorerResult/ExplorerMove types or the public exports in src/index.ts unless strictly needed (say why if so)."
+  ],
+  "rubric": [
+    "Tests written first and recorded red then green: all four castling rewrites on parse; idempotence on already-standard castling; a non-castling king move (e.g. san Kf1, uci e1f1) and a non-king move untouched; a cache row written with e8h8 comes back as e8g8 from get().",
+    "The synthetic fixture is labelled synthetic in its file name or a sibling comment in the test.",
+    "pnpm test and pnpm typecheck clean from the repo root.",
+    "files_changed lists every file changed in 02395bb..your head. Commit message references FR-2, FR-10 and #17."
+  ],
+  "concurrency": "None running. The coordinator is meanwhile committing scaffolding for #6 directly to main (new apps/server, apps/web package skeletons, root package.json/lockfile, CI, and possibly packages/chess-core/src/index.ts exports). No overlap with packages/explorer.",
+  "round": 1
+}

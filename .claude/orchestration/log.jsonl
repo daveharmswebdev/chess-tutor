@@ -43,3 +43,13 @@
 {"ts":"2026-11-07T19:41:51.738Z","event":"coordinator_verdict","brief_id":"013-sparring-bot-r2","verdict":"accepted","reason":"dde4a8f: files match, gate 169, typecheck clean; castling SAN fallback read and accepted"}
 {"ts":"2026-11-07T19:42:38.102Z","event":"shipped","issue":13,"pr":18}
 {"ts":"2026-11-07T19:44:08.886Z","event":"shipped","issue":5,"pr":19}
+{"ts":"2026-11-07T21:26:22.831Z","event":"dispatch","subagent_type":"core-agent","brief_id":"015-still-winning-r1","base_sha":"007d0d4","spoke":true}
+{"ts":"2026-11-07T21:26:23.047Z","event":"agent_complete","subagent_type":"core-agent","brief_id":"015-still-winning-r1","agent_id":"ab53ca3de1f1b55da","status":"async_launched","contract":"pending"}
+{"ts":"2026-11-07T21:27:10.743Z","event":"edit_denied","agent_type":"core-agent","agent_id":"ab53ca3de1f1b55da","path":"/private/tmp/claude-501/-Users-daveharms-personal-workspace-chess-tutor/2c4af807-332d-4ac0-b223-b9f6f756da63/scratchpad/015-still-winning-r1/edit_tests.py"}
+{"ts":"2026-11-07T21:28:16.792Z","event":"return_invalid","agent_id":"ab53ca3de1f1b55da","agent_type":"core-agent","attempt":1,"errors":["/tests_run: a 'gate' check failed, so this is not a success"]}
+{"ts":"2026-11-07T21:28:28.898Z","event":"return_valid","agent_id":"ab53ca3de1f1b55da","agent_type":"core-agent","via":"handback"}
+{"ts":"2026-11-07T21:29:53.240Z","event":"coordinator_verdict","brief_id":"015-still-winning-r1","verdict":"accepted","reason":"2a5d5bc: files match, gate 220; 6-line rule read; no reviewer (small, fully pinned)"}
+{"ts":"2026-11-07T21:29:53.240Z","event":"shipped","issue":16,"pr":20}
+{"ts":"2026-11-07T21:46:49.250Z","event":"dispatch","subagent_type":"explorer-agent","brief_id":"016-explorer-castling-r1","base_sha":"02395bb","spoke":true}
+{"ts":"2026-11-07T21:46:49.463Z","event":"agent_complete","subagent_type":"explorer-agent","brief_id":"016-explorer-castling-r1","agent_id":"af49d2b9618550550","status":"async_launched","contract":"pending"}
+{"ts":"2026-11-07T21:48:22.125Z","event":"return_invalid","agent_id":"af49d2b9618550550","agent_type":"explorer-agent","attempt":1,"errors":["/tests_run/0/phase: must be equal to one of the allowed values [\"red\",\"green\",\"gate\"]"]}

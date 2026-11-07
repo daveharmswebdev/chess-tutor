@@ -12,6 +12,7 @@ export type {
 } from "./types.ts";
 export { detect } from "./detector.ts";
 export { buildRepertoire } from "./repertoire.ts";
+export { parseRepertoirePgn } from "./repertoire-pgn.ts";
 export { MATE_CP, scoreToCp } from "./score.ts";
 export { sanOf } from "./moves.ts";
 export { createSparringBot } from "./bot.ts";
@@ -27,3 +28,14 @@ export type {
   SparringBot,
   SparringBotOptions,
 } from "./bot.ts";
+export type {
+  ApiError,
+  GameEndReason,
+  GameEvent,
+  GameResult,
+  GameStatus,
+  GameView,
+  MoveView,
+  NewGameRequest,
+  PlayMoveRequest,
+} from "./api.ts";
