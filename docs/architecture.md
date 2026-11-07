@@ -182,7 +182,7 @@ The reply is a schema-checked JSON object, so streaming raw tokens to the UI wou
 
 ### 3.9 Persistence, covering IR-7
 
-SQLite through `better-sqlite3` and Drizzle, with tables `games` (PGN, metadata, tutor comments), `tutor_turns` (the stored conversation for each game), `usage`, and `explorer_cache`. The schema is designed to move to Postgres if the app is ever hosted.
+SQLite through Node's built-in `node:sqlite` (`DatabaseSync`, no native dependency to build; it prints an ExperimentalWarning on Node 22), with tables `games` (PGN, metadata, tutor comments), `tutor_turns` (the stored conversation for each game), `usage`, and `explorer_cache`. The schema is designed to move to Postgres if the app is ever hosted.
 
 ## 4. Life of a move
 
