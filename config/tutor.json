@@ -1,7 +1,7 @@
 {
-  "engine": { "flavor": "full", "threads": 4, "depth": 18, "movetimeCapMs": 1000, "multiPv": 3 },
-  "keyMoments": { "blunderCp": 150, "missedWinCp": 150, "punishCp": 150, "stillWinningCp": 500 },
-  "bot": { "explorerRatings": [1200, 1400], "explorerSpeeds": ["blitz", "rapid"], "minGames": 20, "outOfBookElo": 1400 },
-  "tutor": { "effort": "medium", "maxToolRounds": 4 },
-  "budget": { "monthlySoftCapUsd": 25 }
+  "engine": {"flavor": "full", "threads": 4, "depth": 18, "movetimeCapMs": 1000, "multiPv": 3},
+  "keyMoments": {"blunderCp": 150, "missedWinCp": 150, "punishCp": 150, "stillWinningCp": 500},
+  "bot": {"explorerRatings": [1200, 1400], "explorerSpeeds": ["blitz", "rapid"], "minGames": 20, "outOfBookElo": 1400},
+  "tutor": {"effort": "medium", "maxToolRounds": 4, "attemptToleranceCp": 50},
+  "budget": {"monthlySoftCapUsd": 25}
 }
