@@ -94,6 +94,8 @@ export function buildServer(deps: ServerDeps): { app: FastifyInstance; games: Ga
 
   app.post<{ Params: { id: string } }>("/api/games/:id/takeback", async (request) => games.takeback(request.params.id));
 
+  app.post<{ Params: { id: string } }>("/api/games/:id/bot-retry", async (request) => games.botRetry(request.params.id));
+
   app.post<{ Params: { id: string } }>("/api/games/:id/resign", async (request) => games.resign(request.params.id));
 
   app.get<{ Params: { id: string } }>("/api/games/:id/events", (request, reply) => {

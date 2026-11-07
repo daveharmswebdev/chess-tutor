@@ -49,6 +49,8 @@ export interface GameManager {
   view(id: string): GameView | undefined;
   play(id: string, uci: string): GameView;
   takeback(id: string): GameView;
+  /** Restarts the bot on the current position after a bot failure (#23). */
+  botRetry(id: string): GameView;
   resign(id: string): GameView;
   /** Marks every game still playing as abandoned and saves it (shutdown). */
   abandonAll(): void;
@@ -296,6 +298,19 @@ export function createGameManager(opts: GameManagerOptions): GameManager {
         g.moves.pop();
       }
       g.version++;
+      emit(g, { type: "state", game: viewOf(g) });
+      return viewOf(g);
+    },
+
+    botRetry(id) {
+      const g = find(id);
+      requirePlaying(g);
+      if (g.botThinking) throw new GameError(409, "the bot is thinking");
+      if (g.chess.turn() === g.playerColor) throw new GameError(409, "it is the player's turn");
+      log.info({ gameId: g.id, fen: g.chess.fen() }, "bot retry");
+      // Through startBot, so a retried search is discarded if the game changes meanwhile.
+      g.version++;
+      startBot(g);
       emit(g, { type: "state", game: viewOf(g) });
       return viewOf(g);
     },
