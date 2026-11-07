@@ -1,0 +1,19 @@
+{
+  "name": "@chess-tutor/tutor",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "scripts": {
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@anthropic-ai/sdk": "^1.6.0",
+    "@chess-tutor/chess-core": "workspace:*",
+    "@chess-tutor/explorer": "workspace:*",
+    "chess.js": "^1.4.0",
+    "zod": "^4.6.7"
+  }
+}
