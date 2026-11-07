@@ -18,6 +18,9 @@ import type { Color } from "./types.ts";
  *   POST /api/games/:id/resign      -> 200 GameView, status "finished", endReason "resigned".
  *   GET  /api/games/:id/events      -> text/event-stream. Each message is `event: <GameEvent.type>`
  *        plus `data: <GameEvent as JSON>`. The first message on every connection is "state".
+ *        The server also sends "state" after each player move and takeback, and "game_over" to an
+ *        abandoned game's subscribers. When the bot fails, the server sends "state" (botThinking
+ *        false) immediately before "error", so a client that clears its error on "state" still shows it.
  *
  * Finished and abandoned games are saved as PGN (FR-5). The bot replies within 2 s (NFR-3).
  */
