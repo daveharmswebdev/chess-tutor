@@ -161,4 +161,14 @@ describe("edit scope guard", () => {
     expect(JSON.stringify(edit("core-agent", "packages/engine/src/types.ts"))).toMatch(/deny/);
     expect(JSON.stringify(edit("reviewer", "packages/engine/src/types.ts"))).toMatch(/read-only/);
   });
+
+  it("lets editing spokes write scratch files under a temp root, but not read-only agents or other outside paths (#21)", () => {
+    const at = (agent_type: string, file_path: string) => guardEditScope({ agent_type, tool_input: { file_path } }, ownership);
+    const scratch = join(tmpdir(), "chess-tutor-scratch", "015-r1", "notes.py");
+    expect(at("core-agent", scratch)).toBeNull();
+    expect(at("core-agent", "/private/tmp/claude-501/x/scratchpad/015/edit_tests.py")).toBeNull();
+    expect(JSON.stringify(at("reviewer", scratch))).toMatch(/deny/);
+    expect(JSON.stringify(at("core-agent", "/Users/someone/.bashrc"))).toMatch(/deny/);
+    expect(JSON.stringify(at("core-agent", "/tmpfoo/x.ts"))).toMatch(/deny/);
+  });
 });

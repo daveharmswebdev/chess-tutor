@@ -3,8 +3,20 @@
  * (.claude/ownership.json). The coordinator (no agent_type) is not restricted here.
  * Per-brief scope is narrower than ownership; the coordinator checks that afterwards
  * against `git diff`.
+ *
+ * A spoke that edits anything may also write scratch files outside every git repo
+ * under a temp root (the brief's scratch_dir, #21). Read-only agents stay denied.
  */
+import { tmpdir } from "node:os";
+import { resolve, sep } from "node:path";
 import { emit, loadOwnership, log, ownsPath, readStdinJson, repoRelative, type Ownership } from "./lib.ts";
+
+const TEMP_ROOTS = [...new Set(["/tmp", "/private/tmp", tmpdir()].map((r) => resolve(r)))];
+
+export function isScratchPath(abs: string): boolean {
+  const p = resolve(abs);
+  return TEMP_ROOTS.some((root) => p.startsWith(root + sep));
+}
 
 export function guardEditScope(input: Record<string, unknown>, ownership: Ownership): object | null {
   const agentType = typeof input.agent_type === "string" ? input.agent_type : "";
@@ -16,6 +28,7 @@ export function guardEditScope(input: Record<string, unknown>, ownership: Owners
 
   const rel = abs ? repoRelative(abs) : null;
   if (rel !== null && ownsPath(def.owns, rel)) return null;
+  if (rel === null && abs && def.owns.length > 0 && isScratchPath(abs)) return null;
 
   const reason = `${agentType} may only edit ${def.owns.length ? def.owns.join(", ") : "nothing (read-only)"}; '${rel ?? abs}' is outside that. Report it as a finding with owner set to the right agent or 'coordinator' instead.`;
   log(ownership.edit_scope_mode === "block" ? "edit_denied" : "edit_scope_warning", {
