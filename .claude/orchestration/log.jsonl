@@ -53,3 +53,6 @@
 {"ts":"2026-11-07T21:46:49.250Z","event":"dispatch","subagent_type":"explorer-agent","brief_id":"016-explorer-castling-r1","base_sha":"02395bb","spoke":true}
 {"ts":"2026-11-07T21:46:49.463Z","event":"agent_complete","subagent_type":"explorer-agent","brief_id":"016-explorer-castling-r1","agent_id":"af49d2b9618550550","status":"async_launched","contract":"pending"}
 {"ts":"2026-11-07T21:48:22.125Z","event":"return_invalid","agent_id":"af49d2b9618550550","agent_type":"explorer-agent","attempt":1,"errors":["/tests_run/0/phase: must be equal to one of the allowed values [\"red\",\"green\",\"gate\"]"]}
+{"ts":"2026-11-07T21:48:31.834Z","event":"return_valid","agent_id":"af49d2b9618550550","agent_type":"explorer-agent","via":"handback"}
+{"ts":"2026-11-07T21:48:51.830Z","event":"coordinator_verdict","brief_id":"016-explorer-castling-r1","verdict":"accepted","reason":"diff == files_changed, in scope; gate re-run 230 passed, typecheck 0; small diff read in full, no reviewer"}
+{"ts":"2026-11-07T21:50:18.954Z","event":"shipped","issue":17,"pr":22}
