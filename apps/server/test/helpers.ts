@@ -12,6 +12,8 @@ export interface FakeBot extends SparringBot {
   hold(): void;
   release(): void;
   failNext(message: string): void;
+  /** The next search returns this UCI as-is, without checking it (to test FR-10 handling). */
+  illegalNext(uci: string): void;
 }
 
 export function createFakeBot(script: string[] = [], delayMs = 0): FakeBot {
@@ -20,6 +22,7 @@ export function createFakeBot(script: string[] = [], delayMs = 0): FakeBot {
   let held = false;
   let waiters: (() => void)[] = [];
   let failure: string | null = null;
+  let illegal: string | null = null;
   return {
     calls,
     hold() {
@@ -34,12 +37,20 @@ export function createFakeBot(script: string[] = [], delayMs = 0): FakeBot {
     failNext(message) {
       failure = message;
     },
+    illegalNext(uci) {
+      illegal = uci;
+    },
     async chooseMove(fen): Promise<BotMove> {
       calls.push(fen);
       if (failure !== null) {
         const message = failure;
         failure = null;
         throw new Error(message);
+      }
+      if (illegal !== null) {
+        const uci = illegal;
+        illegal = null;
+        return { uci, san: "??", source: "engine", fallbackReason: "unavailable" };
       }
       if (delayMs > 0) await new Promise((r) => setTimeout(r, delayMs));
       if (held) await new Promise<void>((r) => waiters.push(r));

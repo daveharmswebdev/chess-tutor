@@ -12,6 +12,7 @@ import { createEngineFromEnv, type StockfishEngine } from "@chess-tutor/engine";
 import { buildServer } from "./app.ts";
 import { loadBotConfig, loadEngineThreads } from "./config.ts";
 import { createBotExplorer, type BotExplorerSetup } from "./explorer-env.ts";
+import { createShutdown } from "./shutdown.ts";
 import { defaultRepertoireFiles, loadRepertoire, RepertoireLoadError } from "./repertoire.ts";
 import { createSqliteGameStore, resolveDbPath, type GameStore } from "./store.ts";
 
@@ -49,21 +50,17 @@ async function main(): Promise<void> {
     const { app } = buildServer({ bot, store, logger: { level: env["LOG_LEVEL"] || "info" } });
     for (const w of warnings) app.log.warn(w);
 
-    const resources = { store, explorer, engine };
-    let shuttingDown = false;
-    const shutdown = async (signal: string) => {
-      if (shuttingDown) return;
-      shuttingDown = true;
-      app.log.info({ signal }, "shutting down: abandoning live games");
-      try {
-        await app.close(); // preClose abandons and saves games still playing
-      } finally {
-        await resources.engine.quit();
-        resources.explorer.close();
-        resources.store.close();
-        process.exit(0);
-      }
-    };
+    const [liveEngine, liveExplorer, liveStore] = [engine, explorer, store];
+    const shutdown = createShutdown({
+      app,
+      resources: [
+        { name: "engine", close: () => liveEngine.quit() },
+        { name: "explorer cache", close: () => liveExplorer.close() },
+        { name: "game store", close: () => liveStore.close() },
+      ],
+      log: app.log,
+      exit: (code) => process.exit(code),
+    });
     process.on("SIGINT", () => void shutdown("SIGINT"));
     process.on("SIGTERM", () => void shutdown("SIGTERM"));
 
