@@ -52,6 +52,12 @@ export function detect(input: DetectorInput): KeyMoment | null {
 
   if (mover === playerColor) {
     if (decidedMate) return null;
+    // Still clearly winning after the move (#16): stay quiet, unless the best move was
+    // a forced mate for the player and the played move does not keep one.
+    const keptMate =
+      (playedScore !== null && playedScore.kind === "mate" && playedEval > 0) || board.isCheckmate();
+    const missedMate = bestLine.score.kind === "mate" && bestEval > 0 && !keptMate;
+    if (playedEval > thresholds.stillWinningCp && !missedMate) return null;
     const best = sanOf(input.fenBefore, before.bestMove);
     if (bestEval >= thresholds.missedWinCp && playedEval >= 0 && loss >= thresholds.missedWinCp) {
       return { kind: "missed_win", played: played.san, best, gainCp: loss };

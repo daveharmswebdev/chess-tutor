@@ -331,11 +331,69 @@ const cases: Case[] = [
     expected: null,
   },
 
+  // --- stillWinningCp (#16): the player's own drops are quiet while still clearly winning after the move
+  {
+    name: "still-winning probe 1 (#3): +1200 -> +1040 is silent",
+    playerColor: "w", fen: AFTER_NC6, move: "f1c4", best: "f1b5", before: cp(1200), reply: "g8f6", after: cp(1040),
+    expected: null,
+  },
+  {
+    name: "still-winning probe 2: crossing the line (+900 -> +400) still fires",
+    playerColor: "w", fen: AFTER_NC6, move: "f1c4", best: "f1b5", before: cp(900), reply: "g8f6", after: cp(400),
+    expected: { kind: "missed_win", played: "Bc4", best: "Bb5", gainCp: 500 },
+  },
+  {
+    name: "still-winning probe 3a: after exactly stillWinningCp fires",
+    playerColor: "w", fen: AFTER_NC6, move: "f1c4", best: "f1b5", before: cp(650), reply: "g8f6", after: cp(500),
+    expected: { kind: "missed_win", played: "Bc4", best: "Bb5", gainCp: 150 },
+  },
+  {
+    name: "still-winning probe 3b: after one above stillWinningCp is silent",
+    playerColor: "w", fen: AFTER_NC6, move: "f1c4", best: "f1b5", before: cp(651), reply: "g8f6", after: cp(501),
+    expected: null,
+  },
+  {
+    name: "still-winning probe 4a: a missed forced mate speaks even above stillWinningCp",
+    playerColor: "w", fen: AFTER_NC6, move: "f1c4", best: "f1b5", before: mate(2), reply: "g8f6", after: cp(800),
+    expected: { kind: "missed_win", played: "Bc4", best: "Bb5", gainCp: 99800 - 800 },
+  },
+  {
+    name: "still-winning probe 4b: mate in 2 -> mate in 4 stays silent (decided mate)",
+    playerColor: "w", fen: AFTER_NC6, move: "f1c4", best: "f1b5", before: mate(2), reply: "g8f6", after: mate(4),
+    expected: null,
+  },
+  {
+    name: "still-winning probe 5: Black at -1200 -> -1040 (White view) is silent",
+    playerColor: "b", fen: AFTER_E4, move: "g7g5", best: "e7e5", before: cp(-1200), reply: "d2d4", after: cp(-1040),
+    expected: null,
+  },
+  {
+    name: "still-winning probe 5b: Black crossing the line (-900 -> -400) still fires",
+    playerColor: "b", fen: AFTER_E4, move: "g7g5", best: "e7e5", before: cp(-900), reply: "d2d4", after: cp(-400),
+    expected: { kind: "missed_win", played: "g5", best: "e5", gainCp: 500 },
+  },
+  {
+    name: "still-winning probe 6: the losing side is unchanged (-800 -> -1000 is player_blunder)",
+    playerColor: "w", fen: AFTER_NC6, move: "f3g5", best: "f1b5", before: cp(-800), reply: "d8g5", after: cp(-1000),
+    expected: { kind: "player_blunder", played: "Ng5", cpLoss: 200, best: "Bb5" },
+  },
+  {
+    name: "still-winning probe 7: an opponent blunder with the player at +700 is still punish_opponent",
+    playerColor: "w", fen: AFTER_NF3, move: "f7f6", best: "b8c6", before: cp(700), reply: "f3e5", after: cp(850),
+    expected: { kind: "punish_opponent", opponentMove: "f6", refutation: "Nxe5", gainCp: 150 },
+  },
+  {
+    name: "stillWinningCp is a parameter: a higher threshold makes +1040 speak",
+    playerColor: "w", fen: AFTER_NC6, move: "f1c4", best: "f1b5", before: cp(1200), reply: "g8f6", after: cp(1040),
+    thresholds: { ...T, stillWinningCp: 2000 },
+    expected: { kind: "missed_win", played: "Bc4", best: "Bb5", gainCp: 160 },
+  },
+
   // --- thresholds are parameters
   {
     name: "custom thresholds change the boundary",
     playerColor: "w", fen: AFTER_NC6, move: "f3g5", best: "f1b5", before: cp(30), reply: "d8g5", after: cp(-20),
-    thresholds: { blunderCp: 50, missedWinCp: 1000, punishCp: 1000 },
+    thresholds: { blunderCp: 50, missedWinCp: 1000, punishCp: 1000, stillWinningCp: 1000 },
     expected: { kind: "player_blunder", played: "Ng5", cpLoss: 50, best: "Bb5" },
   },
 ];
@@ -346,7 +404,12 @@ describe("detect", () => {
   });
 
   it("reads its default thresholds from config/tutor.json", () => {
-    expect(T).toEqual({ blunderCp: expect.any(Number), missedWinCp: expect.any(Number), punishCp: expect.any(Number) });
+    expect(T).toEqual({
+      blunderCp: expect.any(Number),
+      missedWinCp: expect.any(Number),
+      punishCp: expect.any(Number),
+      stillWinningCp: expect.any(Number),
+    });
     const loss = T.blunderCp;
     const result = detect(
       input({
