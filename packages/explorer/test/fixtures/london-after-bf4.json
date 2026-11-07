@@ -1,0 +1,20 @@
+{
+  "white": 4919012, "draws": 375304, "black": 4680651,
+  "moves": [
+    { "uci": "g7g6", "san": "g6", "averageRating": 1434,
+      "white": 1280978, "draws": 102494, "black": 1348187, "game": null, "opening": null },
+    { "uci": "d7d5", "san": "d5", "averageRating": 1452,
+      "white": 1205611, "draws": 88604, "black": 1068570, "game": null,
+      "opening": { "eco": "D02", "name": "Queen's Pawn Game: London System" } },
+    { "uci": "e7e6", "san": "e6", "averageRating": 1421,
+      "white": 1022535, "draws": 75893, "black": 925392, "game": null, "opening": null },
+    { "uci": "d7d6", "san": "d6", "averageRating": 1398,
+      "white": 701471, "draws": 54209, "black": 689906, "game": null, "opening": null },
+    { "uci": "c7c5", "san": "c5", "averageRating": 1446,
+      "white": 207402, "draws": 17198, "black": 234000, "game": null, "opening": null },
+    { "uci": "b8c6", "san": "Nc6", "averageRating": 1387,
+      "white": 237864, "draws": 16450, "black": 184347, "game": null, "opening": null }
+  ],
+  "recentGames": [], "topGames": [],
+  "opening": { "eco": "A45", "name": "Indian Defense: Accelerated London System" }
+}
