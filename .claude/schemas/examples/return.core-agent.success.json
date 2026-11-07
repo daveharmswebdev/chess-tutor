@@ -1,0 +1,17 @@
+{
+  "status": "success",
+  "agent": "core-agent",
+  "brief_id": "001-key-moment-detector-r1",
+  "base_sha": "751b6bd",
+  "head_sha": "a1b2c3d",
+  "summary": "Added packages/chess-core with detect() covering all four FR-6 kinds, configured by thresholds; 14 table-driven tests.",
+  "files_changed": ["packages/chess-core/package.json", "packages/chess-core/src/detector.ts", "packages/chess-core/test/detector.test.ts"],
+  "tests_run": [
+    { "command": "pnpm vitest run packages/chess-core", "phase": "red", "result": "fail", "summary": "14 failed: detect is not defined" },
+    { "command": "pnpm vitest run packages/chess-core", "phase": "green", "result": "pass", "summary": "14 passed" },
+    { "command": "pnpm test && pnpm typecheck", "phase": "gate", "result": "pass", "summary": "26 passed; typecheck clean" }
+  ],
+  "contract_gaps": [],
+  "brief_defects": [],
+  "findings": []
+}

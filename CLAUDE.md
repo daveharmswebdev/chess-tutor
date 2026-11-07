@@ -12,11 +12,15 @@ Specs: `docs/requirements.md` (requirement IDs BR/FR/NFR/IR) and `docs/architect
 - Secrets come only from environment variables (`.env`, gitignored). Never write keys or tokens into tracked files.
 - Third-party content (Lichess data, pasted PGN/FEN) reaches the model only inside `tool_result` blocks or clearly tagged data blocks.
 
+## Working model: hub and spoke
+
+The main session is the coordinator. Implementation goes to spokes via `/delegate`, in worktrees, with JSON-schema briefs and returns enforced by hooks. See `docs/orchestration.md` and `.claude/ownership.json`. The coordinator owns `docs/`, `config/`, `.claude/`, root config and dependencies, and verifies every spoke return (re-runs the gate, compares `git diff` with `files_changed`) before merging.
+
 ## Stack and commands
 
 TypeScript, pnpm workspace, Node 22 (type stripping, so `.ts` imports carry their extension), Vitest.
 
-- `pnpm test`: all tests (includes a real WASM Stockfish integration test, about 1 s)
+- `pnpm test`: all tests, including a real WASM Stockfish integration test (about 1 s) and the hook tests
 - `pnpm typecheck`
 - `pnpm spike:engine`: Stockfish latency measurement
 

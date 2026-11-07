@@ -1,0 +1,21 @@
+{
+  "$comment": [
+    "Who may edit what: the single source for guard-edit-scope.ts (PreToolUse) and for",
+    "delegation.ts's brief and return checks. Globs are repo-relative: `dir/**` covers",
+    "everything under dir; other patterns match segment by segment (`*` within a segment).",
+    "Anything no agent owns belongs to the coordinator: CLAUDE.md, .claude/, docs/, config/,",
+    "and root config files (package.json, pnpm-lock.yaml, tsconfig.base.json, vitest.config.ts).",
+    "edit_scope_mode: `block` denies an out-of-scope edit; `warn` allows it and logs it."
+  ],
+  "edit_scope_mode": "block",
+  "agents": {
+    "engine-agent":   { "kind": "implementation", "owns": ["packages/engine/**"] },
+    "core-agent":     { "kind": "implementation", "owns": ["packages/chess-core/**", "repertoire/**"] },
+    "explorer-agent": { "kind": "implementation", "owns": ["packages/explorer/**"] },
+    "tutor-agent":    { "kind": "implementation", "owns": ["packages/tutor/**", "prompts/**", "evals/**"] },
+    "server-agent":   { "kind": "implementation", "owns": ["apps/server/**"] },
+    "web-agent":      { "kind": "implementation", "owns": ["apps/web/**"] },
+    "reviewer":       { "kind": "read-only", "owns": [] },
+    "researcher":     { "kind": "read-only", "owns": [] }
+  }
+}

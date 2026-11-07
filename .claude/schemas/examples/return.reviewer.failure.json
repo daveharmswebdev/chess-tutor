@@ -1,0 +1,12 @@
+{
+  "status": "failure",
+  "agent": "reviewer",
+  "brief_id": "002-review-detector-r1",
+  "base_sha": "751b6bd",
+  "summary": "Could not review: the head_sha named in the brief does not exist.",
+  "failure_type": "blocked-by-missing-input",
+  "retryable": false,
+  "attempted": "git cat-file -e a1b2c3d^{commit} -> fatal: Not a valid object name",
+  "alternatives": "Re-issue the brief with the commit the core-agent round actually produced.",
+  "findings": []
+}

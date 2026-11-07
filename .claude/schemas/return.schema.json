@@ -1,0 +1,88 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "chess-tutor/return.schema.json",
+  "title": "Spoke return (spoke -> coordinator)",
+  "description": "A spoke's final report: exactly one fenced ```json block with nothing outside it. Checked by hooks before it reaches the coordinator. The schema checks shape only; the coordinator still re-runs the checks and compares git diff with files_changed.",
+  "type": "object",
+  "oneOf": [
+    {
+      "properties": { "status": { "const": "success" } },
+      "required": ["status", "agent", "brief_id", "base_sha", "head_sha", "summary", "files_changed", "tests_run", "contract_gaps", "brief_defects", "findings"],
+      "not": { "anyOf": [{ "required": ["failure_type"] }, { "required": ["retryable"] }] }
+    },
+    {
+      "properties": { "status": { "const": "failure" } },
+      "required": ["status", "agent", "brief_id", "base_sha", "summary", "failure_type", "retryable", "attempted", "alternatives", "findings"]
+    }
+  ],
+  "properties": {
+    "status": {
+      "enum": ["success", "failure"],
+      "description": "success = the job is done (read-only agents: the checks ran, whatever they found). failure = you could not do the job."
+    },
+    "agent": { "type": "string", "description": "Your agent name exactly as in your definition. Checked against the agent that ran." },
+    "brief_id": { "type": "string", "description": "The brief_id you were given." },
+    "base_sha": { "type": "string", "pattern": "^[0-9a-f]{7,40}$", "description": "`git rev-parse HEAD` before you changed anything. Must equal the brief's base_sha." },
+    "head_sha": {
+      "type": ["string", "null"],
+      "pattern": "^[0-9a-f]{7,40}$",
+      "description": "The commit holding your work. Required (non-null) for an implementation spoke's success; null for read-only agents."
+    },
+    "summary": { "type": "string", "minLength": 1, "description": "One paragraph: what was actually produced. Never claim success with a stubbed deliverable." },
+    "files_changed": {
+      "type": "array",
+      "items": { "type": "string" },
+      "description": "Every file created, modified or deleted, by any means (Edit, Write or a Bash command). Empty for read-only agents."
+    },
+    "tests_run": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["command", "phase", "result", "summary"],
+        "properties": {
+          "command": { "type": "string", "minLength": 1 },
+          "phase": { "enum": ["red", "green", "gate"], "description": "red = the failing test before the fix; green = after; gate = the final full checks." },
+          "result": { "enum": ["pass", "fail", "skip"] },
+          "summary": { "type": "string", "description": "e.g. '18 passed', or the failing assertion." }
+        }
+      },
+      "description": "Every check you actually executed, in order, with its real result."
+    },
+    "contract_gaps": { "type": "array", "items": { "type": "string" }, "description": "Where the given interfaces were insufficient. [] if none." },
+    "brief_defects": {
+      "type": "array",
+      "items": { "type": "string" },
+      "description": "Where the brief itself was wrong: a stale fact, a path that doesn't exist, a rubric that contradicts the code. [] if none."
+    },
+    "findings": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/finding" },
+      "description": "Defects found. For reviewer this is the deliverable. Implementation spokes report defects outside their scope here instead of fixing them."
+    },
+    "failure_type": {
+      "enum": ["blocked-by-missing-input", "brief-contradiction", "out-of-scope-required", "tool-or-environment-failure", "could-not-make-tests-pass"],
+      "description": "Why the job could not be done. (malformed-return is assigned only by the coordinator.)"
+    },
+    "retryable": { "type": "boolean", "description": "true if the same brief could succeed on a re-run; false if the brief or an input must change first." },
+    "attempted": { "type": "string", "minLength": 1, "description": "What was tried, with exact commands." },
+    "partial_results": { "type": "string", "description": "Anything usable that was produced." },
+    "alternatives": { "type": "string", "minLength": 1, "description": "What to try next, or what the coordinator should change in the brief." }
+  },
+  "additionalProperties": false,
+  "$defs": {
+    "finding": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["severity", "owner", "summary", "evidence"],
+      "properties": {
+        "severity": { "enum": ["blocking", "major", "minor"] },
+        "owner": { "type": "string", "description": "The agent whose territory it is in, or 'coordinator'." },
+        "file": { "type": "string" },
+        "line": { "type": "integer", "minimum": 1 },
+        "summary": { "type": "string", "minLength": 1 },
+        "evidence": { "type": "string", "minLength": 1, "description": "Command output, a failing input, or a quote of the code." }
+      }
+    }
+  }
+}

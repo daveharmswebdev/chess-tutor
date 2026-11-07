@@ -1,0 +1,60 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "chess-tutor/brief.schema.json",
+  "title": "Delegation brief (coordinator -> spoke)",
+  "description": "Written as JSON in .claude/orchestration/briefs/<brief_id>.json, then rendered with `node .claude/hooks/delegation.ts render-brief <file>`, which checks this schema plus the semantic rules (scope inside the agent's ownership, base_sha is a real commit) and prints the prompt for the Agent tool. A spoke starts with no memory: everything it needs must be in here.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["brief_id", "agent", "base_sha", "scratch_dir", "objective", "requirements", "contract", "scope", "negative", "rubric", "concurrency"],
+  "properties": {
+    "brief_id": {
+      "type": "string",
+      "pattern": "^[0-9]{3}-[a-z0-9-]+-r[0-9]+$",
+      "description": "<sequence>-<slug>-r<round>, e.g. 003-key-moment-detector-r1. Matches the file name."
+    },
+    "agent": { "type": "string", "description": "The spoke: a key of .claude/ownership.json agents." },
+    "base_sha": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{7,40}$",
+      "description": "The commit the spoke starts from. Worktree spokes branch from the coordinator's HEAD, so commit contract changes before delegating."
+    },
+    "scratch_dir": { "type": "string", "minLength": 1, "description": "This spoke's own scratch directory, never a shared root." },
+    "objective": {
+      "type": "string",
+      "minLength": 1,
+      "description": "What to produce, specific enough that success or failure is unambiguous. Goals and quality criteria, not a step-by-step procedure."
+    },
+    "requirements": {
+      "type": "array",
+      "items": { "type": "string", "pattern": "^(BR|FR|NFR|IR)-[0-9]+$" },
+      "description": "Requirement IDs from docs/requirements.md this round implements. Empty for pure research or review."
+    },
+    "contract": {
+      "type": "string",
+      "minLength": 1,
+      "description": "Every interface, type, schema excerpt and measured number the spoke depends on, pasted verbatim. The spoke cannot see the coordinator's context."
+    },
+    "scope": {
+      "type": "array",
+      "items": { "type": "string", "minLength": 1 },
+      "description": "Repo-relative paths or globs this round may change. Must sit inside the agent's `owns` (checked). Read-only agents: [] ."
+    },
+    "negative": {
+      "type": "array",
+      "items": { "type": "string", "minLength": 1 },
+      "minItems": 1,
+      "description": "Explicitly out of scope: other spokes' territory, forbidden actions, tempting side quests."
+    },
+    "rubric": {
+      "type": "array",
+      "items": { "type": "string", "minLength": 1 },
+      "minItems": 1,
+      "description": "How the work is judged: tests written first, checks that must be clean, behaviours to verify."
+    },
+    "concurrency": {
+      "type": ["string", "null"],
+      "description": "Other rounds running now and the files they touch, or null if nothing else runs."
+    },
+    "round": { "type": "integer", "minimum": 1, "description": "Review round, starting at 1." }
+  }
+}
