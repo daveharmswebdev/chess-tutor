@@ -1,0 +1,9 @@
+{
+  "$comment": "Model ID pinned per environment (IR-9). Change only through review, after running evals on the candidate model.",
+  "development": { "tutor": "claude-opus-5-5", "chat": "claude-opus-5-5" },
+  "eval": { "tutor": "claude-opus-5-5", "chat": "claude-opus-5-5" },
+  "pricingPerMTok": {
+    "claude-opus-5-5": { "input": 4.0, "output": 20.0, "cacheRead": 0.2 },
+    "claude-sonnet-5-5": { "input": 2.0, "output": 10.0, "cacheRead": 0.2 }
+  }
+}

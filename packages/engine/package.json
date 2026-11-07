@@ -1,0 +1,16 @@
+{
+  "name": "@chess-tutor/engine",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "scripts": {
+    "typecheck": "tsc --noEmit",
+    "spike": "node --experimental-strip-types spike/latency.ts"
+  },
+  "dependencies": {
+    "stockfish": "^19.0.1"
+  }
+}

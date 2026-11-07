@@ -1,0 +1,16 @@
+node_modules/
+dist/
+coverage/
+*.sqlite
+*.sqlite-journal
+
+# Secrets (NFR-12)
+.env
+.env.*
+!.env.example
+
+# Personal Claude Code config (tracked counterparts: CLAUDE.md, .claude/settings.json)
+.claude/settings.local.json
+CLAUDE.local.md
+
+.DS_Store

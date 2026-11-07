@@ -1,0 +1,19 @@
+{
+  "name": "chess-tutor",
+  "private": true,
+  "type": "module",
+  "packageManager": "pnpm@12.15.0",
+  "engines": {
+    "node": ">=22"
+  },
+  "scripts": {
+    "test": "vitest run",
+    "typecheck": "pnpm -r typecheck",
+    "spike:engine": "pnpm --filter @chess-tutor/engine spike"
+  },
+  "devDependencies": {
+    "@types/node": "^26.6.6",
+    "typescript": "^7.0.2",
+    "vitest": "^5.1.0"
+  }
+}
