@@ -26,6 +26,12 @@ import type { Color } from "./types.ts";
  *        The server also sends "state" after each player move and takeback, and "game_over" to an
  *        abandoned game's subscribers. When the bot fails, the server sends "state" (botThinking
  *        false) immediately before "error", so a client that clears its error on "state" still shows it.
+ *   Ordering (#23): an HTTP reply can arrive after SSE events caused by the same request (a bot
+ *        that fails or answers within microtasks). SSE is the newer source: once a client has
+ *        received any SSE event for the game after it sent a request, it keeps its SSE-derived
+ *        game state and ignores the GameView in that request's HTTP reply.
+ *        Every request that changes a game is followed by SSE (state, bot_move, error or game_over;
+ *        resign sends game_over), so a client that ignores a reply still catches up.
  *
  * Finished and abandoned games are saved as PGN (FR-5). The bot replies within 2 s (NFR-3).
  */

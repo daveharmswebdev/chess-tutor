@@ -3,7 +3,7 @@
 import type { Color, GameEvent, GameView } from "@chess-tutor/chess-core";
 import { ApiRequestError, type ApiClient } from "./api.ts";
 import { fenAfter, isOwnPiece, moveToUci } from "./chess-rules.ts";
-import { boardFen, canResign, canTakeback, isPlayersTurn, type GameAction, type GameState } from "./game-state.ts";
+import { boardFen, canResign, canRetryBot, canTakeback, isPlayersTurn, type GameAction, type GameState } from "./game-state.ts";
 
 /** The part of the browser EventSource the controller uses. */
 export interface EventSourceLike {
@@ -27,6 +27,8 @@ export interface GameController {
   clickSquare(square: string): Promise<void>;
   takeback(): Promise<void>;
   resign(): Promise<void>;
+  /** After a bot failure: ask the server to retry; the bot's move then arrives over SSE (#23). */
+  retryBot(): Promise<void>;
   dispose(): void;
 }
 
@@ -155,6 +157,11 @@ export function createGameController(deps: GameControllerDeps): GameController {
     async resign() {
       if (!canResign(getState())) return;
       await simpleRequest((id) => api.resign(id));
+    },
+
+    async retryBot() {
+      if (!canRetryBot(getState())) return;
+      await simpleRequest((id) => api.botRetry(id));
     },
 
     dispose() {

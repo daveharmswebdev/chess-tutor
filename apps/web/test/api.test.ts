@@ -38,17 +38,19 @@ describe("api client", () => {
     expect(calls).toEqual([{ url: "/api/games", method: "POST", body: { playerColor: "b" } }]);
   });
 
-  it("posts moves, takebacks and resignations to the game's routes", async () => {
+  it("posts moves, takebacks, resignations and bot retries to the game's routes", async () => {
     const calls: Call[] = [];
     const api = createApiClient({ baseUrl: "/api", fetch: fakeFetch(200, view(), calls) });
     await api.playMove("g1", "d2d4");
     await api.takeback("g1");
     await api.resign("g1");
+    await api.botRetry("g1");
     await api.getGame("g1");
     expect(calls.map((c) => `${c.method} ${c.url}`)).toEqual([
       "POST /api/games/g1/moves",
       "POST /api/games/g1/takeback",
       "POST /api/games/g1/resign",
+      "POST /api/games/g1/bot-retry",
       "GET /api/games/g1",
     ]);
     expect(calls[0]?.body).toEqual({ uci: "d2d4" });

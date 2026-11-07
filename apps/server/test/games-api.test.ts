@@ -388,3 +388,129 @@ describe("shutdown", () => {
     expect(store.get(g.id)).toMatchObject({ status: "abandoned", result: "*", endReason: "abandoned" });
   });
 });
+
+// #23: after a bot failure it is the bot's turn, and before bot-retry only resign or a new game got out.
+describe("POST /api/games/:id/bot-retry", () => {
+  for (const [name, arrange] of [
+    ["rejects", (b: FakeBot) => b.failNext("engine crashed")],
+    ["returns an illegal move", (b: FakeBot) => b.illegalNext("e7e5")],
+  ] as const) {
+    it(`as Black, when the bot's first move ${name}: retry -> botThinking, bot_move, then the player can move`, async () => {
+      setup(["d2d4"]);
+      arrange(bot);
+      const g = await newGame("b");
+      await games.idle(g.id);
+      expect(games.view(g.id)).toMatchObject({ status: "playing", botThinking: false, moves: [] });
+      expect((await post(`/api/games/${g.id}/moves`, { uci: "g8f6" })).status).toBe(409);
+
+      const events = eventCollector();
+      games.subscribe(g.id, events.push);
+      bot.hold();
+      const res = await post(`/api/games/${g.id}/bot-retry`);
+      expect(res.status).toBe(200);
+      expect(res.body).toMatchObject({ status: "playing", botThinking: true, moves: [] });
+      expect(await events.next("state")).toMatchObject({ type: "state", game: { botThinking: true } });
+      bot.release();
+      const ev = await events.next("bot_move");
+      expect(ev).toMatchObject({ move: { uci: "d2d4", by: "bot" }, game: { botThinking: false } });
+      expect(events.events.some((e) => e.type === "error")).toBe(false);
+
+      const after = await play(g.id, "g8f6");
+      expect(ucis(after).slice(0, 2)).toEqual(["d2d4", "g8f6"]);
+    });
+  }
+
+  it("recovers a mid-game failure as White", async () => {
+    setup(["e7e5", "b8c6"]);
+    const g = await newGame("w");
+    await play(g.id, "e2e4");
+    bot.failNext("boom");
+    const failed = await play(g.id, "g1f3");
+    expect(ucis(failed)).toEqual(["e2e4", "e7e5", "g1f3"]);
+    expect(failed.botThinking).toBe(false);
+
+    const res = await post(`/api/games/${g.id}/bot-retry`);
+    expect(res.status).toBe(200);
+    expect(res.body.botThinking).toBe(true);
+    await games.idle(g.id);
+    expect(ucis(games.view(g.id)!)).toEqual(["e2e4", "e7e5", "g1f3", "b8c6"]);
+    const next = await play(g.id, "f1b5");
+    expect(ucis(next).slice(0, 5)).toEqual(["e2e4", "e7e5", "g1f3", "b8c6", "f1b5"]);
+  });
+
+  it("can fail again and be retried again", async () => {
+    setup(["d2d4"]);
+    bot.failNext("first");
+    const g = await newGame("b");
+    await games.idle(g.id);
+    const events = eventCollector();
+    games.subscribe(g.id, events.push);
+    bot.failNext("second");
+    expect((await post(`/api/games/${g.id}/bot-retry`)).status).toBe(200);
+    const err = await events.next("error");
+    expect(err.type === "error" && err.message).toMatch(/second/);
+    expect(games.view(g.id)!.botThinking).toBe(false);
+    expect((await post(`/api/games/${g.id}/bot-retry`)).status).toBe(200);
+    await games.idle(g.id);
+    expect(ucis(games.view(g.id)!)).toEqual(["d2d4"]);
+  });
+
+  it("409s while the bot thinks, on the player's turn, and when not playing; 404 unknown", async () => {
+    setup();
+    const g = await newGame("w");
+    const turn = await post(`/api/games/${g.id}/bot-retry`);
+    expect(turn.status).toBe(409);
+    expect(turn.body.error).toMatch(/player's turn/);
+    bot.hold();
+    await post(`/api/games/${g.id}/moves`, { uci: "e2e4" });
+    const thinking = await post(`/api/games/${g.id}/bot-retry`);
+    expect(thinking.status).toBe(409);
+    expect(thinking.body.error).toMatch(/thinking/);
+    bot.release();
+    await games.idle(g.id);
+    expect(bot.calls).toHaveLength(1);
+    expect((await post(`/api/games/${g.id}/bot-retry`)).status).toBe(409);
+    await post(`/api/games/${g.id}/resign`);
+    expect((await post(`/api/games/${g.id}/bot-retry`)).status).toBe(409);
+    expect((await post("/api/games/nope/bot-retry")).status).toBe(404);
+  });
+
+  it("409s for a failed game that was then resigned", async () => {
+    setup();
+    bot.failNext("boom");
+    const g = await newGame("b");
+    await games.idle(g.id);
+    await post(`/api/games/${g.id}/resign`);
+    expect((await post(`/api/games/${g.id}/bot-retry`)).status).toBe(409);
+    expect(bot.calls).toHaveLength(1);
+  });
+
+  // The retry goes through startBot, so its stale-result guard still applies.
+  it("discards a retried bot move that finishes after a resignation", async () => {
+    setup(["d2d4"]);
+    bot.failNext("boom");
+    const g = await newGame("b");
+    await games.idle(g.id);
+    bot.hold();
+    expect((await post(`/api/games/${g.id}/bot-retry`)).status).toBe(200);
+    expect((await post(`/api/games/${g.id}/takeback`)).status).toBe(409);
+    await post(`/api/games/${g.id}/resign`);
+    bot.release();
+    await games.idle(g.id);
+    expect(games.view(g.id)).toMatchObject({ status: "finished", moves: [] });
+  });
+
+  it("discards a retried bot move that finishes after a new game abandons this one", async () => {
+    setup(["e7e5"]);
+    const g = await newGame("w");
+    bot.failNext("boom");
+    await play(g.id, "e2e4");
+    bot.hold();
+    expect((await post(`/api/games/${g.id}/bot-retry`)).status).toBe(200);
+    const g2 = await newGame("w");
+    bot.release();
+    await games.idle(g.id);
+    expect(games.view(g.id)).toMatchObject({ status: "abandoned", moves: [{ uci: "e2e4" }] });
+    expect(games.view(g2.id)!.moves).toEqual([]);
+  });
+});

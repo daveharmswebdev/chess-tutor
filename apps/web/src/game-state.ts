@@ -1,6 +1,9 @@
 // Game state for the board UI: a pure reducer plus selectors, no DOM. FR-1, FR-4, IR-5.
 // The server's GameView is the truth; the client only adds an optimistic position while a
 // move request is in flight, a selected square, a busy flag and the last error.
+// Ordering (#23): an HTTP reply can arrive after SSE events caused by the same request. SSE is
+// the newer source, so once an SSE event arrives during a request, that request's reply only
+// clears busy and pendingFen and keeps the SSE-derived game and error.
 import type { GameEvent, GameView } from "@chess-tutor/chess-core";
 import { sideToMove } from "./chess-rules.ts";
 
@@ -10,12 +13,14 @@ export interface GameState {
   game: GameView | null;
   /** Position shown while the player's move is in flight; null otherwise. */
   pendingFen: string | null;
-  /** A request (new game, move, takeback, resign) is in flight. */
+  /** A request (new game, move, takeback, resign, bot retry) is in flight. */
   busy: boolean;
   /** Last error for the status line; cleared by the next successful update. */
   error: string | null;
   /** Square selected for click-to-move. */
   selected: string | null;
+  /** An SSE event for this game arrived since the current request started (#23). */
+  sseSinceRequest: boolean;
 }
 
 export type GameAction =
@@ -36,30 +41,25 @@ export const initialGameState: GameState = {
   busy: false,
   error: null,
   selected: null,
+  sseSinceRequest: false,
 };
-
-function isPrefix(shorter: GameView, longer: GameView): boolean {
-  return (
-    shorter.moves.length < longer.moves.length && shorter.moves.every((m, i) => m.uci === longer.moves[i]?.uci)
-  );
-}
 
 export function gameReducer(state: GameState, action: GameAction): GameState {
   switch (action.type) {
     case "request_started":
-      return { ...state, busy: true, error: null };
+      return { ...state, busy: true, error: null, sseSinceRequest: false };
 
     case "game_started":
       return { ...initialGameState, game: action.game };
 
     case "move_attempted":
-      return { ...state, busy: true, error: null, selected: null, pendingFen: action.fen };
+      return { ...state, busy: true, error: null, selected: null, pendingFen: action.fen, sseSinceRequest: false };
 
     case "move_accepted": {
       if (!state.game || state.game.id !== action.game.id) return state; // late reply from an old game
-      // The SSE bot_move may overtake this response; keep the newer view then.
-      const game = isPrefix(action.game, state.game) ? state.game : action.game;
-      return { ...state, game, busy: false, pendingFen: null };
+      // SSE (a bot_move, or state + error from a bot failure) may overtake this response; keep it then.
+      if (state.sseSinceRequest) return { ...state, busy: false, pendingFen: null };
+      return { ...state, game: action.game, busy: false, pendingFen: null };
     }
 
     case "move_rejected":
@@ -68,6 +68,7 @@ export function gameReducer(state: GameState, action: GameAction): GameState {
 
     case "request_succeeded":
       if (state.game && state.game.id !== action.game.id) return state;
+      if (state.sseSinceRequest) return { ...state, busy: false, pendingFen: null, selected: null };
       return { ...state, game: action.game, busy: false, pendingFen: null, selected: null, error: null };
 
     case "request_failed":
@@ -81,7 +82,8 @@ export function gameReducer(state: GameState, action: GameAction): GameState {
 
     case "server_event": {
       const event = action.event;
-      if (event.type === "error") return { ...state, error: event.message };
+      // The controller only forwards events from the current game's stream.
+      if (event.type === "error") return { ...state, error: event.message, sseSinceRequest: true };
       if (!state.game || state.game.id !== event.game.id) return state;
       const overtakesPending = state.pendingFen !== null && event.game.moves.length > state.game.moves.length;
       return {
@@ -90,6 +92,7 @@ export function gameReducer(state: GameState, action: GameAction): GameState {
         error: null,
         pendingFen: overtakesPending ? null : state.pendingFen,
         selected: event.game.fen === state.game.fen ? state.selected : null,
+        sseSinceRequest: true,
       };
     }
   }
@@ -122,6 +125,22 @@ export function canTakeback(state: GameState): boolean {
     !state.busy &&
     state.pendingFen === null &&
     g.moves.some((m) => m.by === "player")
+  );
+}
+
+/**
+ * True when the bot should move but is not thinking: the state a bot failure leaves behind
+ * (#23). The player can then ask the server to retry (POST /api/games/:id/bot-retry).
+ */
+export function canRetryBot(state: GameState): boolean {
+  const g = state.game;
+  return (
+    g !== null &&
+    g.status === "playing" &&
+    !g.botThinking &&
+    !state.busy &&
+    state.pendingFen === null &&
+    sideToMove(g.fen) !== g.playerColor
   );
 }
 
@@ -161,5 +180,6 @@ export function statusText(state: GameState): string {
   if (g.status === "finished") return resultText(g);
   if (g.botThinking || state.pendingFen !== null) return "Bot is thinking...";
   if (isPlayersTurn(state)) return "Your move.";
+  if (canRetryBot(state)) return "The bot did not move. Retry the bot move.";
   return "Waiting for the server...";
 }

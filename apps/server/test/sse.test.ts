@@ -154,6 +154,46 @@ describe("GET /api/games/:id/events (real socket)", () => {
     });
   }
 
+  // #23: as Black there is no move to take back after the bot's first move fails; bot-retry recovers.
+  for (const [name, arrange] of [
+    ["rejects", (bot: FakeBot) => bot.failNext("engine crashed")],
+    ["returns an illegal move", (bot: FakeBot) => bot.illegalNext("e7e5")],
+  ] as const) {
+    it(`as Black, when the bot's first move ${name}: bot-retry, then bot_move over SSE, then the player moves`, async () => {
+      const bot = createFakeBot(["d2d4"], 20);
+      await start(bot);
+      arrange(bot);
+      const game = (await (await postJson("/api/games", { playerColor: "b" })).json()) as GameView;
+      // Wait until the failure has been reported: the first state on a new connection then shows it.
+      for (let i = 0; i < 100; i++) {
+        const view = (await (await fetch(`${base}/api/games/${game.id}`)).json()) as GameView;
+        if (!view.botThinking) break;
+        await new Promise((r) => setTimeout(r, 10));
+      }
+
+      let retried: GameView | undefined;
+      const messages = await readEvents(
+        `/api/games/${game.id}/events`,
+        (m) => m.event === "bot_move" || m.event === "error",
+        async () => {
+          const res = await fetch(`${base}/api/games/${game.id}/bot-retry`, { method: "POST" });
+          expect(res.status).toBe(200);
+          retried = (await res.json()) as GameView;
+        },
+      );
+      expect(messages[0]!.data).toMatchObject({ type: "state", game: { botThinking: false, moves: [] } });
+      expect(retried).toMatchObject({ botThinking: true, status: "playing", moves: [] });
+      expect(messages.at(-1)!.data).toMatchObject({
+        type: "bot_move",
+        move: { uci: "d2d4", by: "bot" },
+        game: { botThinking: false },
+      });
+
+      const move = await postJson(`/api/games/${game.id}/moves`, { uci: "g8f6" });
+      expect(move.status).toBe(200);
+    });
+  }
+
   it("404s events for an unknown game", async () => {
     await start(createFakeBot());
     const res = await fetch(`${base}/api/games/nope/events`);
