@@ -1,0 +1,249 @@
+import type { GameView } from "@chess-tutor/chess-core";
+import { describe, expect, it } from "vitest";
+import { ApiRequestError, type ApiClient } from "../src/api.ts";
+import { createGameController, type EventSourceLike } from "../src/controller.ts";
+import { boardFen, gameReducer, initialGameState, type GameAction, type GameState } from "../src/game-state.ts";
+import { AFTER_D4_D5_FEN, AFTER_D4_FEN, D4, D5, START_FEN, view } from "./fixtures.ts";
+
+class FakeEventSource implements EventSourceLike {
+  readyState = 1;
+  closed = false;
+  readonly listeners = new Map<string, Array<(ev: { data?: unknown }) => void>>();
+  readonly url: string;
+  constructor(url: string) {
+    this.url = url;
+  }
+  addEventListener(type: string, listener: (ev: { data?: unknown }) => void): void {
+    const list = this.listeners.get(type) ?? [];
+    list.push(listener);
+    this.listeners.set(type, list);
+  }
+  close(): void {
+    this.closed = true;
+    this.readyState = 2;
+  }
+  emit(type: string, data?: unknown): void {
+    const ev = data === undefined ? {} : { data: JSON.stringify(data) };
+    for (const l of this.listeners.get(type) ?? []) l(ev);
+  }
+  emitRaw(type: string, data: string): void {
+    for (const l of this.listeners.get(type) ?? []) l({ data });
+  }
+}
+
+function fakeApi(overrides: Partial<ApiClient> = {}): ApiClient {
+  const unexpected = async (): Promise<GameView> => {
+    throw new Error("unexpected call");
+  };
+  return {
+    newGame: unexpected,
+    getGame: unexpected,
+    playMove: unexpected,
+    takeback: unexpected,
+    resign: unexpected,
+    eventsUrl: (id) => `/api/games/${id}/events`,
+    ...overrides,
+  };
+}
+
+function harness(api: ApiClient) {
+  let state: GameState = initialGameState;
+  const actions: GameAction[] = [];
+  const sources: FakeEventSource[] = [];
+  const controller = createGameController({
+    api,
+    openEvents: (url) => {
+      const s = new FakeEventSource(url);
+      sources.push(s);
+      return s;
+    },
+    dispatch: (a) => {
+      actions.push(a);
+      state = gameReducer(state, a);
+    },
+    getState: () => state,
+  });
+  return { controller, actions, sources, state: () => state };
+}
+
+describe("game controller", () => {
+  it("starts a game and subscribes to its events", async () => {
+    const h = harness(fakeApi({ newGame: async () => view({ playerColor: "b", botThinking: true }) }));
+    await h.controller.newGame("b");
+    expect(h.state().game?.playerColor).toBe("b");
+    expect(h.sources.map((s) => s.url)).toEqual(["/api/games/g1/events"]);
+  });
+
+  it("closes the old event stream when a new game starts, and on dispose", async () => {
+    let n = 0;
+    const h = harness(fakeApi({ newGame: async () => view({ id: `g${++n}` }) }));
+    await h.controller.newGame("w");
+    await h.controller.newGame("w");
+    expect(h.sources[0]?.closed).toBe(true);
+    expect(h.sources[1]?.closed).toBe(false);
+    h.controller.dispose();
+    expect(h.sources[1]?.closed).toBe(true);
+  });
+
+  it("feeds state, bot_move, game_over and error events into the reducer", async () => {
+    const h = harness(fakeApi({ newGame: async () => view() }));
+    await h.controller.newGame("w");
+    const es = h.sources[0]!;
+    es.emit("state", { type: "state", game: view({ fen: AFTER_D4_FEN, moves: [D4], botThinking: true }) });
+    expect(h.state().game?.moves).toEqual([D4]);
+    es.emit("bot_move", { type: "bot_move", move: D5, game: view({ fen: AFTER_D4_D5_FEN, moves: [D4, D5] }) });
+    expect(h.state().game?.moves).toEqual([D4, D5]);
+    es.emit("error", { type: "error", message: "engine timed out" });
+    expect(h.state().error).toBe("engine timed out");
+    es.emit("game_over", { type: "game_over", game: view({ status: "finished", result: "0-1", endReason: "resigned" }) });
+    expect(h.state().game?.status).toBe("finished");
+  });
+
+  it("treats a data-less error (connection drop) as a reconnect, not a game error", async () => {
+    const h = harness(fakeApi({ newGame: async () => view() }));
+    await h.controller.newGame("w");
+    const es = h.sources[0]!;
+    es.readyState = 0; // CONNECTING: the browser reconnects and the server resends "state"
+    es.emit("error");
+    expect(h.state().error).toBeNull();
+    es.readyState = 2; // CLOSED: gave up
+    es.emit("error");
+    expect(h.state().error).toBe("Lost the connection to the game server.");
+  });
+
+  it("ignores malformed event data", async () => {
+    const h = harness(fakeApi({ newGame: async () => view() }));
+    await h.controller.newGame("w");
+    h.sources[0]!.emitRaw("state", "{not json");
+    expect(h.state().game?.moves).toEqual([]);
+    expect(h.state().error).toBeNull();
+  });
+
+  it("plays a legal move: optimistic position, then the server's view", async () => {
+    const sent: string[] = [];
+    const h = harness(
+      fakeApi({
+        newGame: async () => view(),
+        playMove: async (_id, uci) => {
+          sent.push(uci);
+          expect(boardFen(h.state())).toBe(AFTER_D4_FEN); // optimistic while in flight
+          return view({ fen: AFTER_D4_FEN, moves: [D4], botThinking: true });
+        },
+      }),
+    );
+    await h.controller.newGame("w");
+    expect(await h.controller.play("d2", "d4")).toBe(true);
+    expect(sent).toEqual(["d2d4"]);
+    expect(h.state().game?.botThinking).toBe(true);
+  });
+
+  it("does not send a move the client already knows is illegal, or when it is not the player's turn", async () => {
+    const h = harness(fakeApi({ newGame: async () => view({ botThinking: true }) }));
+    await h.controller.newGame("w");
+    expect(await h.controller.play("d2", "d4")).toBe(false); // bot thinking
+    h.sources[0]!.emit("state", { type: "state", game: view() });
+    expect(await h.controller.play("d2", "d5")).toBe(false); // illegal
+  });
+
+  it("snaps back after the server rejects a move with 400", async () => {
+    const h = harness(
+      fakeApi({
+        newGame: async () => view(),
+        playMove: async () => {
+          throw new ApiRequestError(400, "That move was not accepted: illegal");
+        },
+      }),
+    );
+    await h.controller.newGame("w");
+    expect(await h.controller.play("d2", "d4")).toBe(false);
+    expect(boardFen(h.state())).toBe(START_FEN);
+    expect(h.state().error).toBe("That move was not accepted: illegal");
+  });
+
+  it("takes back and resigns through the API", async () => {
+    const h = harness(
+      fakeApi({
+        newGame: async () => view({ fen: AFTER_D4_D5_FEN, moves: [D4, D5] }),
+        takeback: async () => view(),
+        resign: async () => view({ status: "finished", result: "0-1", endReason: "resigned" }),
+      }),
+    );
+    await h.controller.newGame("w");
+    await h.controller.takeback();
+    expect(h.state().game?.moves).toEqual([]);
+    await h.controller.resign();
+    expect(h.state().game?.endReason).toBe("resigned");
+  });
+
+  it("shows a 409 from takeback as an error and keeps the game", async () => {
+    const h = harness(
+      fakeApi({
+        newGame: async () => view({ fen: AFTER_D4_D5_FEN, moves: [D4, D5] }),
+        takeback: async () => {
+          throw new ApiRequestError(409, "Not possible right now: bot is thinking");
+        },
+      }),
+    );
+    await h.controller.newGame("w");
+    await h.controller.takeback();
+    expect(h.state().error).toBe("Not possible right now: bot is thinking");
+    expect(h.state().game?.moves).toEqual([D4, D5]);
+    expect(h.state().busy).toBe(false);
+  });
+
+  it("moves by clicking source then target square", async () => {
+    const sent: string[] = [];
+    const h = harness(
+      fakeApi({
+        newGame: async () => view(),
+        playMove: async (_id, uci) => {
+          sent.push(uci);
+          return view({ fen: AFTER_D4_FEN, moves: [D4], botThinking: true });
+        },
+      }),
+    );
+    await h.controller.newGame("w");
+    await h.controller.clickSquare("d2");
+    expect(h.state().selected).toBe("d2");
+    await h.controller.clickSquare("d4");
+    expect(sent).toEqual(["d2d4"]);
+    expect(h.state().selected).toBeNull();
+  });
+
+  it("click selection: own piece selects, another own piece reselects, empty or illegal clears", async () => {
+    const h = harness(fakeApi({ newGame: async () => view() }));
+    await h.controller.newGame("w");
+    await h.controller.clickSquare("e5"); // empty, nothing selected
+    expect(h.state().selected).toBeNull();
+    await h.controller.clickSquare("d7"); // opponent's piece
+    expect(h.state().selected).toBeNull();
+    await h.controller.clickSquare("d2");
+    await h.controller.clickSquare("g1");
+    expect(h.state().selected).toBe("g1");
+    await h.controller.clickSquare("g1"); // same square toggles off
+    expect(h.state().selected).toBeNull();
+    await h.controller.clickSquare("d2");
+    await h.controller.clickSquare("d5"); // not a legal target
+    expect(h.state().selected).toBeNull();
+  });
+
+  it("ignores clicks while the board is locked", async () => {
+    const h = harness(fakeApi({ newGame: async () => view({ botThinking: true }) }));
+    await h.controller.newGame("w");
+    await h.controller.clickSquare("d2");
+    expect(h.state().selected).toBeNull();
+  });
+
+  it("reports a failed new-game request", async () => {
+    const h = harness(
+      fakeApi({
+        newGame: async () => {
+          throw new ApiRequestError(0, "Cannot reach the game server.");
+        },
+      }),
+    );
+    await h.controller.newGame("w");
+    expect(h.state().error).toBe("Cannot reach the game server.");
+    expect(h.sources).toEqual([]);
+  });
+});

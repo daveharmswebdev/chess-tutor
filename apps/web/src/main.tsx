@@ -1,5 +1,13 @@
-// Placeholder from the #6 scaffold. web-agent replaces this with the board UI.
+import { StrictMode } from "react";
 import { createRoot } from "react-dom/client";
+import { App } from "./App.tsx";
+import "./styles.css";
 
 const root = document.getElementById("root");
-if (root) createRoot(root).render(<p>Chess Tutor</p>);
+if (root) {
+  createRoot(root).render(
+    <StrictMode>
+      <App />
+    </StrictMode>,
+  );
+}
