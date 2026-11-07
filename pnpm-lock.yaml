@@ -181,6 +181,9 @@ importers:
 
   apps/server:
     dependencies:
+      '@anthropic-ai/sdk':
+        specifier: ^1.6.0
+        version: 1.6.0(zod@4.6.7)
       '@chess-tutor/chess-core':
         specifier: workspace:*
         version: link:../../packages/chess-core
@@ -190,6 +193,9 @@ importers:
       '@chess-tutor/explorer':
         specifier: workspace:*
         version: link:../../packages/explorer
+      '@chess-tutor/tutor':
+        specifier: workspace:*
+        version: link:../../packages/tutor
       chess.js:
         specifier: ^1.4.0
         version: 1.4.0
