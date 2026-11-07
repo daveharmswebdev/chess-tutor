@@ -85,7 +85,7 @@ interface Analysis { depth: number; lines: { moves: string[]; scoreCp?: number; 
 - `ExplorerClient.lookup(fen, { ratings, speeds })` returns `{ moves: { san, games, white, draws, black }[], totalGames }`.
 - Responses are cached in SQLite by `(fen, ratings, speeds)` for 30 days, since opening statistics barely change. The client sends one request at a time and treats an unreachable explorer as "out of book."
 - **Authentication:** anonymous requests return a 401, so the client sends `Authorization: Bearer ${LICHESS_TOKEN}`.
-- **Error mapping:** a 401 throws a configuration error with a clear message. A 429 honors `Retry-After` and that lookup is treated as out of book. A 5xx or a network error is also treated as out of book, so the game continues.
+- **Error mapping:** a 401 throws a configuration error with a clear message. A 429 honors `Retry-After` and that lookup is treated as out of book. A 5xx or a network error is also treated as out of book, so the game continues. Each request times out after 1500 ms, inside the bot's 2 s budget (NFR-3). A timeout, network error or 5xx starts a 30 s cooldown during which uncached lookups are out of book without a request; cache hits are still served. A cache (SQLite) fault counts as a miss on read and is ignored on write.
 - **Contract:** Lichess's JSON is parsed with a zod schema into our own `ExplorerResult` type. A change on their side breaks only this package.
 - Verified in [spike 002](spikes/002-lichess-explorer-auth.md): a personal token with no permissions works. The response shape is recorded there (moves carry `averageRating`).
 
