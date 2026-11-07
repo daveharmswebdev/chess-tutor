@@ -26,13 +26,34 @@ const responseSchema = z.object({
   opening: openingSchema.nullish(),
 });
 
+/**
+ * Lichess may spell castling as king-takes-rook (e1h1, e1a1, e8h8, e8a8). We expose
+ * standard UCI (e1g1, e1c1, e8g8, e8c8). Only rewritten when the SAN says it is castling,
+ * so a plain king move or capture on those squares is left alone. Idempotent.
+ */
+const KING_TAKES_ROOK: Record<string, Record<string, string>> = {
+  "O-O": { e1h1: "e1g1", e8h8: "e8g8" },
+  "O-O-O": { e1a1: "e1c1", e8a8: "e8c8" },
+};
+
+export function normalizeCastlingUci(san: string, uci: string): string {
+  const castle = /^(O-O(?:-O)?)[+#]?$/.exec(san)?.[1];
+  if (castle === undefined) return uci;
+  return KING_TAKES_ROOK[castle]?.[uci] ?? uci;
+}
+
+/** Normalize every move in a result (used on fresh parse and on cache read). */
+export function normalizeResultCastling<T extends ExplorerResult>(result: T): T {
+  return { ...result, moves: result.moves.map((m) => ({ ...m, uci: normalizeCastlingUci(m.san, m.uci) })) };
+}
+
 /** Parse raw JSON into our ExplorerResult, or return undefined if the shape is wrong. */
 export function parseExplorerResponse(raw: unknown): ExplorerResult | undefined {
   const parsed = responseSchema.safeParse(raw);
   if (!parsed.success) return undefined;
   const r = parsed.data;
   const moves: ExplorerMove[] = r.moves.map((m) => ({
-    uci: m.uci,
+    uci: normalizeCastlingUci(m.san, m.uci),
     san: m.san,
     games: m.white + m.draws + m.black,
     white: m.white,
