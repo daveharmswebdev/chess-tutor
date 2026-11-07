@@ -30,6 +30,8 @@ import type { Color } from "./types.ts";
  *        that fails or answers within microtasks). SSE is the newer source: once a client has
  *        received any SSE event for the game after it sent a request, it keeps its SSE-derived
  *        game state and ignores the GameView in that request's HTTP reply.
+ *        Every request that changes a game is followed by SSE (state, bot_move, error or game_over;
+ *        resign sends game_over), so a client that ignores a reply still catches up.
  *
  * Finished and abandoned games are saved as PGN (FR-5). The bot replies within 2 s (NFR-3).
  */
