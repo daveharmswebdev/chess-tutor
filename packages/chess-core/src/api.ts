@@ -15,6 +15,11 @@ import type { Color } from "./types.ts";
  *   POST /api/games/:id/takeback    -> 200 GameView, back at the player's previous turn
  *        (removes the bot's reply, if any, and the player's last move). 409 while the bot is
  *        thinking, when the game is not "playing", or when the player has no move to undo.
+ *   POST /api/games/:id/bot-retry   -> 200 GameView with botThinking true; the bot's move then
+ *        arrives over SSE as usual (#23). For recovering after a bot failure: 409 while the bot is
+ *        thinking, when the game is not "playing", or when it is the player's turn; 404 unknown game.
+ *        The web shows a "Retry bot move" action whenever the game is "playing", botThinking is
+ *        false and it is the bot's turn (that state only arises after a bot failure).
  *   POST /api/games/:id/resign      -> 200 GameView, status "finished", endReason "resigned".
  *   GET  /api/games/:id/events      -> text/event-stream. Each message is `event: <GameEvent.type>`
  *        plus `data: <GameEvent as JSON>`. The first message on every connection is "state".
