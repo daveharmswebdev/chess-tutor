@@ -9,8 +9,9 @@ export function playUci(chess: Chess, uci: string): Move {
   if (!/^[a-h][1-8][a-h][1-8][qrbn]?$/.test(uci)) {
     throw new Error(`illegal move "${uci}": not UCI notation (position ${fen})`);
   }
+  let move: Move;
   try {
-    return chess.move({
+    move = chess.move({
       from: uci.slice(0, 2),
       to: uci.slice(2, 4),
       ...(uci.length === 5 ? { promotion: uci.slice(4) } : {}),
@@ -18,6 +19,12 @@ export function playUci(chess: Chess, uci: string): Move {
   } catch {
     throw new Error(`illegal move "${uci}" in position ${fen}`);
   }
+  if (toUci(move) !== uci) {
+    // chess.js ignores a promotion piece on a non-promoting move (e.g. "e2e4q").
+    chess.undo();
+    throw new Error(`illegal move "${uci}": not a promotion (position ${fen})`);
+  }
+  return move;
 }
 
 /** SAN of a UCI move in the given position, without changing anything. */

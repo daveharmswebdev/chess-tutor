@@ -52,6 +52,8 @@ interface Case {
   after: Score | "terminal";
   repertoire?: Repertoire | null;
   thresholds?: KeyMomentThresholds;
+  /** Extra multi-PV lines in `before` (ranks 2, 3, ...). */
+  otherLines?: { move: string; score: Score }[];
   expected: KeyMoment | null;
 }
 
@@ -59,12 +61,16 @@ function input(c: Case): DetectorInput {
   const afterFen = play(c.fen, c.move);
   const after: Analysis =
     c.after === "terminal" ? terminal(afterFen) : analysis(afterFen, c.reply ?? "(none)", c.after);
+  const before = analysis(c.fen, c.best, c.before);
+  (c.otherLines ?? []).forEach((l, i) =>
+    before.lines.push({ rank: i + 2, moves: [l.move], score: l.score, depth: 18 }),
+  );
   return {
     playerColor: c.playerColor,
     fenBefore: c.fen,
     move: c.move,
     history: c.history ?? [],
-    before: analysis(c.fen, c.best, c.before),
+    before,
     after,
     repertoire: c.repertoire ?? null,
     thresholds: c.thresholds ?? T,
@@ -165,9 +171,69 @@ const cases: Case[] = [
     expected: null,
   },
   {
-    name: "a slower mate (2 -> 4) costs 200 cp in the mate encoding and fires",
+    name: "a slower mate (2 -> 4) for the same side is a decided game: silent (decision B)",
     playerColor: "w", fen: AFTER_NC6, move: "f1c4", best: "f1b5", before: mate(2), reply: "g8f6", after: mate(4),
-    expected: { kind: "missed_win", played: "Bc4", best: "Bb5", gainCp: 200 },
+    expected: null,
+  },
+  {
+    name: "player being mated faster (mate against, 3 -> 1) is silent (decision B)",
+    playerColor: "b", fen: AFTER_NC6.replace(" w ", " b "), move: "a7a6", best: "g8f6", before: mate(3), reply: "f1b5", after: mate(1),
+    expected: null,
+  },
+  {
+    name: "opponent being mated faster (5 -> 2) is no punish_opponent (decision B)",
+    playerColor: "w", fen: AFTER_NF3, move: "a7a6", best: "b8c6", before: mate(5), reply: "f3e5", after: mate(2),
+    expected: null,
+  },
+  {
+    name: "opponent_left_book still applies in a decided mate (decision B)",
+    playerColor: "w", fen: AFTER_NF3, move: "f7f6", history: ["e2e4", "e7e5", "g1f3"], best: "b8c6",
+    before: mate(5), reply: "f3e5", after: mate(2), repertoire,
+    expected: { kind: "opponent_left_book", line: "Italian", expected: ["Nc6"], played: "f6" },
+  },
+  {
+    name: "own mate turning into mate for the other side still fires",
+    playerColor: "w", fen: AFTER_NC6, move: "f3g5", best: "f1b5", before: mate(2), reply: "d8g5", after: mate(-3),
+    expected: { kind: "player_blunder", played: "Ng5", cpLoss: 99800 + 99700, best: "Bb5" },
+  },
+
+  // --- decision A: playedEval comes from before.lines when the move is a multi-PV line
+  {
+    name: "probe A1: the engine-best move is never a missed_win, despite after drifting",
+    playerColor: "w", fen: AFTER_NC6, move: "f1b5", best: "f1b5", before: cp(300), reply: "a7a6", after: cp(100),
+    expected: null,
+  },
+  {
+    name: "probe A2: the engine-best move is never a player_blunder, despite after drifting",
+    playerColor: "w", fen: AFTER_NC6, move: "f1b5", best: "f1b5", before: cp(30), reply: "a7a6", after: cp(-150),
+    expected: null,
+  },
+  {
+    name: "the opponent's engine-best move is never punish_opponent",
+    playerColor: "w", fen: AFTER_NF3, move: "b8c6", best: "b8c6", before: cp(40), reply: "f1b5", after: cp(400),
+    expected: null,
+  },
+  {
+    name: "a rank-2 move is scored from its multi-PV line, not from after",
+    playerColor: "w", fen: AFTER_NC6, move: "b1c3", best: "f1b5", before: cp(30), reply: "g8f6", after: cp(-300),
+    otherLines: [{ move: "f1c4", score: cp(25) }, { move: "b1c3", score: cp(20) }],
+    expected: null,
+  },
+  {
+    name: "a multi-PV line can itself be a blunder",
+    playerColor: "w", fen: AFTER_NC6, move: "b1c3", best: "f1b5", before: cp(30), reply: "g8f6", after: cp(0),
+    otherLines: [{ move: "b1c3", score: cp(-120) }],
+    expected: { kind: "player_blunder", played: "Nc3", cpLoss: 150, best: "Bb5" },
+  },
+  {
+    name: "repertoire probe: the line named is the first one that still continues",
+    playerColor: "w", fen: AFTER_NF3, move: "f7f6", history: ["e2e4", "e7e5", "g1f3"], best: "b8c6",
+    before: cp(40), reply: "f3e5", after: cp(100),
+    repertoire: buildRepertoire([
+      { name: "Short", color: "w", pgn: "1. e4 e5 2. Nf3" },
+      { name: "Italian", color: "w", pgn: "1. e4 e5 2. Nf3 Nc6 3. Bc4" },
+    ]),
+    expected: { kind: "opponent_left_book", line: "Italian", expected: ["Nc6"], played: "f6" },
   },
   {
     name: "delivering checkmate (after has no lines) is silent",
@@ -302,6 +368,11 @@ describe("detect", () => {
     expect(() => detect({ ...i, move: "zz" })).toThrow();
   });
 
+  it("throws on a promotion suffix for a move that is not a promotion", () => {
+    const i = input(cases[0]!);
+    expect(() => detect({ ...i, move: "e2e4q" })).toThrow(/illegal/i);
+  });
+
   it("puts SAN, never UCI, in every string field", () => {
     const uci = /^[a-h][1-8][a-h][1-8][qrbn]?$/;
     for (const c of cases) {
@@ -334,5 +405,19 @@ describe("scoreToCp", () => {
     [mate(-3), "b", 99700],
   ] as const)("%o for %s is %d", (score, pov, expected) => {
     expect(scoreToCp(score, pov)).toBe(expected);
+  });
+
+  it("mate 0 is signed by the side to move, and 0 without it", () => {
+    expect(scoreToCp(mate(0), "w", "w")).toBe(-100000);
+    expect(scoreToCp(mate(0), "b", "w")).toBe(100000);
+    expect(scoreToCp(mate(0), "w", "b")).toBe(100000);
+    expect(scoreToCp(mate(0), "b", "b")).toBe(-100000);
+    expect(Object.is(scoreToCp(mate(0), "w"), 0)).toBe(true);
+    expect(Object.is(scoreToCp(mate(0), "b"), 0)).toBe(true);
+  });
+
+  it("never returns -0", () => {
+    expect(Object.is(scoreToCp(cp(0), "b"), 0)).toBe(true);
+    expect(Object.is(scoreToCp(cp(0), "w"), 0)).toBe(true);
   });
 });

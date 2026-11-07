@@ -48,6 +48,18 @@ describe("buildRepertoire / continuations", () => {
     });
   });
 
+  it("names the first matching line that still has a continuation", () => {
+    const r = buildRepertoire([
+      { name: "Short", color: "w", pgn: "1. e4 e5 2. Nf3" },
+      { name: "Italian", color: "w", pgn: "1. e4 e5 2. Nf3 Nc6 3. Bc4" },
+    ]);
+    expect(r.continuations(["e2e4", "e7e5", "g1f3"], "w")).toEqual({
+      line: "Italian",
+      moves: [{ uci: "b8c6", san: "Nc6" }],
+    });
+    expect(r.continuations(["e2e4"], "w")?.line).toBe("Short");
+  });
+
   it("filters by color", () => {
     expect(sans(rep.continuations(["d2d4"], "b"))).toEqual(["Nf6"]);
     expect(sans(rep.continuations(["d2d4", "g8f6"], "b"))).toEqual(["c4", "Bf4"]);
