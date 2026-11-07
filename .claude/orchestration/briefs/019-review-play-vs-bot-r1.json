@@ -1,0 +1,32 @@
+{
+  "brief_id": "019-review-play-vs-bot-r1",
+  "agent": "reviewer",
+  "issue": 6,
+  "base_sha": "46b1de2",
+  "scratch_dir": "/private/tmp/claude-501/-Users-daveharms-personal-workspace-chess-tutor/9bbad0c8-2a2e-4c44-ac62-d80647cb9488/scratchpad/019-review-play-vs-bot-r1",
+  "objective": "Review commit range 46b1de2..bf701d9 (branch issue-6-play-vs-bot: merge of server commit 37dfbde and web commit da94097) for correctness bugs, coverage of FR-1, FR-4, FR-5, NFR-3, IR-5, IR-7 and the issue #6 acceptance criteria, and conformance of both apps to the shared game API contract packages/chess-core/src/api.ts. Your worktree may not be at the reviewed commit, and you may not run git in another agent's worktree: read the change with `git diff 46b1de2..bf701d9` and `git show bf701d9:<path>` (shared object store). Classify each finding blocking / major / minor.",
+  "requirements": [
+    "FR-1",
+    "FR-4",
+    "FR-5",
+    "NFR-3",
+    "IR-5",
+    "IR-7"
+  ],
+  "contract": "Issue #6 Done when: board with legal-move enforcement, a move list and takebacks; the bot replies within 2 seconds (NFR-3); finished and abandoned games are saved as PGN (FR-5); an end-to-end browser test plays a few moves automatically, in CI; tests pass in CI. Scope addition: the server reads repertoire/london.pgn and repertoire/kid.pgn at startup and fails with a clear message if one is missing or doesn't parse. Note on #6: node:sqlite's ExperimentalWarning is silenced at server start.\n\nThe contract is packages/chess-core/src/api.ts at 46b1de2 (read it with git show). Key rules: 409 for takeback while bot thinking / not playing / nothing to undo; 409 for a move when not the player's turn, bot thinking or game not playing; 400 illegal or malformed; 404 unknown; creating a game abandons and saves a playing one; first SSE message on every connection is state.\n\nImplementation decisions given to the spokes: no or empty LICHESS_TOKEN -> warning + stub explorer, engine-only bot; DB_PATH default <repo>/data/chess-tutor.sqlite, ':memory:' works; games saved when finished or abandoned (new game, or SIGINT/SIGTERM shutdown); PGN Seven Tag Roster with Player / Sparring bot and endReason; a bot result that arrives after the game changed is discarded; a bot error -> SSE error event, game stays playing with botThinking false. Web: server is the authority, client chess.js only for legal targets, snap back after a 400, board locked while botThinking or not playing, auto-queen promotion acceptable, EventSource closed on new game/unmount; Playwright webServer runs real server on PORT=3101 DB_PATH=:memory: LICHESS_TOKEN='' and vite on 5174.\n\nSpoke-reported choices to judge: server sends an extra 'state' event after player moves and takebacks, and game_over to an abandoned game's subscribers; server listens on host 'localhost'; empty JSON body accepted as no body; server has its own copy of strict UCI validation because chess-core does not export playUci; the client distinguishes SSE event 'error' (GameEvent) from EventSource connection errors by presence of ev.data; Playwright API webServer readiness is a TCP port check.\n\nCoordinator gate on bf701d9: pnpm test 336 passed; pnpm typecheck exit 0; CI=1 pnpm test:e2e 1 passed (5.4 s) against the real server with WASM Stockfish, bot moves logged at ~500 ms; each spoke's git diff matched its files_changed and stayed in apps/server/** or apps/web/**.",
+  "scope": [],
+  "negative": [
+    "Read-only: do not edit, commit, or run anything that writes to the repo.",
+    "Do not run the e2e or start servers; reason from code and tests.",
+    "Do not review anything outside the commit range."
+  ],
+  "rubric": [
+    "Every finding cites file:line and a concrete failure scenario (request sequence, FEN, event order).",
+    "Check the server's race handling: bot result after takeback/resign/new game, two quick moves, takeback ordering, SSE subscribers on abandoned games, shutdown path saving playing games and quitting the engine.",
+    "Check PGN correctness (headers, result, castling and promotion SAN, games started as Black) and that the store survives restarts with a file DB.",
+    "Check the web client against the server's real event order (bot_move possibly arriving before the move's HTTP response, extra state events), board locking, snap-back, and EventSource cleanup.",
+    "Say explicitly whether every issue #6 acceptance criterion is met, and what remains for the coordinator (e.g. CI e2e job)."
+  ],
+  "concurrency": "None running.",
+  "round": 1
+}

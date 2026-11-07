@@ -2,7 +2,7 @@
   "brief_id": "018-board-ui-r1",
   "agent": "web-agent",
   "issue": 6,
-  "base_sha": "53c55eb",
+  "base_sha": "46b1de2",
   "scratch_dir": "/private/tmp/claude-501/-Users-daveharms-personal-workspace-chess-tutor/9bbad0c8-2a2e-4c44-ac62-d80647cb9488/scratchpad/018-board-ui-r1",
   "objective": "Replace the apps/web placeholder with a React app where the player chooses White or Black, starts a game, and plays it to the end against the sparring bot on a real board: only legal moves can be made, a move list in SAN, a Takeback button, a Resign button, a clear status line (your move / bot is thinking / result and reason), and a placeholder tutor panel. It talks only to the game API contract below (REST + SSE). Also add the first Playwright end-to-end test (config + spec) that plays a few moves automatically against the real server.",
   "requirements": [
@@ -24,7 +24,7 @@
     "Tests written first, recorded red then green, for the API client (status codes 400/404/409 mapped to readable errors) and the game-state reducer (state/bot_move/game_over/error events, locking while botThinking, snap-back after an illegal move).",
     "pnpm --filter @chess-tutor/web build succeeds; pnpm test and pnpm typecheck clean from the repo root.",
     "The e2e spec passes against your scratch fake server via E2E_API_COMMAND (paste the Playwright summary in your return); state in contract_gaps that it is not yet run against the real server.",
-    "files_changed lists every file changed in 53c55eb..your head. Commit message references FR-1, FR-4, IR-5 and #6."
+    "files_changed lists every file changed in 46b1de2..your head. Commit message references FR-1, FR-4, IR-5 and #6."
   ],
   "concurrency": "In parallel: server-agent (brief 017-game-server-r1) builds apps/server (Fastify, SSE, SQLite, bot wiring) against the same contract in its own worktree. No file overlap: you own apps/web/** only.",
   "round": 1

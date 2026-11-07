@@ -56,3 +56,17 @@
 {"ts":"2026-11-07T21:48:31.834Z","event":"return_valid","agent_id":"af49d2b9618550550","agent_type":"explorer-agent","via":"handback"}
 {"ts":"2026-11-07T21:48:51.830Z","event":"coordinator_verdict","brief_id":"016-explorer-castling-r1","verdict":"accepted","reason":"diff == files_changed, in scope; gate re-run 230 passed, typecheck 0; small diff read in full, no reviewer"}
 {"ts":"2026-11-07T21:50:18.954Z","event":"shipped","issue":17,"pr":22}
+{"ts":"2026-11-07T22:12:57.566Z","event":"dispatch","subagent_type":"server-agent","brief_id":"017-game-server-r1","base_sha":"46b1de2","spoke":true}
+{"ts":"2026-11-07T22:13:23.014Z","event":"dispatch","subagent_type":"web-agent","brief_id":"018-board-ui-r1","base_sha":"46b1de2","spoke":true}
+{"ts":"2026-11-07T22:13:23.146Z","event":"agent_complete","subagent_type":"server-agent","brief_id":"017-game-server-r1","agent_id":"a8f789d784f483700","status":"async_launched","contract":"pending"}
+{"ts":"2026-11-07T22:13:23.257Z","event":"agent_complete","subagent_type":"web-agent","brief_id":"018-board-ui-r1","agent_id":"a1d776af7b8468a79","status":"async_launched","contract":"pending"}
+{"ts":"2026-11-07T22:20:39.458Z","event":"return_valid","agent_id":"a1d776af7b8468a79","agent_type":"web-agent","via":"handback"}
+{"ts":"2026-11-07T22:20:57.734Z","event":"return_valid","agent_id":"a8f789d784f483700","agent_type":"server-agent","via":"handback"}
+{"ts":"2026-11-07T22:22:18.942Z","event":"dispatch","subagent_type":"reviewer","brief_id":"019-review-play-vs-bot-r1","base_sha":"46b1de2","spoke":true}
+{"ts":"2026-11-07T22:22:19.142Z","event":"agent_complete","subagent_type":"reviewer","brief_id":"019-review-play-vs-bot-r1","agent_id":"ab531664087078309","status":"async_launched","contract":"pending"}
+{"ts":"2026-11-07T22:25:45.999Z","event":"return_valid","agent_id":"ab531664087078309","agent_type":"reviewer","via":"handback"}
+{"ts":"2026-11-07T22:26:45.848Z","event":"coordinator_verdict","brief_id":"018-board-ui-r1","verdict":"accepted","reason":"gate 289 passed on da94097, files match; merged into issue-6-play-vs-bot, e2e passes vs real server"}
+{"ts":"2026-11-07T22:26:45.863Z","event":"coordinator_verdict","brief_id":"017-game-server-r1","verdict":"re-delegated","reason":"gate 278 passed on 37dfbde, files match; review 019 major (bot error leaves client stuck) -> round 2 brief 020"}
+{"ts":"2026-11-07T22:29:15.995Z","event":"return_valid","agent_id":"a8f789d784f483700","agent_type":"server-agent","via":"handback"}
+{"ts":"2026-11-07T22:29:54.614Z","event":"coordinator_verdict","brief_id":"020-game-server-r2","verdict":"accepted","reason":"files match; merged into issue-6-play-vs-bot: 346 passed, typecheck 0, e2e 1 passed vs real server; diff reviewed by coordinator (narrow fix of review 019 major)"}
+{"ts":"2026-11-07T22:32:08.002Z","event":"shipped","issue":6,"pr":24}

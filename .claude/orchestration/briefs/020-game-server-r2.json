@@ -1,0 +1,29 @@
+{
+  "brief_id": "020-game-server-r2",
+  "agent": "server-agent",
+  "issue": 6,
+  "base_sha": "37dfbde",
+  "scratch_dir": "/private/tmp/claude-501/-Users-daveharms-personal-workspace-chess-tutor/9bbad0c8-2a2e-4c44-ac62-d80647cb9488/scratchpad/020-game-server-r2",
+  "objective": "Round 2 on your own branch (you start at your round-1 commit 37dfbde). Fix the review's major finding so the browser recovers after a bot failure, and close three minors: (1) whenever the bot fails (chooseMove rejects, or returns an illegal move) the server first emits a 'state' event carrying the updated GameView (botThinking false), and then the 'error' event; (2) the shutdown path always closes the explorer cache and the store and exits, even if engine.quit() rejects; (3) PGN tests that cover castling SAN, promotion SAN, a checkmate with its Result and Termination, and a game started as Black where the bot moved first.",
+  "requirements": [
+    "FR-4",
+    "FR-5",
+    "IR-5"
+  ],
+  "contract": "Review 019 of 46b1de2..bf701d9 (your server merged with the web client) found, verbatim in substance:\n\nMAJOR (web-facing, fix on the server): after a bot error the client stays stuck on 'Bot is thinking...' with Takeback disabled. Sequence: new game as White; POST /moves e2e4 -> 200 {botThinking:true}; the bot rejects -> apps/server/src/games.ts (~line 221) sets g.botThinking=false and emits only {type:'error', message}. The same applies to the illegal-bot-move branch (~line 205). GameEvent 'error' carries no GameView, so the client never learns botThinking is false.\n\nCoordinator decision: emit { type: 'state', game: viewOf(g) } immediately BEFORE the 'error' event in both branches. The order matters: the web reducer (apps/web/src/game-state.ts) replaces the game and clears its error message on 'state', and sets the message on 'error', so 'state' then 'error' leaves the board unlocked AND the message visible. 'error' then 'state' would hide the message. Test the order over the event stream (the existing SSE/fake-bot test helpers). The coordinator documents this ordering in packages/chess-core/src/api.ts; do not edit packages.\n\nMINOR to fix: apps/server/src/main.ts ~line 60: finally { await resources.engine.quit(); resources.explorer.close(); resources.store.close(); process.exit(0); } - if quit() rejects, the rest is skipped and the voided promise becomes an unhandled rejection. Make each close independent (log failures) and always exit.\n\nMINOR to fix: apps/server/test/outcome-pgn-store.test.ts ~line 42: toPgn tests only use ['e2e4','e7e5']. Add cases for O-O, a promotion (=Q), a checkmate (Result 1-0 or 0-1, Termination checkmate, SAN with #), and a playerColor 'b' game where the bot's move comes first (White header 'Sparring bot', Black 'Player').\n\nOut of this round (to be filed as issues by the coordinator, do not do): retry after a bot failure before its first move in a Black game; cancelling stale engine searches; pruning the in-memory games map; Termination tag values.\n\nCoordinator gate on the merged bf701d9: pnpm test 336 passed, pnpm typecheck 0, CI=1 pnpm test:e2e 1 passed against the real server. Your own branch at 37dfbde: pnpm test 278 passed, typecheck 0.",
+  "scope": [
+    "apps/server/**"
+  ],
+  "negative": [
+    "Do not edit packages/**, apps/web, docs, config, .github, root files or the lockfile.",
+    "No new dependencies.",
+    "Do not change the HTTP status codes or event shapes beyond adding the state-before-error emission."
+  ],
+  "rubric": [
+    "Tests first, red then green: event order state-then-error for both a rejecting bot and an illegal bot move, with botThinking false in that state, and a takeback succeeding afterwards; shutdown closes store and cache even if engine.quit rejects (inject or unit-test the shutdown function); the four PGN cases.",
+    "pnpm test and pnpm typecheck clean from the repo root.",
+    "files_changed lists every file changed in 37dfbde..your head. Commit message references FR-4, FR-5, IR-5 and #6."
+  ],
+  "concurrency": "None running. The coordinator holds an integration branch merging your branch with the web client and will merge this round into it.",
+  "round": 2
+}

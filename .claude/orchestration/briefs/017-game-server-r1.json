@@ -2,7 +2,7 @@
   "brief_id": "017-game-server-r1",
   "agent": "server-agent",
   "issue": 6,
-  "base_sha": "53c55eb",
+  "base_sha": "46b1de2",
   "scratch_dir": "/private/tmp/claude-501/-Users-daveharms-personal-workspace-chess-tutor/9bbad0c8-2a2e-4c44-ac62-d80647cb9488/scratchpad/017-game-server-r1",
   "objective": "Replace the apps/server placeholder with a Fastify server that implements every endpoint and SSE event in the game API contract below, so a player can play a full game as White or Black against the sparring bot: legal-move enforcement on the server (chess.js is the authority), takebacks, resign, game-over detection with result and endReason, the bot's reply pushed over SSE within 2 s (NFR-3), and finished and abandoned games saved as PGN in SQLite (FR-5, IR-7). The server also loads both repertoire files at startup and exits with a clear message if one is missing or does not parse (issue #6 scope addition, needed later by FR-6a/FR-19).",
   "requirements": [
@@ -28,7 +28,7 @@
     "Real WASM engine test: bot reply under 2000 ms (NFR-3).",
     "pnpm --filter @chess-tutor/server start boots with PORT/DB_PATH/LICHESS_TOKEN as in the e2e arrangement (smoke it yourself: curl POST /api/games, then stop it).",
     "pnpm test and pnpm typecheck clean from the repo root.",
-    "files_changed lists every file changed in 53c55eb..your head. Commit message references FR-1, FR-4, FR-5, NFR-3, IR-5, IR-7 and #6."
+    "files_changed lists every file changed in 46b1de2..your head. Commit message references FR-1, FR-4, FR-5, NFR-3, IR-5, IR-7 and #6."
   ],
   "concurrency": "In parallel: web-agent (brief 018-board-ui-r1) builds apps/web (React board, move list, takeback, Playwright config and e2e spec) against the same contract, in its own worktree. No file overlap: you own apps/server/** only. The coordinator integrates both and runs the e2e afterwards.",
   "round": 1
