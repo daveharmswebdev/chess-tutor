@@ -1,4 +1,7 @@
 {
+  "worktree": {
+    "baseRef": "head"
+  },
   "permissions": {
     "allow": [
       "Bash(pnpm test:*)",
@@ -7,11 +10,71 @@
       "Bash(pnpm vitest:*)",
       "Bash(git status:*)",
       "Bash(git diff:*)",
-      "Bash(git log:*)"
+      "Bash(git log:*)",
+      "Bash(pnpm install:*)",
+      "Bash(node .claude/hooks/delegation.ts:*)",
+      "Bash(git rev-parse:*)"
     ],
     "deny": [
       "Read(./.env)",
       "Read(./.env.*)"
+    ]
+  },
+  "hooks": {
+    "PreToolUse": [
+      {
+        "matcher": "Agent",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "c=$(git -C \"$CLAUDE_PROJECT_DIR\" rev-parse --path-format=absolute --git-common-dir) && cd \"${c%/.git}\" && exec node --no-warnings .claude/hooks/delegation.ts pre-agent",
+            "timeout": 30
+          }
+        ]
+      },
+      {
+        "matcher": "SubagentHandback",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "c=$(git -C \"$CLAUDE_PROJECT_DIR\" rev-parse --path-format=absolute --git-common-dir) && cd \"${c%/.git}\" && exec node --no-warnings .claude/hooks/delegation.ts pre-handback",
+            "timeout": 30
+          }
+        ]
+      },
+      {
+        "matcher": "Edit|Write|NotebookEdit",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "c=$(git -C \"$CLAUDE_PROJECT_DIR\" rev-parse --path-format=absolute --git-common-dir) && cd \"${c%/.git}\" && exec node --no-warnings .claude/hooks/guard-edit-scope.ts",
+            "timeout": 15
+          }
+        ]
+      }
+    ],
+    "PostToolUse": [
+      {
+        "matcher": "Agent",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "c=$(git -C \"$CLAUDE_PROJECT_DIR\" rev-parse --path-format=absolute --git-common-dir) && cd \"${c%/.git}\" && exec node --no-warnings .claude/hooks/delegation.ts post-agent",
+            "timeout": 30
+          }
+        ]
+      }
+    ],
+    "SubagentStop": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "c=$(git -C \"$CLAUDE_PROJECT_DIR\" rev-parse --path-format=absolute --git-common-dir) && cd \"${c%/.git}\" && exec node --no-warnings .claude/hooks/delegation.ts subagent-stop",
+            "timeout": 30
+          }
+        ]
+      }
     ]
   }
 }
