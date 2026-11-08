@@ -59,12 +59,50 @@ export interface MovesGrade {
  * repertoire moves), each line played from the position its tool was asked about.
  */
 export function basePositions(input: Pick<GradeInput, "history" | "fen" | "attemptFen" | "kind" | "reply" | "toolResults">): string[] {
-  const list = [...historyFens(input.history), input.fen, input.attemptFen];
+  return unique([...historyFens(input.history), ...currentPositions(input)]);
+}
+
+/**
+ * Positions a move described as played now or next may refer to (#29): fen, attemptFen, the
+ * position after revealMove and the tool-line positions, but no earlier position of the game.
+ */
+export function currentPositions(input: Pick<GradeInput, "fen" | "attemptFen" | "kind" | "reply" | "toolResults">): string[] {
+  const list = [input.fen, input.attemptFen];
   const attempt = input.kind === "hint" ? input.fen : input.attemptFen;
   const answer = input.reply.revealMove ? playUci(attempt, input.reply.revealMove) : null;
   if (answer) list.push(answer.fen);
   for (const t of input.toolResults) list.push(...toolLinePositions(t));
   return unique(list);
+}
+
+// Tense of a move mention, from the last cue before it in its sentence (#29). Past: the game so
+// far ("you played Nd2", "Black castled"), so any position of the game may hold it. Present or
+// none: now, next, a plan or a line, held to the current positions.
+const PAST_CUE =
+  /\b(?:played|went|moved|took|captured|castled|developed|pushed|answered|replied|responded|chose|was|were|had|did|earlier|already|ago|previously|previous|(?:just|has|have|had)\s+put)\b/gi;
+const PRESENT_CUE =
+  /\b(?:now|next|play|plays|push|pushes|try|tries|can|could|should|will|would|must|threatens?|wants?|consider)\b/gi;
+/** A numbered move ("2.Bf4", "9...c5") reads as a game record or a line: any position. */
+const NUMBERED = /(?:^|[^\w.])\d+\.(?:\.\.)?\s?$/;
+
+/** SAN after "your", "the", "Black's" names a piece where it stands ("your Bf4"), not a move. */
+const PIECE_REF = /\b(?:your|the|their|his|her|my|our|white's|black's|opponent's)\s+$/i;
+
+function pieceStands(fen: string, piece: string, square: string): boolean {
+  const at = board(fen)?.get(square as never);
+  return at !== undefined && at.type === piece;
+}
+
+/** `pastMentions`: starts of earlier mentions read as past; a line continues their tense ("2.Bf4 Nf6"). */
+function isPastMention(text: string, at: number, pastMentions: number[]): boolean {
+  const before = text.slice(0, at);
+  if (NUMBERED.test(before)) return true;
+  const start = Math.max(before.lastIndexOf(". "), before.lastIndexOf("! "), before.lastIndexOf("? "), before.lastIndexOf("; "), before.lastIndexOf("\n")) + 1;
+  // With the mention's first word, for "just put their queen on d6".
+  const sentence = before.slice(start) + (/^[A-Za-z]+/.exec(text.slice(at))?.[0] ?? "");
+  const last = (re: RegExp) => Math.max(-1, ...[...sentence.matchAll(re)].map((m) => m.index!));
+  const past = Math.max(last(PAST_CUE), ...pastMentions.filter((p) => p >= start).map((p) => p - start));
+  return past >= 0 && past > last(PRESENT_CUE);
 }
 
 const ucis = (moves: unknown): string[] =>
@@ -111,30 +149,43 @@ function unique(list: string[]): string[] {
 const MAX_POSITIONS = 400;
 
 /**
- * NFR-6, moves: every move named in `message` and `reveal` must be legal in a position of the
- * case (the game's positions, fen, attemptFen) or in one reached by moves named earlier in the
- * same field (so "Bxd6 exd6" and "g6, then Bg7 and O-O" read as lines). Either side may be to
- * move: explanations often give one side's plan ("g6, Bg7, O-O") without the replies.
+ * NFR-6, moves: every move named in `message` and `reveal` must be legal in a position it may
+ * refer to, or in one reached by moves named earlier in the same field (so "Bxd6 exd6" and "g6,
+ * then Bg7 and O-O" read as lines). A move described as played now, next or in a plan ("Play Nc3
+ * now", "Black plays Nb8-c6") is held to currentPositions; only a past-tense reference ("you
+ * played Nd2") or a numbered game record ("2.Bf4") may use the game's earlier positions (#29).
+ * Either side may be to move: explanations often give one side's plan ("g6, Bg7, O-O") without
+ * the replies. Plan mentions ("the f5 break") are not graded: a plan need not be legal yet.
  */
 export function gradeMoves(input: GradeInput): MovesGrade {
   const mentions: MentionGrade[] = [];
+  const current = currentPositions(input);
+  const history = historyFens(input.history);
   for (const field of ["message", "reveal"] as const) {
     const text = input.reply[field];
     if (!text) continue;
-    let positions = basePositions(input);
+    // Two pools: lines from current positions, and everything (history too) for past references.
+    let now = current;
+    let all = unique([...history, ...current]);
+    const pastMentions: number[] = [];
     for (const m of findMentions(text)) {
+      if (m.plan) continue;
+      const past = isPastMention(text, m.start, pastMentions);
+      if (past) pastMentions.push(m.start);
       const reached: string[] = [];
-      for (const fen of positions) {
+      for (const fen of past ? all : now) {
         for (const variant of [fen, flipTurn(fen)]) {
           if (!variant) continue;
-          for (const mv of resolve(variant, m.spec)) {
-            const after = playUci(variant, uciOf(mv));
-            if (after) reached.push(after.fen);
-          }
+          for (const mv of resolve(variant, m.spec)) reached.push(mv.after);
         }
       }
-      mentions.push({ field, raw: m.raw, legal: reached.length > 0 });
-      positions = unique([...positions, ...reached]).slice(0, MAX_POSITIONS);
+      let legal = reached.length > 0;
+      if (!legal && m.spec.piece && m.spec.to && !m.spec.capture && PIECE_REF.test(text.slice(0, m.start))) {
+        legal = (past ? all : now).some((fen) => pieceStands(fen, m.spec.piece!, m.spec.to!));
+      }
+      mentions.push({ field, raw: m.raw, legal });
+      if (!past) now = unique([...now, ...reached]).slice(0, MAX_POSITIONS);
+      all = unique([...all, ...reached]).slice(0, MAX_POSITIONS);
     }
   }
   const illegal = mentions.filter((m) => !m.legal).map((m) => m.raw);
@@ -170,7 +221,10 @@ export interface GiveAwayGrade {
 }
 
 const PIECE_NAME: Record<string, string> = { p: "pawn", n: "knight", b: "bishop", r: "rook", q: "queen", k: "king" };
-const CHECK_NOUN = /\b(?:a|give|gives|giving|gave|with|deliver|delivers|delivering)\s+check\b|\bcheck\s+(?:with|from)\b|\bchecks?\s+(?:the|black's|white's|your opponent's)\s+king\b/i;
+const CHECK_NOUN =
+  /\b(?:a|give|gives|giving|gave|with|deliver|delivers|delivering)\s+check\b|\b(?:king|queen|rook|bishop|knight|pawn)\s+checks?\b|\bcheck(?:s|ed|ing)?\s+(?:with|from|by)\b|\bchecks?\s+(?:the|black's|white's|your opponent's)\s+king\b/i;
+/** Castling in words: "castle", "castles", "castling", "castled" (#29). */
+const CASTLE_WORD = /\bcastl(?:e|es|ed|ing)\b/i;
 
 const coords = (sq: string) => ({ f: sq.charCodeAt(0) - 97, r: Number(sq[1]) - 1 });
 
@@ -195,19 +249,25 @@ function alongLine(from: string, to: string, a: { from: string; to: string }): b
  * - the message names revealMove in any notation (SAN, UCI, long algebraic, "bishop to d3",
  *   or a pawn move's square in a move context);
  * - the message names the answer's piece and a check, when the answer gives check
- *   ("can a check with your other bishop ...");
+ *   ("can a check with your other bishop ...", "a bishop check", "checks with your bishop");
+ * - the message says "castle" (in any form) when the answer is castling;
  * - an arrow is the answer move or starts on its from-square (shows the piece).
  * An arrow that only ends on the answer's to-square, runs along its line through it, or starts
  * on its empty to-square is a Socratic nudge: reported in `nudges` ("points at the answer
  * square"), not a give-away. Malformed arrows (the session drops them) are ignored here.
+ * Without a revealMove the answer is the case's engineBest: a reply that names the engine's
+ * move without revealing it still gives it away (#29).
  */
 export function gradeGiveAway(input: GradeInput): GiveAwayGrade {
   const problems: string[] = [];
   const nudges: string[] = [];
-  const answer = input.reply.revealMove;
+  const answer = input.reply.revealMove ?? input.engineBest;
   if (!answer) return { pass: true, problems, nudges };
   const attempt = input.kind === "hint" ? input.fen : input.attemptFen;
   const played = playUci(attempt, answer);
+  if (played?.move.san.startsWith("O-O") && CASTLE_WORD.test(input.reply.message)) {
+    problems.push(`message says "castle" and the answer ${answer} is castling (${played.move.san})`);
+  }
   const from = answer.slice(0, 2);
   const to = answer.slice(2, 4);
 
@@ -295,15 +355,59 @@ export function evalEvidence(input: Pick<GradeInput, "toolResults" | "moment">):
 /** 0.3 pawns: engine scores drift and the tutor rounds (the tutor's own claims check uses the same). */
 const EVAL_TOLERANCE_CP = 30;
 
-const QUOTE =
-  /(?<![\w.])(?:mate in (\d+)|([+\-−])?(\d+(?:\.\d+)?)\s*(pawns?|centipawns?|cp)\b|([+\-−])(\d+(?:\.\d+)?)(?!\w|\.\d))/gi;
+const MATE_QUOTE = /(?<![\w.])mate in (\d+)/gi;
+/** "1.5 pawns", "+2 pawns", "150 cp", "a 1.5-pawn edge". */
+const UNIT_QUOTE = /(?<![\w.])([+\-−])?(\d+(?:\.\d+)?)(?:\s*-\s*|\s*)(pawns?|centipawns?|cp)\b/gi;
+/** "+1.5", "-0.4". */
+const SIGNED_QUOTE = /(?<![\w.])([+\-−])(\d+(?:\.\d+)?)(?!\w|\.\d)/g;
+/** "better by 2.3", "down 0.4", "ahead by about 1": a number without unit after a direction word (#29). */
+const BARE_QUOTE =
+  /\b(?:by|up|down|ahead|behind)\s+(?:(?:about|roughly|around|nearly|almost|just|only|over|under)\s+)?(\d+(?:\.\d+)?)(?!\w|\.\d)(?!\s*-?\s*(?:pawns?|centipawns?|cp)\b)(?!\s+(?:moves?|tempi|tempo|squares?|files?|ranks?|pieces?|points?|minutes?|seconds?|games?|times?|of|to|or|and)\b)/gi;
+/**
+ * A whole number of pawns without a sign is material ("2 pawns on the queenside") unless an
+ * evaluation word frames it: "up 2 pawns", "by 2 pawns", "an advantage of 2 pawns", "a 2-pawn edge".
+ */
+const PAWN_LEAD = /\b(?:up|down|ahead|behind|by|worth|(?:advantage|edge|lead|deficit)\s+of)\s+(?:(?:about|roughly|around|nearly|almost|just|only|over|under)\s+)?$/i;
+const PAWN_FOLLOW = /^\s+(?:edge|advantage|lead|deficit|better|worse|ahead|behind|up|down)\b/i;
+
+interface RawQuote {
+  raw: string;
+  index: number;
+  mate: number | null;
+  sign: string | undefined;
+  num: string;
+  unit: string;
+}
+
+/** Every evaluation quoted in `text`, in order, without overlaps (the earliest, then longest, wins). */
+export function findEvalQuotes(text: string): RawQuote[] {
+  const found: RawQuote[] = [];
+  for (const m of text.matchAll(MATE_QUOTE)) found.push({ raw: m[0], index: m.index!, mate: Number(m[1]), sign: undefined, num: m[1]!, unit: "" });
+  for (const m of text.matchAll(UNIT_QUOTE)) {
+    const [raw, sign, num, unit] = m as unknown as [string, string | undefined, string, string];
+    const material = sign === undefined && !num.includes(".") && unit.toLowerCase().startsWith("p");
+    if (material && !PAWN_LEAD.test(text.slice(0, m.index!)) && !PAWN_FOLLOW.test(text.slice(m.index! + raw.length))) continue;
+    found.push({ raw, index: m.index!, mate: null, sign, num, unit: unit.toLowerCase() });
+  }
+  for (const m of text.matchAll(SIGNED_QUOTE)) found.push({ raw: m[0], index: m.index!, mate: null, sign: m[1], num: m[2]!, unit: "" });
+  for (const m of text.matchAll(BARE_QUOTE)) found.push({ raw: m[0], index: m.index!, mate: null, sign: undefined, num: m[1]!, unit: "" });
+  const sorted = found.sort((a, b) => a.index - b.index || b.raw.length - a.raw.length);
+  const out: RawQuote[] = [];
+  for (const q of sorted) {
+    const last = out[out.length - 1];
+    if (last && q.index < last.index + last.raw.length) continue;
+    out.push(q);
+  }
+  return out;
+}
 const SIDE = /\b(white|black|you|your|you're|you are|opponent|opponent's)\b/gi;
 const UP = /\b(up|ahead|better|advantage|edge|winning|plus)\b/i;
 const DOWN = /\b(down|behind|worse|losing|minus)\b/i;
 
 /**
  * NFR-6, evaluations (FR-10): every quoted evaluation (+1.5, 1.5 pawns, 150 cp / centipawns,
- * mate in N) must match a score from this ask's tool results or the key-moment data, within
+ * mate in N, and unsigned "better by 2.3", "down 0.4", "a 1.5-pawn edge"; not a material count
+ * such as "2 pawns on the queenside") must match a score from this ask's tool results or the key-moment data, within
  * 0.3 pawns (0.5 for a whole number of pawns). Sign-aware where the sentence names a side and a
  * direction ("Black is up 1.5", "+1.5 for White", "you are down 2 pawns"): such a quote must
  * match a White-relative engine score for that side; matching only the other side's score is
@@ -315,20 +419,17 @@ export function gradeEvals(input: GradeInput): EvalsGrade {
   for (const field of ["message", "reveal"] as const) {
     const text = input.reply[field];
     if (!text) continue;
-    for (const m of text.matchAll(QUOTE)) {
-      const raw = m[0];
-      if (m[1] !== undefined) {
-        const n = Number(m[1]);
+    for (const q of findEvalQuotes(text)) {
+      const { raw, sign, num, unit } = q;
+      if (q.mate !== null) {
+        const n = q.mate;
         quotes.push({ raw, cp: null, mate: n, side: null, problem: ev.mates.includes(n) ? null : "unmatched" });
         continue;
       }
-      const sign = m[2] ?? m[5];
-      const num = m[3] ?? m[6]!;
-      const unit = (m[4] ?? "").toLowerCase();
-      const size = unit.startsWith("c") ? Number(num) : Number(num) * 100;
+      const size = unit.startsWith("c") ? Number(num) : Math.round(Number(num) * 100);
       const tol = !unit.startsWith("c") && !num.includes(".") ? 50 : EVAL_TOLERANCE_CP;
       const near = (a: number, b: number) => Math.abs(a - b) <= tol + 1e-9;
-      const { side, direction } = sideOf(text, m.index!, raw.length, input.playerColor, sign);
+      const { side, direction } = sideOf(text, q.index, raw.length, input.playerColor, sign);
       let problem: EvalQuote["problem"] = null;
       if (side !== null && direction !== 0) {
         const white = (side === "w" ? 1 : -1) * direction * size;

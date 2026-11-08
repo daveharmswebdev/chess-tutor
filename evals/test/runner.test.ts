@@ -116,6 +116,44 @@ describe("runEval", () => {
     expect(readFileSync(join(opts.outDir, "report.md"), "utf8")).toMatch(/give_away 1/);
   });
 
+  /** A session whose ask makes one billed API round (through the recording client), then fails. */
+  const billedThenFails =
+    (end: "throw" | "zero_usage"): NonNullable<RunOptions["createSession"]> =>
+    (deps) => ({
+      async ask(request) {
+        await deps.client.messages
+          .stream({ model: deps.config.model, max_tokens: 100, messages: [{ role: "user", content: [{ type: "text", text: `<hint_request>\n${JSON.stringify(request)}` }] }] })
+          .finalMessage();
+        if (end === "throw") throw new Error("boom after a billed round");
+        const usage = { requests: 0, inputTokens: 0, outputTokens: 0, cacheReadInputTokens: 0, cacheCreationInputTokens: 0 };
+        return { ok: false, reason: "api_unavailable", message: "lost the usage", usage, ms: 1 };
+      },
+    });
+
+  it("counts the recorded rounds of a throwing ask toward --max-usd, at concurrency 2 (NFR-4)", async () => {
+    const { client, stats } = fakeClient({ delayMs: 15 });
+    // Each case: one round of 1000 input + 500 output tokens = $0.014.
+    const opts = options({ client, cases: CASES.slice(0, 4), concurrency: 2, maxUsd: 0.01, createSession: billedThenFails("throw") });
+    const summary = await runEval(opts);
+    expect(stats.maxActive).toBe(2);
+    expect(summary.rows.map((r) => r.id)).toEqual(["hint-1", "hint-2"]);
+    expect(summary.skipped).toEqual(["hint-3", "hint-4"]);
+    expect(summary.stoppedByBudget).toBe(true);
+    expect(summary.spentUsd).toBeCloseTo(0.028, 6);
+    const one = readJson<CaseResult>(join(opts.outDir, "cases", "hint-1.json"));
+    expect(one.reason).toBe("threw");
+    expect(one.usage).toMatchObject({ requests: 1, inputTokens: 1000, outputTokens: 500 });
+    expect(one.costUsd).toBeCloseTo(0.014, 6);
+  });
+
+  it("counts the recorded rounds when a failed outcome reports less usage than was billed", async () => {
+    const { client } = fakeClient({ delayMs: 5 });
+    const opts = options({ client, cases: CASES.slice(0, 3), concurrency: 2, maxUsd: 0.01, createSession: billedThenFails("zero_usage") });
+    const summary = await runEval(opts);
+    expect(summary.skipped).toEqual(["hint-3"]);
+    expect(summary.spentUsd).toBeCloseTo(0.028, 6);
+  });
+
   it("repeats each case --repeat times", async () => {
     const { client } = fakeClient();
     const opts = options({ client, cases: CASES.slice(0, 1), repeat: 2 });

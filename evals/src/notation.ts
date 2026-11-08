@@ -6,12 +6,16 @@ import { Chess, type Move, type Square } from "chess.js";
  *
  * Recognised: SAN piece moves (Nf3, Bxd6, Nbd7, R1e2), pawn captures (exd6), promotions
  * (e8=Q), castling (O-O, O-O-O, 0-0), each with an optional + or #; UCI (g1f3, e7e8q); long
- * algebraic (Ng1-f3, e3-e4, Bc4xf7); "<piece> [goes/moves/...] to <square>"; and a bare square
- * as a pawn move only in a move context: after "...", a move number, a verb such as
- * play/push/try/then/move/break, after "and"/"or"/"," that follows another move mention (the
- * same piece's move when that mention was "<piece> to <square>"), or followed by an annotation
- * (! !? ?! ?? + #; a lone "?" ends a question). Elsewhere a square is a square ("the knight on
- * f6", "go after c7", "the rook on a8?").
+ * algebraic (Ng1-f3, e3-e4, Bc4xf7); "<piece> [goes/moves/...] to <square>"; "putting/bringing/
+ * placing [your] <piece> on <square>"; and a bare square as a pawn move only in a move context:
+ * after "...", a move number, a verb such as play/push/try/then/move/break, after "and"/"or"/","
+ * that follows another move mention (the same piece's move when that mention was "<piece> to
+ * <square>"), or followed by an annotation (! !? ?! ?? + #; a lone "?" ends a question).
+ * Elsewhere a square is a square ("the knight on f6", "go after c7", "the rook on a8?").
+ *
+ * A square named as a plan ("the e4 break", "the f5 push") is a pawn move with `plan: true`: it
+ * names the move (NFR-7) but need not be legal yet ("prepare the f5 break"), so the legality
+ * grader skips it.
  */
 
 export interface Mention {
@@ -22,6 +26,8 @@ export interface Mention {
   spec: MoveSpec;
   /** Found as "<piece> to <square>" (or chained to one). */
   pieceTo?: boolean;
+  /** A pawn move named as a plan ("the e4 break"): a move for NFR-7, not graded for legality. */
+  plan?: boolean;
 }
 
 /** What a mention says about a move; null fields are unspecified. */
@@ -50,6 +56,13 @@ const PIECE_TO = new RegExp(
   `\\b(king|queen|rook|bishop|knight|pawn)\\s+(?:(?:can\\s+|could\\s+)?(?:go|goes|went|jump|jumps|jumped|move|moves|moved|come|comes|came)\\s+)?to\\s+([a-h][1-8])${E}`,
   "gi",
 );
+// "putting your knight on e5", "bring the other bishop to d3" (#29).
+const PLACE_PIECE = new RegExp(
+  `\\b(?:put|puts|putting|place|places|placing|bring|brings|bringing|plant|plants|planting|post|posts|posting|land|lands|landing|get|gets|getting|reroute|reroutes|rerouting|send|sends|sending)\\s+(?:(?:your|the|a|his|her|their|that|white's|black's)\\s+)?(?:(?:other|light-squared|dark-squared)\\s+)?(king|queen|rook|bishop|knight|pawn)\\s+(?:on|to|onto|into)\\s+([a-h][1-8])${E}`,
+  "gi",
+);
+/** A square followed by a plan noun is a pawn move: "the e4 break", "the c5 push" (#29). */
+const PLAN_NOUN = /^\s+(?:break|push|advance|thrust|lever)\b/i;
 const SQUARE = new RegExp(`${B}([a-h][1-8])([!?+#]+)?${E}`, "g");
 // Not "after" or "with": "go after c7", "with c7 covered" name squares (#10 round 2).
 const MOVE_VERBS =
@@ -100,6 +113,9 @@ export function findMentions(text: string): Mention[] {
   for (const m of text.matchAll(PIECE_TO)) {
     found.push({ raw: m[0], start: m.index!, end: m.index! + m[0].length, spec: spec({ piece: PIECE_WORD[m[1]!.toLowerCase()]!, to: m[2]! }), pieceTo: true });
   }
+  for (const m of text.matchAll(PLACE_PIECE)) {
+    found.push({ raw: m[0], start: m.index!, end: m.index! + m[0].length, spec: spec({ piece: PIECE_WORD[m[1]!.toLowerCase()]!, to: m[2]! }), pieceTo: true });
+  }
 
   let mentions = dedupe(found);
   // Bare squares as pawn moves, only in a move context (needs the other mentions for chains).
@@ -116,6 +132,8 @@ export function findMentions(text: string): Mention[] {
       const piece = chained && prev.pieceTo ? prev.spec.piece : "p";
       const raw = m[0];
       squares.push({ raw, start, end: start + raw.length, spec: spec({ piece, to: m[1]! }), pieceTo: chained && prev.pieceTo === true });
+    } else if (m[2] === undefined && PLAN_NOUN.test(text.slice(start + m[0].length))) {
+      squares.push({ raw: m[0], start, end: start + m[0].length, spec: spec({ piece: "p", to: m[1]! }), plan: true });
     }
   }
   mentions = dedupe([...mentions, ...squares]);
@@ -135,9 +153,22 @@ function dedupe(list: Mention[]): Mention[] {
 
 /** Legal moves in `fen` that fit the mention. */
 export function resolve(fen: string, s: MoveSpec): Move[] {
-  const chess = board(fen);
-  if (!chess) return [];
-  return chess.moves({ verbose: true }).filter((mv) => fits(mv, s));
+  return legalMoves(fen).filter((mv) => fits(mv, s));
+}
+
+// Legal moves per position: the graders resolve every mention in hundreds of positions, and
+// building a Chess and its move list each time made grading a recorded case take seconds (#29).
+const MOVES = new Map<string, Move[]>();
+const MAX_CACHED = 20_000;
+
+/** Every legal move in `fen` (verbose, with `after`); [] for an invalid FEN. Do not mutate the result. */
+export function legalMoves(fen: string): Move[] {
+  let list = MOVES.get(fen);
+  if (list) return list;
+  list = board(fen)?.moves({ verbose: true }) ?? [];
+  if (MOVES.size >= MAX_CACHED) MOVES.clear();
+  MOVES.set(fen, list);
+  return list;
 }
 
 function fits(mv: Move, s: MoveSpec): boolean {
