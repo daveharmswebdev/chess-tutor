@@ -4,14 +4,17 @@ import { ApiRequestError, type ApiClient } from "../src/api.ts";
 import { createGameController, type EventSourceLike } from "../src/controller.ts";
 import {
   boardFen,
+  canHint,
   canRetryBot,
+  canReveal,
   gameReducer,
   initialGameState,
   isPlayersTurn,
+  tutorStatusOf,
   type GameAction,
   type GameState,
 } from "../src/game-state.ts";
-import { AFTER_D4_D5_FEN, AFTER_D4_FEN, D4, D5, START_FEN, view } from "./fixtures.ts";
+import { AFTER_D4_D5_FEN, AFTER_D4_FEN, BF4, D4, D5, START_FEN, question, reveal, tutorStatus, view } from "./fixtures.ts";
 
 class FakeEventSource implements EventSourceLike {
   readyState = 1;
@@ -50,6 +53,12 @@ function fakeApi(overrides: Partial<ApiClient> = {}): ApiClient {
     takeback: unexpected,
     resign: unexpected,
     botRetry: unexpected,
+    tutorHint: async () => {
+      throw new Error("unexpected call");
+    },
+    tutorReveal: async () => {
+      throw new Error("unexpected call");
+    },
     eventsUrl: (id) => `/api/games/${id}/events`,
     ...overrides,
   };
@@ -424,5 +433,154 @@ describe("game controller", () => {
       await h.controller.resign();
       expect(h.state().game?.endReason).toBe("resigned");
     });
+  });
+});
+
+describe("game controller: tutor (#7: FR-8, FR-11, FR-12, NFR-1, NFR-9)", () => {
+  const afterD5 = (overrides: Parameters<typeof view>[0] = {}) => view({ fen: AFTER_D4_D5_FEN, moves: [D4, D5], ...overrides });
+
+  it("feeds every tutor_* event into the reducer", async () => {
+    const h = harness(fakeApi({ newGame: async () => afterD5() }));
+    await h.controller.newGame("w");
+    const es = h.sources[0]!;
+    es.emit("tutor_thinking", { type: "tutor_thinking", kind: "opponent_left_book" });
+    expect(tutorStatusOf(h.state()).thinking).toBe(true);
+    es.emit("tutor_progress", { type: "tutor_progress", label: "Checking Bf4…" });
+    expect(h.state().tutor.progress).toBe("Checking Bf4…");
+    es.emit("tutor_reply", { type: "tutor_reply", question: question() });
+    expect(h.state().tutor.question?.id).toBe("q1");
+    es.emit("tutor_reveal", { type: "tutor_reveal", reveal: reveal() });
+    expect(h.state().tutor.reveal).toEqual(reveal());
+    es.emit("tutor_attempt", { type: "tutor_attempt", questionId: "q1", move: BF4, correct: true, cpLoss: 0 });
+    expect(h.state().tutor.attempt?.correct).toBe(true);
+    es.emit("tutor_failed", { type: "tutor_failed", message: "The tutor could not answer." });
+    expect(h.state().tutor.failed).toBe("The tutor could not answer.");
+  });
+
+  it("ignores malformed tutor events", async () => {
+    const h = harness(fakeApi({ newGame: async () => afterD5() }));
+    await h.controller.newGame("w");
+    const es = h.sources[0]!;
+    es.emit("tutor_reply", { type: "tutor_reply" });
+    es.emit("tutor_progress", { type: "tutor_progress", label: 3 });
+    es.emit("tutor_attempt", { type: "tutor_attempt", questionId: "q1" });
+    es.emitRaw("tutor_reveal", "{nope");
+    expect(h.state().tutor).toEqual(initialGameState.tutor);
+  });
+
+  it("asks for a hint when allowed; the reply then arrives over SSE", async () => {
+    const hinted: string[] = [];
+    const h = harness(fakeApi({ newGame: async () => afterD5(), tutorHint: async (id) => void hinted.push(id) }));
+    await h.controller.newGame("w");
+    expect(canHint(h.state())).toBe(true);
+    await h.controller.hint();
+    expect(hinted).toEqual(["g1"]);
+    expect(h.state().tutor.notice).toBeNull();
+    h.sources[0]!.emit("tutor_thinking", { type: "tutor_thinking", kind: "hint" });
+    h.sources[0]!.emit("tutor_reply", { type: "tutor_reply", question: question({ kind: "hint", canReveal: false }) });
+    expect(h.state().tutor.question?.kind).toBe("hint");
+  });
+
+  it("the hint's SSE events may arrive before its 202: still no notice, question shown", async () => {
+    let es: FakeEventSource | undefined;
+    const h = harness(
+      fakeApi({
+        newGame: async () => afterD5(),
+        tutorHint: async () => {
+          es!.emit("tutor_thinking", { type: "tutor_thinking", kind: "hint" });
+          es!.emit("tutor_reply", { type: "tutor_reply", question: question({ kind: "hint" }) });
+        },
+      }),
+    );
+    await h.controller.newGame("w");
+    es = h.sources[0]!;
+    await h.controller.hint();
+    expect(h.state().tutor.question?.kind).toBe("hint");
+    expect(tutorStatusOf(h.state()).thinking).toBe(false);
+    expect(h.state().tutor.notice).toBeNull();
+  });
+
+  it("does not ask for a hint when it is not allowed", async () => {
+    let calls = 0;
+    const tutorHint = async () => void calls++;
+    for (const game of [
+      afterD5({ tutor: tutorStatus({ available: false, reason: "Coaching is off: no API key is set." }) }),
+      afterD5({ tutor: tutorStatus({ thinking: true }) }),
+      view({ fen: AFTER_D4_FEN, moves: [D4], botThinking: true }),
+    ]) {
+      const h = harness(fakeApi({ newGame: async () => game, tutorHint }));
+      await h.controller.newGame("w");
+      await h.controller.hint();
+    }
+    expect(calls).toBe(0);
+  });
+
+  it("shows 409 and 503 from Hint as a short notice, without throwing or touching the game", async () => {
+    for (const [status, message] of [
+      [409, "Not possible right now: the tutor is busy"],
+      [503, "Coaching is not available right now."],
+    ] as const) {
+      const h = harness(
+        fakeApi({
+          newGame: async () => afterD5(),
+          tutorHint: async () => {
+            throw new ApiRequestError(status, message);
+          },
+        }),
+      );
+      await h.controller.newGame("w");
+      await expect(h.controller.hint()).resolves.toBeUndefined();
+      expect(h.state().tutor.notice).toBe(message);
+      expect(h.state().error).toBeNull();
+      expect(h.state().busy).toBe(false);
+      expect(h.state().game?.moves).toEqual([D4, D5]);
+    }
+  });
+
+  it("Show me: shows the reveal from the 200 reply", async () => {
+    const h = harness(fakeApi({ newGame: async () => afterD5({ tutor: tutorStatus({ question: question() }) }), tutorReveal: async () => reveal() }));
+    await h.controller.newGame("w");
+    expect(canReveal(h.state())).toBe(true);
+    await h.controller.reveal();
+    expect(h.state().tutor.reveal).toEqual(reveal());
+    expect(canReveal(h.state())).toBe(false);
+  });
+
+  it("Show me: the tutor_reveal event before the 200 reply gives the same state", async () => {
+    let es: FakeEventSource | undefined;
+    const h = harness(
+      fakeApi({
+        newGame: async () => afterD5({ tutor: tutorStatus({ question: question() }) }),
+        tutorReveal: async () => {
+          es!.emit("tutor_reveal", { type: "tutor_reveal", reveal: reveal() });
+          return reveal();
+        },
+      }),
+    );
+    await h.controller.newGame("w");
+    es = h.sources[0]!;
+    await h.controller.reveal();
+    expect(h.state().tutor.reveal).toEqual(reveal());
+  });
+
+  it("Show me: no request without an open question; a 409 shows a notice", async () => {
+    let calls = 0;
+    const none = harness(fakeApi({ newGame: async () => afterD5(), tutorReveal: async () => (calls++, reveal()) }));
+    await none.controller.newGame("w");
+    await none.controller.reveal();
+    expect(calls).toBe(0);
+
+    const h = harness(
+      fakeApi({
+        newGame: async () => afterD5({ tutor: tutorStatus({ question: question() }) }),
+        tutorReveal: async () => {
+          throw new ApiRequestError(409, "Not possible right now: no open question");
+        },
+      }),
+    );
+    await h.controller.newGame("w");
+    await expect(h.controller.reveal()).resolves.toBeUndefined();
+    expect(h.state().tutor.notice).toBe("Not possible right now: no open question");
+    expect(h.state().tutor.reveal).toBeNull();
   });
 });

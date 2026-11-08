@@ -3,7 +3,17 @@
 import type { Color, GameEvent, GameView } from "@chess-tutor/chess-core";
 import { ApiRequestError, type ApiClient } from "./api.ts";
 import { fenAfter, isOwnPiece, moveToUci } from "./chess-rules.ts";
-import { boardFen, canResign, canRetryBot, canTakeback, isPlayersTurn, type GameAction, type GameState } from "./game-state.ts";
+import {
+  boardFen,
+  canHint,
+  canResign,
+  canRetryBot,
+  canReveal,
+  canTakeback,
+  isPlayersTurn,
+  type GameAction,
+  type GameState,
+} from "./game-state.ts";
 
 /** The part of the browser EventSource the controller uses. */
 export interface EventSourceLike {
@@ -29,10 +39,25 @@ export interface GameController {
   resign(): Promise<void>;
   /** After a bot failure: ask the server to retry; the bot's move then arrives over SSE (#23). */
   retryBot(): Promise<void>;
+  /** POST /tutor/hint when canHint; the reply arrives over SSE. 409/503 become a tutor notice (FR-12). */
+  hint(): Promise<void>;
+  /** "Show me": POST /tutor/reveal when canReveal; a 409 becomes a tutor notice (FR-11). */
+  reveal(): Promise<void>;
   dispose(): void;
 }
 
-const EVENT_TYPES = ["state", "bot_move", "game_over", "error"] as const;
+const EVENT_TYPES = [
+  "state",
+  "bot_move",
+  "game_over",
+  "error",
+  "tutor_thinking",
+  "tutor_progress",
+  "tutor_reply",
+  "tutor_failed",
+  "tutor_reveal",
+  "tutor_attempt",
+] as const satisfies ReadonlyArray<GameEvent["type"]>;
 const CLOSED = 2;
 
 function messageOf(e: unknown): string {
@@ -40,14 +65,51 @@ function messageOf(e: unknown): string {
   return "Something went wrong talking to the game server.";
 }
 
+const isObject = (v: unknown): v is Record<string, unknown> => typeof v === "object" && v !== null;
+const isString = (v: unknown): v is string => typeof v === "string";
+
+/** Checks the fields each event type needs before it reaches the reducer. */
+function wellFormed(e: Record<string, unknown>): boolean {
+  switch (e["type"]) {
+    case "state":
+    case "bot_move":
+    case "game_over":
+      return isObject(e["game"]);
+    case "error":
+    case "tutor_failed":
+      return isString(e["message"]);
+    case "tutor_thinking":
+      return isString(e["kind"]);
+    case "tutor_progress":
+      return isString(e["label"]);
+    case "tutor_reply": {
+      const q = e["question"];
+      return isObject(q) && isString(q["id"]) && isString(q["message"]) && Array.isArray(q["arrows"]);
+    }
+    case "tutor_reveal": {
+      const r = e["reveal"];
+      return isObject(r) && isString(r["questionId"]) && isString(r["text"]) && Array.isArray(r["arrows"]);
+    }
+    case "tutor_attempt": {
+      const m = e["move"];
+      return (
+        isString(e["questionId"]) &&
+        isObject(m) &&
+        isString(m["san"]) &&
+        typeof e["correct"] === "boolean" &&
+        typeof e["cpLoss"] === "number"
+      );
+    }
+    default:
+      return false;
+  }
+}
+
 function parseEvent(data: unknown): GameEvent | null {
   if (typeof data !== "string") return null;
   try {
     const parsed: unknown = JSON.parse(data);
-    if (typeof parsed !== "object" || parsed === null || !("type" in parsed)) return null;
-    const event = parsed as GameEvent;
-    if (event.type === "error") return typeof event.message === "string" ? event : null;
-    return typeof event.game === "object" && event.game !== null ? event : null;
+    return isObject(parsed) && wellFormed(parsed) ? (parsed as unknown as GameEvent) : null;
   } catch {
     return null;
   }
@@ -162,6 +224,31 @@ export function createGameController(deps: GameControllerDeps): GameController {
     async retryBot() {
       if (!canRetryBot(getState())) return;
       await simpleRequest((id) => api.botRetry(id));
+    },
+
+    async hint() {
+      const state = getState();
+      if (!state.game || !canHint(state)) return;
+      const id = state.game.id;
+      dispatch({ type: "tutor_notice", message: null });
+      try {
+        await api.tutorHint(id);
+      } catch (e) {
+        if (getState().game?.id === id) dispatch({ type: "tutor_notice", message: messageOf(e) });
+      }
+    },
+
+    async reveal() {
+      const state = getState();
+      if (!state.game || !canReveal(state)) return;
+      const id = state.game.id;
+      dispatch({ type: "tutor_notice", message: null });
+      try {
+        const reveal = await api.tutorReveal(id);
+        if (getState().game?.id === id) dispatch({ type: "tutor_reveal_received", reveal });
+      } catch (e) {
+        if (getState().game?.id === id) dispatch({ type: "tutor_notice", message: messageOf(e) });
+      }
     },
 
     dispose() {
