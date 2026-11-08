@@ -12,9 +12,14 @@ on:
     paths:
       - "prompts/**"
       - "packages/tutor/**"
+      - "packages/chess-core/**"
+      - "repertoire/**"
       - "evals/**"
       - "config/models.json"
       - "config/tutor.json"
+
+permissions:
+  contents: read
 
 concurrency:
   group: evals-${{ github.ref }}
