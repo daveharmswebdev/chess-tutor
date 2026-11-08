@@ -1,0 +1,33 @@
+{
+  "brief_id": "033-evals-r2",
+  "agent": "tutor-agent",
+  "issue": 10,
+  "base_sha": "d233d63",
+  "scratch_dir": "/private/tmp/claude-501/-Users-daveharms-personal-workspace-chess-tutor/029814ab-5fb1-4dfa-a9cc-a73999ef0392/scratchpad/033-evals-r2",
+  "objective": "Round 2 of #10, after the first live runs: (1) NFR-7 grader follows the user's rule (below), with 'arrow ends on the answer's square' and 'runs along its line' moved to an informational 'points at the answer square' metric not counted against NFR-7; (2) the NFR-6 move-legality grader stops flagging legal moves inside lines: it accepts a move legal in any position reached along the engine lines in this case's recorded tool results, and along chains of moves named in the text (allowing the opponent's reply to be skipped is not required; follow tool lines instead), and a square followed by '?' is a square unless it comes in a move context; (3) the recorder captures the reason text of every correction retry the session sends, and the report/compare show retry counts by reason; (4) the tutor drops malformed pre-reveal arrows (not two real squares, or from === to) before returning a reply, in packages/tutor, with a test; (5) prompts/CHANGELOG.md records the model pin (Sonnet 5.5 medium for development and eval, 2026-11-08, evidence docs/evals/2026-11-08-q3-model-choice.md); no prompt text change.",
+  "requirements": [
+    "NFR-6",
+    "NFR-7",
+    "NFR-8",
+    "FR-11"
+  ],
+  "contract": "Live results of round 1 (coordinator, 2026-11-08, $4.05): full per-case JSON copied to /private/tmp/claude-501/-Users-daveharms-personal-workspace-chess-tutor/029814ab-5fb1-4dfa-a9cc-a73999ef0392/scratchpad/q3-results/{opus-medium,sonnet-medium,opus-low}/cases/*.json plus compare/compare.md. Use real cases from there as test fixtures (copy what you need).\n\nUser decisions: model pinned = Sonnet 5.5 medium (coordinator committed config/models.json on branch issue-10-evals, b04da13; not on your branch, do not edit config). Give-away rule (NFR-7): a first message gives the answer away if it names the answer move in any notation, a pre-reveal arrow IS the answer move or starts on its from-square (its piece), or it names the answer's piece together with the check it gives. An arrow that only ends on the answer's to-square, or runs along its line, is an allowed Socratic nudge: report it as information ('points at the answer square: N%'), not as a give-away. Keep the 'starts on the answer's empty to-square' rule out of NFR-7 too (it is a nudge of the same kind) unless you show a case where it reveals the move.\n\nGrader false positives found (all in q3-results): opus-medium po-london-ng4 'exf4' ('Qe2, and after exf4 exf4 you are still a knight up' — legal in the engine line in the tool results); sonnet-medium lb-london-c5 'exd4' ('If Black plays cxd4, recapture with exd4'); opus-medium hint-london-ne5 'Qxh5' ('The engine's main line goes e4 Be7 e5 ... Then Ng5 and Qxh5'); sonnet-medium po-london-bg6-trap 'Bxh5'; and squares with '?' read as moves: opus-medium lb-london-qb6 'c7?', opus-low lb-london-qb6 'b2?', opus-low po-london-qxb2 'a8?', sonnet-medium hint-london-c5 'd2?'. 14 illegal flags in total over the three runs; re-grade all three runs after your fix (graders run offline from the recorded JSON: add a 'regrade <dir>' command that rewrites grades/summary/report from the per-case files without calling the API) and report how many flags remain and whether each remaining one is a real tutor error.\n\nSonnet's 4 failed asks were the tutor's claims check refusing give-aways twice (dxe5 named in message x2 cases, arrow b5-c7 = answer) and one move without a tool call (d5): those are correct refusals, leave the claims check alone. Retry reasons are not recorded today (the correction user turn is not captured), which is why (3) is needed; Sonnet needed 46 retries vs Opus 26.\n\nMalformed arrows: Sonnet produced h7->h7 and d6->d6 style arrows (arrows well formed 81%). Strip them in the session after validation (the reply stays ok; TutorReply contract unchanged).",
+  "scope": [
+    "packages/tutor/**",
+    "prompts/**",
+    "evals/**"
+  ],
+  "negative": [
+    "Never call the real Anthropic API or Lichess.",
+    "Do not change prompt text (prompts/tutor-system.v1.md) or the claims check's FR-8/FR-10 rules; only the arrow sanitising in packages/tutor.",
+    "Do not edit config/, docs/, .github/, root files or the lockfile; no new dependencies."
+  ],
+  "rubric": [
+    "Tests first (red then green): each listed false positive graded legal from its real recorded case; 'look at c7?' is a square; a truly illegal move in a line still flagged; NFR-7 rule per the user (ends-on-square and along-line arrows informational only); retry reasons captured by the recorder with a fake client that sends a correction; malformed arrows stripped by the session.",
+    "regrade command run on the three copied result dirs; return the new NFR-6 legality and NFR-7 figures for each and the list of remaining illegal flags with your verdict on each.",
+    "pnpm test green; pnpm typecheck clean.",
+    "files_changed lists every file changed in d233d63..your head. Commit message references NFR-6, NFR-7, NFR-8, FR-11 and #10."
+  ],
+  "concurrency": "Nothing else is running. The coordinator's branch issue-10-evals adds config/models.json, docs/evals/, docs/requirements.md and .github/workflows/evals.yml on top of your d233d63; no file overlap.",
+  "round": 2
+}

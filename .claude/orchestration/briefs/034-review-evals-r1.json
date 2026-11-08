@@ -1,0 +1,29 @@
+{
+  "brief_id": "034-review-evals-r1",
+  "agent": "reviewer",
+  "issue": 10,
+  "base_sha": "0f0bedf",
+  "scratch_dir": "/private/tmp/claude-501/-Users-daveharms-personal-workspace-chess-tutor/029814ab-5fb1-4dfa-a9cc-a73999ef0392/scratchpad/034-review-evals-r1",
+  "objective": "Review #10 (tutor eval suite and model choice) on branch issue-10-evals: the range git diff 15d63a6..0f0bedf (15d63a6 = main). Read with git diff / git show. Find correctness bugs in the graders, runner, regrade and report (a grader that passes a bad reply or fails a good one is the worst kind), budget-cap holes (a run that can spend past --max-usd), and contract or requirement gaps. Report blocking / major / minor and say whether each #10 'Done when' criterion is met.",
+  "requirements": [
+    "NFR-6",
+    "NFR-7",
+    "NFR-10",
+    "IR-9",
+    "FR-11"
+  ],
+  "contract": "#10 Done when: eval cases cover all four kinds of key moment; 100% of mentioned moves legal and every quoted evaluation matches the engine (NFR-6); >= 90% of first messages don't give away the answer (NFR-7); Opus vs Sonnet compared on quality and cost, and the model chosen and pinned in config/models.json (Q-3); evals run automatically in CI on changes to prompts, tutor code or model config (NFR-10).\n\nUser decisions (2026-11-08): live calls, not Batches; local now + CI job that skips with a notice without the ANTHROPIC_API_KEY secret and reports without blocking until the tutor meets the thresholds; $10 budget; model = Sonnet 5.5 medium; NFR-7 give-away = names the answer move in any notation, a pre-reveal arrow is the answer or starts on its from-square, or names the answer's piece with the check it gives. Arrows ending on the answer's square / along its line are allowed nudges (information only).\n\nCommits: d233d63 tutor-agent r1 (evals/ suite, 66 cases); b04da13 coordinator (config/models.json Sonnet pin, .github/workflows/evals.yml, docs/evals/2026-11-08-q3-model-choice.md, docs/requirements.md Q-3); 2a925d8 tutor-agent r2 (grader fixes, regrade, retry reasons, packages/tutor dropMalformedArrows in schema.ts/session.ts, prompts/CHANGELOG.md); a896472 merge; 0f0bedf coordinator server test fix. Gate at 0f0bedf: pnpm test 648 passed (40 files), typecheck 0. Live results (local, not in git): Opus med / Sonnet med / Opus low, after regrade: moves legal 100/100/100%, evals 100%, NFR-7 87.9/96.8/84.6%, p95 15.5/10.6/12.8 s, $0.27/$0.15/$0.19 per game.\n\nCheck in particular: packages/tutor dropMalformedArrows runs after zod validation and before the claims check and cannot drop a valid arrow; the legality grader's widened position set (every position along tool lines, chains of named moves) cannot make a genuinely illegal move pass in an obvious case; the budget cap with concurrency > 1 (in-flight cases started before the cap); evals.yml: secrets are not exposed to PRs from forks, the skip path really skips, paths filter covers config/tutor.json and evals/; the docs/evals record matches the data and the user's decisions.",
+  "scope": [],
+  "negative": [
+    "Read-only: do not edit, commit, or run anything that writes to the repo.",
+    "Do not call the Anthropic API or run the live runner (pnpm eval / src/run.ts without regrade/compare). Running pnpm test, vitest and the offline regrade on fixtures is fine.",
+    "Do not review outside the range."
+  ],
+  "rubric": [
+    "Every finding cites file:line and a concrete failure scenario.",
+    "Try to get a bad reply past a grader and a good reply failed by one, with in-process probes.",
+    "Explicit per-criterion 'Done when' status and a ship / no-ship verdict."
+  ],
+  "concurrency": "The coordinator is running one live Sonnet eval pass in evals/results/ (gitignored) at the same time; ignore that directory.",
+  "round": 1
+}

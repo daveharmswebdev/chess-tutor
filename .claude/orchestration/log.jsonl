@@ -114,3 +114,16 @@
 {"ts":"2026-11-08T00:43:13.003Z","event":"return_valid","agent_id":"aacd1bb82b200a10e","agent_type":"reviewer","via":"handback"}
 {"ts":"2026-11-08T00:43:20.540Z","event":"coordinator_verdict","brief_id":"031-review-tutor-r2","agent":"reviewer","verdict":"review","reason":"SHIP. All 028 findings fixed except deferred no_token. New: major eval sign/deltas (follow-up), 4 minors."}
 {"ts":"2026-11-08T00:46:42.541Z","event":"shipped","issue":7,"pr":27}
+{"ts":"2026-11-08T12:48:07.270Z","event":"dispatch","subagent_type":"tutor-agent","brief_id":"032-evals-r1","base_sha":"15d63a6","spoke":true}
+{"ts":"2026-11-08T12:48:07.504Z","event":"agent_complete","subagent_type":"tutor-agent","brief_id":"032-evals-r1","agent_id":"a1e629b2205bc84e9","status":"async_launched","contract":"pending"}
+{"ts":"2026-11-08T13:57:26.874Z","event":"return_invalid","agent_id":"a1e629b2205bc84e9","agent_type":"tutor-agent","attempt":1,"errors":["/tests_run: a 'gate' check failed, so this is not a success"]}
+{"ts":"2026-11-08T13:58:15.073Z","event":"return_valid","agent_id":"a1e629b2205bc84e9","agent_type":"tutor-agent","via":"handback"}
+{"ts":"2026-11-08T13:59:03.079Z","event":"coordinator_verdict","brief_id":"032-evals-r1","agent":"tutor-agent","verdict":"accepted","reason":"88 files all in evals/ == files_changed; re-ran 625 passed, typecheck 0; 66 cases","tokens":229698,"duration_ms":4207895}
+{"ts":"2026-11-08T14:53:38.625Z","event":"return_valid","agent_id":"a1e629b2205bc84e9","agent_type":"tutor-agent","via":"handback"}
+{"ts":"2026-11-08T14:55:31.083Z","event":"coordinator_verdict","brief_id":"033-evals-r2","agent":"tutor-agent","verdict":"accepted","reason":"30 files in scope == files_changed; merged a896472, 648 passed after coordinator test fix for the model pin; typecheck 0","tokens":300208,"duration_ms":606514}
+{"ts":"2026-11-08T14:56:11.689Z","event":"dispatch","subagent_type":"reviewer","brief_id":"034-review-evals-r1","base_sha":"0f0bedf","spoke":true}
+{"ts":"2026-11-08T14:56:11.924Z","event":"agent_complete","subagent_type":"reviewer","brief_id":"034-review-evals-r1","agent_id":"aeb0255e5bb14604e","status":"async_launched","contract":"pending"}
+{"ts":"2026-11-08T15:01:10.145Z","event":"return_valid","agent_id":"aeb0255e5bb14604e","agent_type":"reviewer","via":"handback"}
+{"ts":"2026-11-08T15:01:17.720Z","event":"coordinator_verdict","brief_id":"034-review-evals-r1","agent":"reviewer","verdict":"review","reason":"SHIP. 3 major grader false-pass holes -> follow-up issue; record numbers + paths filter fixed inline"}
+{"ts":"2026-11-08T15:01:24.579Z","event":"coordinator_verdict","brief_id":"034-review-evals-r1","agent":"reviewer","verdict":"review","reason":"cost entry","tokens":91955,"duration_ms":298552}
+{"ts":"2026-11-08T15:10:18.936Z","event":"shipped","issue":10,"pr":31}
