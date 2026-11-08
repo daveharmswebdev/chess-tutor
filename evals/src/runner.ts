@@ -9,6 +9,7 @@ import {
   type TutorExplorer,
   type TutorOutcome,
   type TutorRequest,
+  type TutorUsage,
 } from "@chess-tutor/tutor";
 import { costUsd, PLAYER_PROFILE, sha256, type Price } from "./config.ts";
 import { gradeReply } from "./graders.ts";
@@ -36,6 +37,8 @@ export interface RunOptions {
   repeat: number;
   outDir: string;
   log?: (line: string) => void;
+  /** Tests only: replaces createTutorSession (the runner always passes it the recording client). */
+  createSession?: typeof createTutorSession;
 }
 
 /** The request the server would send for this case. */
@@ -49,6 +52,7 @@ export function requestFor(c: EvalCase): TutorRequest {
  * and claims check as the server), at most `concurrency` at a time, and grades each reply.
  * Before starting a case it checks the spend: once the summed cost of finished cases reaches
  * maxUsd, no new case starts (cases already running finish, so a run can end slightly above).
+ * A failed ask counts what its recorded rounds were billed, not $0 (NFR-4).
  */
 export async function runEval(opts: RunOptions): Promise<RunSummary> {
   const log = opts.log ?? ((l: string) => console.log(l));
@@ -118,7 +122,7 @@ function fileName(id: string): string {
 async function runCase(c: EvalCase, id: string, repeat: number, opts: RunOptions): Promise<CaseResult> {
   const rounds: RecordedRound[] = [];
   const progress: string[] = [];
-  const session = createTutorSession(
+  const session = (opts.createSession ?? createTutorSession)(
     {
       client: recordingClient(opts.client, rounds),
       engine: opts.engine,
@@ -134,10 +138,12 @@ async function runCase(c: EvalCase, id: string, repeat: number, opts: RunOptions
   try {
     outcome = await session.ask(requestFor(c), (p) => progress.push(p.label));
   } catch (err) {
-    // ask() is documented never to throw; record it if it does.
-    const usage = { requests: rounds.length, inputTokens: 0, outputTokens: 0, cacheReadInputTokens: 0, cacheCreationInputTokens: 0 };
-    outcome = { ok: false, reason: "threw", message: String(err), usage, ms: Math.round(performance.now() - started) };
+    // ask() is documented never to throw; record it if it does, with what its rounds were billed.
+    outcome = { ok: false, reason: "threw", message: String(err), usage: recordedUsage(rounds), ms: Math.round(performance.now() - started) };
   }
+  // NFR-4: a failed ask may report less than was billed (the session's own catch reports none),
+  // so the spend uses the recorded rounds' usage when it costs more.
+  const usage = outcome.ok ? outcome.usage : costlier(outcome.usage, recordedUsage(rounds), opts.price);
 
   const reply = outcome.ok ? outcome.reply : null;
   let revealCpLoss: number | null = null;
@@ -160,13 +166,32 @@ async function runCase(c: EvalCase, id: string, repeat: number, opts: RunOptions
     firstRoundMs: rounds[0]?.ms ?? null,
     toolCalls: rounds.reduce((n, r) => n + r.toolUses.length, 0),
     ...retriesOf(rounds),
-    usage: outcome.usage,
-    costUsd: costUsd(outcome.usage, opts.price),
+    usage,
+    costUsd: costUsd(usage, opts.price),
     revealCpLoss,
     progress,
     rounds,
     grades,
   };
+}
+
+/** Usage summed over the recorded API rounds (what was billed); failed requests carry none. */
+export function recordedUsage(rounds: RecordedRound[]): TutorUsage {
+  const u: TutorUsage = { requests: 0, inputTokens: 0, outputTokens: 0, cacheReadInputTokens: 0, cacheCreationInputTokens: 0 };
+  const n = (x: unknown) => (typeof x === "number" && Number.isFinite(x) ? x : 0);
+  for (const r of rounds) {
+    if (!r.usage) continue;
+    u.requests++;
+    u.inputTokens += n(r.usage["input_tokens"]);
+    u.outputTokens += n(r.usage["output_tokens"]);
+    u.cacheReadInputTokens += n(r.usage["cache_read_input_tokens"]);
+    u.cacheCreationInputTokens += n(r.usage["cache_creation_input_tokens"]);
+  }
+  return u;
+}
+
+function costlier(a: TutorUsage, b: TutorUsage, price: Price): TutorUsage {
+  return costUsd(b, price) > costUsd(a, price) ? b : a;
 }
 
 /** Loss of `uci` against the case's engine best, from the attempt side's view (engine at config depth). */
