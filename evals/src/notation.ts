@@ -13,7 +13,8 @@ import { Chess, type Move, type Square } from "chess.js";
  * <square>"), or followed by an annotation (! !? ?! ?? + #; a lone "?" ends a question).
  * Elsewhere a square is a square ("the knight on f6", "go after c7", "the rook on a8?").
  *
- * A square named as a plan ("the e4 break", "the f5 push") is a pawn move with `plan: true`: it
+ * A square named as a plan ("the e4 break", "the e4-break", "the f5 pawn push") is a pawn move,
+ * and "your knight belongs on e5" the knight's, with `plan: true`: it
  * names the move (NFR-7) but need not be legal yet ("prepare the f5 break"), so the legality
  * grader skips it.
  */
@@ -58,11 +59,13 @@ const PIECE_TO = new RegExp(
 );
 // "putting your knight on e5", "bring the other bishop to d3" (#29).
 const PLACE_PIECE = new RegExp(
-  `\\b(?:put|puts|putting|place|places|placing|bring|brings|bringing|plant|plants|planting|post|posts|posting|land|lands|landing|get|gets|getting|reroute|reroutes|rerouting|send|sends|sending)\\s+(?:(?:your|the|a|his|her|their|that|white's|black's)\\s+)?(?:(?:other|light-squared|dark-squared)\\s+)?(king|queen|rook|bishop|knight|pawn)\\s+(?:on|to|onto|into)\\s+([a-h][1-8])${E}`,
+  `\\b(?:put|puts|putting|place|places|placing|bring|brings|bringing|plant|plants|planting|post|posts|posting|land|lands|landing|get|gets|getting|reroute|reroutes|rerouting|send|sends|sending)\\s+(?:(?:your|the|a|his|her|their|that|white's|black's)\\s+)?(?:(?:other|light-squared|dark-squared|king's|queen's|kingside|queenside)\\s+)?(king|queen|rook|bishop|knight|pawn)\\s+(?:on|to|onto|into)\\s+([a-h][1-8])${E}`,
   "gi",
 );
-/** A square followed by a plan noun is a pawn move: "the e4 break", "the c5 push" (#29). */
-const PLAN_NOUN = /^\s+(?:break|push|advance|thrust|lever)\b/i;
+/** A square followed by a plan noun is a pawn move: "the e4 break", "the e4 pawn break", "the e4-break" (#29). */
+const PLAN_SQUARE = new RegExp(`${B}([a-h][1-8])(?:-|\\s+)(?:pawn\\s+)?(?:break|push|advance|thrust|lever)\\b`, "gi");
+/** Where a piece belongs, a plan: "your knight belongs on e5" (#29 round 2). */
+const PIECE_BELONGS = new RegExp(`\\b(king|queen|rook|bishop|knight|pawn)\\s+belongs?\\s+(?:on|to)\\s+([a-h][1-8])${E}`, "gi");
 const SQUARE = new RegExp(`${B}([a-h][1-8])([!?+#]+)?${E}`, "g");
 // Not "after" or "with": "go after c7", "with c7 covered" name squares (#10 round 2).
 const MOVE_VERBS =
@@ -113,6 +116,12 @@ export function findMentions(text: string): Mention[] {
   for (const m of text.matchAll(PIECE_TO)) {
     found.push({ raw: m[0], start: m.index!, end: m.index! + m[0].length, spec: spec({ piece: PIECE_WORD[m[1]!.toLowerCase()]!, to: m[2]! }), pieceTo: true });
   }
+  for (const m of text.matchAll(PLAN_SQUARE)) {
+    found.push({ raw: m[0], start: m.index!, end: m.index! + m[0].length, spec: spec({ piece: "p", to: m[1]! }), plan: true });
+  }
+  for (const m of text.matchAll(PIECE_BELONGS)) {
+    found.push({ raw: m[0], start: m.index!, end: m.index! + m[0].length, spec: spec({ piece: PIECE_WORD[m[1]!.toLowerCase()]!, to: m[2]! }), plan: true });
+  }
   for (const m of text.matchAll(PLACE_PIECE)) {
     found.push({ raw: m[0], start: m.index!, end: m.index! + m[0].length, spec: spec({ piece: PIECE_WORD[m[1]!.toLowerCase()]!, to: m[2]! }), pieceTo: true });
   }
@@ -132,8 +141,6 @@ export function findMentions(text: string): Mention[] {
       const piece = chained && prev.pieceTo ? prev.spec.piece : "p";
       const raw = m[0];
       squares.push({ raw, start, end: start + raw.length, spec: spec({ piece, to: m[1]! }), pieceTo: chained && prev.pieceTo === true });
-    } else if (m[2] === undefined && PLAN_NOUN.test(text.slice(start + m[0].length))) {
-      squares.push({ raw: m[0], start, end: start + m[0].length, spec: spec({ piece: "p", to: m[1]! }), plan: true });
     }
   }
   mentions = dedupe([...mentions, ...squares]);

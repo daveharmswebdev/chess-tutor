@@ -128,3 +128,92 @@ describe("NFR-7 give-away wordings (#29)", () => {
     expect(problems(NE5, { message: "Play e4 now!", revealMove: null }, { engineBest: null })).toEqual([]);
   });
 });
+
+describe("review 038 of #29 (round 2)", () => {
+  const illegal = (message: string) => gradeMoves(input(NE5, { message, reveal: null })).illegal;
+  const quotes = (message: string) => gradeEvals(input(NE5, { message })).quotes;
+
+  it.each([["Play 9.Nc3 now."], ["9.Nc3! is best."]])("a numbered mention of the current move or later uses the current position: '%s'", (message) => {
+    expect(illegal(message)).toEqual(["Nc3"]);
+  });
+
+  it("an earlier move number is still a game record", () => {
+    expect(illegal("The game began 1.d4 d5 2.Bf4 and 6.Nbd2 came later.")).toEqual([]);
+  });
+
+  it.each([
+    ["Black's last move was ...b6, so Nc3 is strong."],
+    ["Since Black was slow, Nc3 is best."],
+    ["Now that you have developed, Nc3 is the move."],
+    ["Black played ...b6 so Nc3 is strong."],
+  ])("decides tense per clause: '%s' flags Nc3", (message) => {
+    expect(illegal(message)).toEqual(["Nc3"]);
+  });
+
+  it("carries a past tense along a list of moves, not into a present-tense clause", () => {
+    expect(illegal("Black played ...Nc6, ...Bd6 and ...O-O.")).toEqual([]);
+    expect(illegal("You played Nd2, and Nc3 is better now.")).toEqual(["Nc3"]);
+  });
+
+  it.each([["Black's ...b6 weakened c6."], ["After ...b6 the long diagonal opens."], ["Black's last move ...b6 weakens c6."]])(
+    "the opponent's last move is a valid reference without a past-tense cue: '%s'",
+    (message) => {
+      expect(illegal(message)).toEqual([]);
+    },
+  );
+
+  it("the position before the last move gives no moves to the player", () => {
+    // White to move now; before ...b6 it was Black to move, so a White move there is not current.
+    expect(illegal("Play Nb1-c3 now.")).toEqual(["Nb1-c3"]);
+  });
+
+  it.each([
+    ["You are better by 2.3 and should attack.", 230],
+    ["White is down 0.4 or so.", 40],
+    ["You are up 1.5 to 2 here.", 150],
+    ["The engine gives 1.8 for White.", 180],
+    ["The evaluation is 2.3 in White's favour.", 230],
+    ["White is 1.5 better.", 150],
+  ])("extracts the unsigned evaluation in '%s'", (message, cp) => {
+    const q = quotes(message);
+    expect(q.map((x) => Math.abs(x.cp ?? 0))).toEqual([cp]);
+    expect(q.every((x) => x.problem === "unmatched")).toBe(true);
+  });
+
+  it.each([
+    ["e4 is defended by 2 pawns."],
+    ["Black's c5 pawn is backed up by 2 pawns."],
+    // Documented choice: "up N pawns in/of material" is a material count, not an engine evaluation.
+    ["After the trade you are up 2 pawns in material."],
+    ["The engine's top line after 9.e4 runs at depth 18."],
+  ])("does not read '%s' as an evaluation", (message) => {
+    expect(quotes(message)).toEqual([]);
+  });
+
+  it("keeps whole-pawn evaluations that a lead word frames", () => {
+    expect(quotes("White is up 2 pawns.").map((q) => q.cp)).toEqual([200]);
+    expect(quotes("You are better by 1 here.").map((q) => q.cp)).toEqual([100]);
+  });
+
+  describe("castle words", () => {
+    const ga = (message: string) => gradeGiveAway(input(NE5, { message, revealMove: "e1g1" })).problems;
+    it.each([["Black has already castled. Where is your king safest?"], ["Black castled; is your king safe?"], ["Your opponent castled long."]])(
+      "passes '%s' (about the opponent)",
+      (message) => {
+        expect(ga(message)).toEqual([]);
+      },
+    );
+    it.each([["Is it time to castle?"], ["Should you castle?"], ["What about castling now?"]])("flags '%s'", (message) => {
+      expect(ga(message).join(" ")).toMatch(/castl/);
+    });
+  });
+
+  it.each([
+    ["the e4 pawn break", "e3e4", "Think about the e4 pawn break."],
+    ["the e4-break", "e3e4", "Think about the e4-break."],
+    ["putting your king's knight on e5", "f3e5", "What about putting your king's knight on e5?"],
+    ["your knight belongs on e5", "f3e5", "Your knight belongs on e5, doesn't it?"],
+  ])("flags '%s' when it is the answer", (_label, revealMove, message) => {
+    expect(gradeGiveAway(input(NE5, { message, revealMove })).problems.length).toBeGreaterThan(0);
+  });
+});
