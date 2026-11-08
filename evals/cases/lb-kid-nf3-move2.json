@@ -1,0 +1,24 @@
+{
+  "id": "lb-kid-nf3-move2",
+  "kind": "opponent_left_book",
+  "playerColor": "b",
+  "history": [
+    "d2d4",
+    "g8f6",
+    "g1f3"
+  ],
+  "fen": "rnbqkb1r/pppppppp/5n2/8/3P4/5N2/PPP1PPPP/RNBQKB1R b KQkq - 2 2",
+  "moment": {
+    "kind": "opponent_left_book",
+    "line": "KID Classical",
+    "expected": [
+      "c4",
+      "Bf4"
+    ],
+    "played": "Nf3"
+  },
+  "attemptFen": "rnbqkb1r/pppppppp/5n2/8/3P4/5N2/PPP1PPPP/RNBQKB1R b KQkq - 2 2",
+  "engineBest": "d7d5",
+  "engineBestCp": -25,
+  "source": "KID: 2.Nf3"
+}

@@ -1,0 +1,25 @@
+{
+  "id": "pb-london-qh5",
+  "kind": "player_blunder",
+  "playerColor": "w",
+  "history": [
+    "d2d4",
+    "d7d5",
+    "c1f4",
+    "g8f6",
+    "e2e3",
+    "e7e6",
+    "d1h5"
+  ],
+  "fen": "rnbqkb1r/ppp2ppp/4pn2/3p3Q/3P1B2/4P3/PPP2PPP/RN2KBNR b KQkq - 1 4",
+  "moment": {
+    "kind": "player_blunder",
+    "played": "Qh5",
+    "cpLoss": 1030,
+    "best": "Nf3"
+  },
+  "attemptFen": "rnbqkb1r/ppp2ppp/4pn2/3p4/3P1B2/4P3/PPP2PPP/RN1QKBNR w KQkq - 0 4",
+  "engineBest": "g1f3",
+  "engineBestCp": 14,
+  "source": "London: early queen sortie to h5, covered by the f6 knight"
+}

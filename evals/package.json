@@ -5,6 +5,7 @@
   "type": "module",
   "scripts": {
     "eval": "node --experimental-strip-types --disable-warning=ExperimentalWarning --env-file-if-exists=../.env src/run.ts",
+    "generate-cases": "node --experimental-strip-types --disable-warning=ExperimentalWarning src/generate-cases.ts",
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {

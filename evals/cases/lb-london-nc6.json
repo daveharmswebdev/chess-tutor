@@ -1,0 +1,25 @@
+{
+  "id": "lb-london-nc6",
+  "kind": "opponent_left_book",
+  "playerColor": "w",
+  "history": [
+    "d2d4",
+    "d7d5",
+    "c1f4",
+    "b8c6"
+  ],
+  "fen": "r1bqkbnr/ppp1pppp/2n5/3p4/3P1B2/8/PPP1PPPP/RN1QKBNR w KQkq - 2 3",
+  "moment": {
+    "kind": "opponent_left_book",
+    "line": "London vs 1...d5",
+    "expected": [
+      "Nf6",
+      "c5"
+    ],
+    "played": "Nc6"
+  },
+  "attemptFen": "r1bqkbnr/ppp1pppp/2n5/3p4/3P1B2/8/PPP1PPPP/RN1QKBNR w KQkq - 2 3",
+  "engineBest": "e2e3",
+  "engineBestCp": 44,
+  "source": "London: 2...Nc6"
+}

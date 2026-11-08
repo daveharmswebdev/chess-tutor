@@ -1,0 +1,31 @@
+{
+  "id": "mw-london-nb4-qd2",
+  "kind": "missed_win",
+  "playerColor": "w",
+  "history": [
+    "d2d4",
+    "d7d5",
+    "c1f4",
+    "g8f6",
+    "e2e3",
+    "c8f5",
+    "f1d3",
+    "f5d3",
+    "d1d3",
+    "b8c6",
+    "g1f3",
+    "c6b4",
+    "d3d2"
+  ],
+  "fen": "r2qkb1r/ppp1pppp/5n2/3p4/1n1P1B2/4PN2/PPPQ1PPP/RN2K2R b KQkq - 4 7",
+  "moment": {
+    "kind": "missed_win",
+    "played": "Qd2",
+    "best": "Qb5+",
+    "gainCp": 449
+  },
+  "attemptFen": "r2qkb1r/ppp1pppp/5n2/3p4/1n1P1B2/3QPN2/PPP2PPP/RN2K2R w KQkq - 3 7",
+  "engineBest": "d3b5",
+  "engineBestCp": 474,
+  "source": "London: retreats instead of Qb5+"
+}

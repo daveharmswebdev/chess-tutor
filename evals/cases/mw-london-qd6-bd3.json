@@ -1,0 +1,25 @@
+{
+  "id": "mw-london-qd6-bd3",
+  "kind": "missed_win",
+  "playerColor": "w",
+  "history": [
+    "d2d4",
+    "d7d5",
+    "c1f4",
+    "g8f6",
+    "e2e3",
+    "d8d6",
+    "f1d3"
+  ],
+  "fen": "rnb1kb1r/ppp1pppp/3q1n2/3p4/3P1B2/3BP3/PPP2PPP/RN1QK1NR b KQkq - 2 4",
+  "moment": {
+    "kind": "missed_win",
+    "played": "Bd3",
+    "best": "Bxd6",
+    "gainCp": 804
+  },
+  "attemptFen": "rnb1kb1r/ppp1pppp/3q1n2/3p4/3P1B2/4P3/PPP2PPP/RN1QKBNR w KQkq - 1 4",
+  "engineBest": "f4d6",
+  "engineBestCp": 878,
+  "source": "London: develops instead of Bxd6"
+}

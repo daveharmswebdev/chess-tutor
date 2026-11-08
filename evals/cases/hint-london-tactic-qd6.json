@@ -1,0 +1,19 @@
+{
+  "id": "hint-london-tactic-qd6",
+  "kind": "hint",
+  "playerColor": "w",
+  "history": [
+    "d2d4",
+    "d7d5",
+    "c1f4",
+    "g8f6",
+    "e2e3",
+    "d8d6"
+  ],
+  "fen": "rnb1kb1r/ppp1pppp/3q1n2/3p4/3P1B2/4P3/PPP2PPP/RN1QKBNR w KQkq - 1 4",
+  "moment": null,
+  "attemptFen": "rnb1kb1r/ppp1pppp/3q1n2/3p4/3P1B2/4P3/PPP2PPP/RN1QKBNR w KQkq - 1 4",
+  "engineBest": "f1b5",
+  "engineBestCp": 862,
+  "source": "London: the queen on d6 can be taken"
+}

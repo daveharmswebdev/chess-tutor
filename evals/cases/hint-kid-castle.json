@@ -1,0 +1,22 @@
+{
+  "id": "hint-kid-castle",
+  "kind": "hint",
+  "playerColor": "b",
+  "history": [
+    "d2d4",
+    "g8f6",
+    "c2c4",
+    "g7g6",
+    "b1c3",
+    "f8g7",
+    "e2e4",
+    "d7d6",
+    "g1f3"
+  ],
+  "fen": "rnbqk2r/ppp1ppbp/3p1np1/8/2PPP3/2N2N2/PP3PPP/R1BQKB1R b KQkq - 1 5",
+  "moment": null,
+  "attemptFen": "rnbqk2r/ppp1ppbp/3p1np1/8/2PPP3/2N2N2/PP3PPP/R1BQKB1R b KQkq - 1 5",
+  "engineBest": "b8a6",
+  "engineBestCp": -53,
+  "source": "KID: time to castle"
+}

@@ -1,0 +1,543 @@
+[
+  {
+    "id": "london-qh5:claude-opus-5-5:medium",
+    "model": "claude-opus-5-5",
+    "effort": "medium",
+    "kind": "player_blunder",
+    "playerColor": "w",
+    "history": [
+      "d2d4",
+      "d7d5",
+      "c1f4",
+      "g8f6",
+      "e2e3",
+      "e7e6",
+      "d1h5"
+    ],
+    "fen": "rnbqkb1r/ppp2ppp/4pn2/3p3Q/3P1B2/4P3/PPP2PPP/RN2KBNR b KQkq - 1 4",
+    "attemptFen": "rnbqkb1r/ppp2ppp/4pn2/3p4/3P1B2/4P3/PPP2PPP/RN1QKBNR w KQkq - 0 4",
+    "reply": {
+      "schemaVersion": 1,
+      "kind": "player_blunder",
+      "message": "Before you move your queen to h5, look at Black's knight on f6. Which squares can that knight jump to? Is h5 one of them?",
+      "reveal": "Qh5 loses the queen to Nxh5, because the f6 knight covers h5. Play Nf3 instead: it develops a piece, keeps your queen safe, and fits the normal London setup.",
+      "revealMove": "g1f3",
+      "arrows": [
+        {
+          "from": "f6",
+          "to": "h5"
+        }
+      ]
+    },
+    "ok": true,
+    "ms": 10259,
+    "usage": {
+      "requests": 2,
+      "inputTokens": 1405,
+      "outputTokens": 398,
+      "cacheReadInputTokens": 3225,
+      "cacheCreationInputTokens": 3225
+    },
+    "toolCalls": [
+      "evaluate_move({\"fen\":\"rnbqkb1r/ppp2ppp/4pn2/3p4/3P1B2/4P3/PPP2PPP/RN1QKBNR w KQkq - 0 4\",\"move\":\"Qh5\"})"
+    ]
+  },
+  {
+    "id": "london-qd6:claude-opus-5-5:medium",
+    "model": "claude-opus-5-5",
+    "effort": "medium",
+    "kind": "punish_opponent",
+    "playerColor": "w",
+    "history": [
+      "d2d4",
+      "d7d5",
+      "c1f4",
+      "g8f6",
+      "e2e3",
+      "d8d6"
+    ],
+    "fen": "rnb1kb1r/ppp1pppp/3q1n2/3p4/3P1B2/4P3/PPP2PPP/RN1QKBNR w KQkq - 1 4",
+    "attemptFen": "rnb1kb1r/ppp1pppp/3q1n2/3p4/3P1B2/4P3/PPP2PPP/RN1QKBNR w KQkq - 1 4",
+    "reply": {
+      "schemaVersion": 1,
+      "kind": "punish_opponent",
+      "message": "Black just put their queen on d6. Look along the diagonal from your bishop on f4. What does it point at, and is anything protecting that square well enough?",
+      "reveal": "Bxd6 wins Black's queen for your bishop. After exd6, you're up about 9 points of material, which is close to a winning position. Bb5+ first also wins the queen, but taking it right away is simplest. Whenever your opponent moves a piece, check what it walked into!",
+      "revealMove": "f4d6",
+      "arrows": [
+        {
+          "from": "f4",
+          "to": "e5"
+        }
+      ]
+    },
+    "ok": true,
+    "ms": 11221,
+    "usage": {
+      "requests": 2,
+      "inputTokens": 2241,
+      "outputTokens": 760,
+      "cacheReadInputTokens": 6450,
+      "cacheCreationInputTokens": 0
+    },
+    "toolCalls": [
+      "analyze_position({\"fen\":\"rnb1kb1r/ppp1pppp/3q1n2/3p4/3P1B2/4P3/PPP2PPP/RN1QKBNR w KQkq - 1 4\",\"multi_pv\":2})",
+      "evaluate_move({\"fen\":\"rnb1kb1r/ppp1pppp/3q1n2/3p4/3P1B2/4P3/PPP2PPP/RN1QKBNR w KQkq - 1 4\",\"move\":\"Bxd6\"})"
+    ]
+  },
+  {
+    "id": "kid-trompowsky:claude-opus-5-5:medium",
+    "model": "claude-opus-5-5",
+    "effort": "medium",
+    "kind": "opponent_left_book",
+    "playerColor": "b",
+    "history": [
+      "d2d4",
+      "g8f6",
+      "c1g5"
+    ],
+    "fen": "rnbqkb1r/pppppppp/5n2/6B1/3P4/8/PPP1PPPP/RN1QKBNR b KQkq - 2 2",
+    "attemptFen": "rnbqkb1r/pppppppp/5n2/6B1/3P4/8/PPP1PPPP/RN1QKBNR b KQkq - 2 2",
+    "reply": {
+      "schemaVersion": 1,
+      "kind": "opponent_left_book",
+      "message": "Your opponent played Bg5 (the Trompowsky Attack), not c4 or Bf4. That bishop is now pinning nothing, but it is eyeing your knight on f6. Can you still set up your usual King's Indian pieces, and where does your dark-squared bishop want to go?",
+      "reveal": "You can stay in your King's Indian setup with g6. Your pieces go to the same squares as always: bishop on g7, pawn on d6, castle short, then aim for the ...e5 pawn break to fight for the center. If White takes on f6, don't panic. Recapture, and you get the two bishops for the rest of the game.",
+      "revealMove": "g7g6",
+      "arrows": [
+        {
+          "from": "g5",
+          "to": "f6"
+        },
+        {
+          "from": "f8",
+          "to": "g7"
+        }
+      ]
+    },
+    "ok": true,
+    "ms": 10758,
+    "usage": {
+      "requests": 3,
+      "inputTokens": 3396,
+      "outputTokens": 792,
+      "cacheReadInputTokens": 6466,
+      "cacheCreationInputTokens": 3233
+    },
+    "toolCalls": [
+      "opening_explorer({\"fen\":\"rnbqkb1r/pppppppp/5n2/6B1/3P4/8/PPP1PPPP/RN1QKBNR b KQkq - 2 2\"})",
+      "get_repertoire_context({\"fen\":\"rnbqkb1r/pppppppp/5n2/6B1/3P4/8/PPP1PPPP/RN1QKBNR b KQkq - 2 2\"})",
+      "evaluate_move({\"fen\":\"rnbqkb1r/pppppppp/5n2/6B1/3P4/8/PPP1PPPP/RN1QKBNR b KQkq - 2 2\",\"move\":\"g6\"})"
+    ]
+  },
+  {
+    "id": "london-hint-bd3:claude-opus-5-5:medium",
+    "model": "claude-opus-5-5",
+    "effort": "medium",
+    "kind": "hint",
+    "playerColor": "w",
+    "history": [
+      "d2d4",
+      "d7d5",
+      "c1f4",
+      "g8f6",
+      "e2e3",
+      "e7e6",
+      "g1f3",
+      "c7c5",
+      "c2c3",
+      "b8c6",
+      "b1d2",
+      "f8d6",
+      "f4g3",
+      "e8g8"
+    ],
+    "fen": "r1bq1rk1/pp3ppp/2nbpn2/2pp4/3P4/2P1PNB1/PP1N1PPP/R2QKB1R w KQ - 5 8",
+    "attemptFen": "r1bq1rk1/pp3ppp/2nbpn2/2pp4/3P4/2P1PNB1/PP1N1PPP/R2QKB1R w KQ - 5 8",
+    "reply": {
+      "schemaVersion": 1,
+      "kind": "hint",
+      "message": "Your queenside pieces are out, but your king is still in the middle. Which of your pieces hasn't moved yet, and where could it aim at Black's kingside so you can castle next move?",
+      "reveal": "Bd3 is the normal London move here. The bishop goes to its best diagonal, pointing at h7 next to Black's king, and it clears the way for you to castle. After that, Qe2 and the e3-e4 pawn push can open the center for your pieces.",
+      "revealMove": "f1d3",
+      "arrows": [
+        {
+          "from": "e1",
+          "to": "g1"
+        },
+        {
+          "from": "f1",
+          "to": "h7"
+        }
+      ]
+    },
+    "ok": true,
+    "ms": 6489,
+    "usage": {
+      "requests": 2,
+      "inputTokens": 1922,
+      "outputTokens": 448,
+      "cacheReadInputTokens": 6450,
+      "cacheCreationInputTokens": 0
+    },
+    "toolCalls": [
+      "get_repertoire_context({\"fen\":\"r1bq1rk1/pp3ppp/2nbpn2/2pp4/3P4/2P1PNB1/PP1N1PPP/R2QKB1R w KQ - 5 8\"})",
+      "analyze_position({\"fen\":\"r1bq1rk1/pp3ppp/2nbpn2/2pp4/3P4/2P1PNB1/PP1N1PPP/R2QKB1R w KQ - 5 8\"})"
+    ]
+  },
+  {
+    "id": "london-qh5:claude-sonnet-5-5:medium",
+    "model": "claude-sonnet-5-5",
+    "effort": "medium",
+    "kind": "player_blunder",
+    "playerColor": "w",
+    "history": [
+      "d2d4",
+      "d7d5",
+      "c1f4",
+      "g8f6",
+      "e2e3",
+      "e7e6",
+      "d1h5"
+    ],
+    "fen": "rnbqkb1r/ppp2ppp/4pn2/3p3Q/3P1B2/4P3/PPP2PPP/RN2KBNR b KQkq - 1 4",
+    "attemptFen": "rnbqkb1r/ppp2ppp/4pn2/3p4/3P1B2/4P3/PPP2PPP/RN1QKBNR w KQkq - 0 4",
+    "reply": {
+      "schemaVersion": 1,
+      "kind": "player_blunder",
+      "message": "Look at your queen on h5. Which black piece can capture it for free? Is the queen protected there?",
+      "reveal": "Nf3 was the right move. It develops a knight and helps you castle. Qh5 left the queen where the f6-knight could take it with Nxh5, and nothing protected her. Bring the queen out later, once she can't be attacked by a minor piece.",
+      "revealMove": "g1f3",
+      "arrows": [
+        {
+          "from": "f6",
+          "to": "h5"
+        }
+      ]
+    },
+    "ok": true,
+    "ms": 6278,
+    "usage": {
+      "requests": 2,
+      "inputTokens": 1368,
+      "outputTokens": 317,
+      "cacheReadInputTokens": 3225,
+      "cacheCreationInputTokens": 3225
+    },
+    "toolCalls": [
+      "evaluate_move({\"fen\":\"rnbqkb1r/ppp2ppp/4pn2/3p3Q/3P1B2/4P3/PPP2PPP/RN2KBNR b KQkq - 1 4\",\"move\":\"Nxh5\"})"
+    ]
+  },
+  {
+    "id": "london-qd6:claude-sonnet-5-5:medium",
+    "model": "claude-sonnet-5-5",
+    "effort": "medium",
+    "kind": "punish_opponent",
+    "playerColor": "w",
+    "history": [
+      "d2d4",
+      "d7d5",
+      "c1f4",
+      "g8f6",
+      "e2e3",
+      "d8d6"
+    ],
+    "fen": "rnb1kb1r/ppp1pppp/3q1n2/3p4/3P1B2/4P3/PPP2PPP/RN1QKBNR w KQkq - 1 4",
+    "attemptFen": "rnb1kb1r/ppp1pppp/3q1n2/3p4/3P1B2/4P3/PPP2PPP/RN1QKBNR w KQkq - 1 4",
+    "reply": {
+      "schemaVersion": 1,
+      "kind": "punish_opponent",
+      "message": "Black's queen just came out to d6. Look at which of your pieces is already aiming at it. Is the queen safe there?",
+      "reveal": "Bxd6 wins the queen. Your bishop on f4 was already attacking d6, and Black can only take the bishop back with a pawn: exd6. That leaves you a whole queen up for a bishop. Bb5+ also works well, but taking the queen right away is the strongest.",
+      "revealMove": "f4d6",
+      "arrows": []
+    },
+    "ok": true,
+    "ms": 7120,
+    "usage": {
+      "requests": 2,
+      "inputTokens": 1659,
+      "outputTokens": 526,
+      "cacheReadInputTokens": 6450,
+      "cacheCreationInputTokens": 0
+    },
+    "toolCalls": [
+      "analyze_position({\"fen\":\"rnb1kb1r/ppp1pppp/3q1n2/3p4/3P1B2/4P3/PPP2PPP/RN1QKBNR w KQkq - 1 4\"})"
+    ]
+  },
+  {
+    "id": "kid-trompowsky:claude-sonnet-5-5:medium",
+    "model": "claude-sonnet-5-5",
+    "effort": "medium",
+    "kind": "opponent_left_book",
+    "playerColor": "b",
+    "history": [
+      "d2d4",
+      "g8f6",
+      "c1g5"
+    ],
+    "fen": "rnbqkb1r/pppppppp/5n2/6B1/3P4/8/PPP1PPPP/RN1QKBNR b KQkq - 2 2",
+    "attemptFen": "rnbqkb1r/pppppppp/5n2/6B1/3P4/8/PPP1PPPP/RN1QKBNR b KQkq - 2 2",
+    "reply": {
+      "schemaVersion": 1,
+      "kind": "opponent_left_book",
+      "message": "White played Bg5, the Trompowsky Attack, instead of a normal KID setup. The bishop is pinning your knight on f6 against your queen. Which King's Indian move can you still play to keep your usual setup?",
+      "reveal": "Play g6, then Bg7 and O-O. This is your usual King's Indian setup, and the engine says it's fine: it costs only a tiny 14 centipawns compared with the top move d5. The bishop on g7 guards your king and presses on the long diagonal. After castling, aim for the pawn breaks d6 and c5 to challenge White's center.",
+      "revealMove": "g7g6",
+      "arrows": [
+        {
+          "from": "g5",
+          "to": "f6"
+        },
+        {
+          "from": "f8",
+          "to": "g7"
+        }
+      ]
+    },
+    "ok": true,
+    "ms": 9149,
+    "usage": {
+      "requests": 4,
+      "inputTokens": 5444,
+      "outputTokens": 965,
+      "cacheReadInputTokens": 9699,
+      "cacheCreationInputTokens": 3233
+    },
+    "toolCalls": [
+      "opening_explorer({\"fen\":\"rnbqkb1r/pppppppp/5n2/6B1/3P4/8/PPP1PPPP/RN1QKBNR b KQkq - 2 2\"})",
+      "get_repertoire_context({\"fen\":\"rnbqkb1r/pppppppp/5n2/6B1/3P4/8/PPP1PPPP/RN1QKBNR b KQkq - 2 2\"})",
+      "evaluate_move({\"fen\":\"rnbqkb1r/pppppppp/5n2/6B1/3P4/8/PPP1PPPP/RN1QKBNR b KQkq - 2 2\",\"move\":\"g6\"})"
+    ]
+  },
+  {
+    "id": "london-hint-bd3:claude-sonnet-5-5:medium",
+    "model": "claude-sonnet-5-5",
+    "effort": "medium",
+    "kind": "hint",
+    "playerColor": "w",
+    "history": [
+      "d2d4",
+      "d7d5",
+      "c1f4",
+      "g8f6",
+      "e2e3",
+      "e7e6",
+      "g1f3",
+      "c7c5",
+      "c2c3",
+      "b8c6",
+      "b1d2",
+      "f8d6",
+      "f4g3",
+      "e8g8"
+    ],
+    "fen": "r1bq1rk1/pp3ppp/2nbpn2/2pp4/3P4/2P1PNB1/PP1N1PPP/R2QKB1R w KQ - 5 8",
+    "attemptFen": "r1bq1rk1/pp3ppp/2nbpn2/2pp4/3P4/2P1PNB1/PP1N1PPP/R2QKB1R w KQ - 5 8",
+    "reply": {
+      "schemaVersion": 1,
+      "kind": "hint",
+      "message": "Your king is still in the middle and your light-squared bishop hasn't moved. Which square would let it aim at Black's kingside and get you ready to castle?",
+      "reveal": "Play Bd3. It develops your last minor piece and points it at Black's kingside. It also clears f1, so you can castle next. It is the usual London move here.",
+      "revealMove": "f1d3",
+      "arrows": [
+        {
+          "from": "e1",
+          "to": "g1"
+        },
+        {
+          "from": "h7",
+          "to": "h7"
+        }
+      ]
+    },
+    "ok": true,
+    "ms": 7156,
+    "usage": {
+      "requests": 3,
+      "inputTokens": 3629,
+      "outputTokens": 569,
+      "cacheReadInputTokens": 9675,
+      "cacheCreationInputTokens": 0
+    },
+    "toolCalls": [
+      "get_repertoire_context({\"fen\":\"r1bq1rk1/pp3ppp/2nbpn2/2pp4/3P4/2P1PNB1/PP1N1PPP/R2QKB1R w KQ - 5 8\"})",
+      "analyze_position({\"fen\":\"r1bq1rk1/pp3ppp/2nbpn2/2pp4/3P4/2P1PNB1/PP1N1PPP/R2QKB1R w KQ - 5 8\"})"
+    ]
+  },
+  {
+    "id": "london-qh5:claude-opus-5-5:low",
+    "model": "claude-opus-5-5",
+    "effort": "low",
+    "kind": "player_blunder",
+    "playerColor": "w",
+    "history": [
+      "d2d4",
+      "d7d5",
+      "c1f4",
+      "g8f6",
+      "e2e3",
+      "e7e6",
+      "d1h5"
+    ],
+    "fen": "rnbqkb1r/ppp2ppp/4pn2/3p3Q/3P1B2/4P3/PPP2PPP/RN2KBNR b KQkq - 1 4",
+    "attemptFen": "rnbqkb1r/ppp2ppp/4pn2/3p4/3P1B2/4P3/PPP2PPP/RN1QKBNR w KQkq - 0 4",
+    "reply": {
+      "schemaVersion": 1,
+      "kind": "player_blunder",
+      "message": "Look at the queen on h5. Which black piece is already attacking that square? Before you move a piece, check whether the square it lands on is safe.",
+      "reveal": "Qh5 just gives the queen away, because the knight on f6 can take it. Nf3 is the normal London move. It develops a piece, gets ready to castle and keeps the queen safe at home.",
+      "revealMove": "g1f3",
+      "arrows": [
+        {
+          "from": "f6",
+          "to": "h5"
+        }
+      ]
+    },
+    "ok": true,
+    "ms": 3080,
+    "usage": {
+      "requests": 1,
+      "inputTokens": 456,
+      "outputTokens": 174,
+      "cacheReadInputTokens": 3225,
+      "cacheCreationInputTokens": 0
+    },
+    "toolCalls": []
+  },
+  {
+    "id": "london-qd6:claude-opus-5-5:low",
+    "model": "claude-opus-5-5",
+    "effort": "low",
+    "kind": "punish_opponent",
+    "playerColor": "w",
+    "history": [
+      "d2d4",
+      "d7d5",
+      "c1f4",
+      "g8f6",
+      "e2e3",
+      "d8d6"
+    ],
+    "fen": "rnb1kb1r/ppp1pppp/3q1n2/3p4/3P1B2/4P3/PPP2PPP/RN1QKBNR w KQkq - 1 4",
+    "attemptFen": "rnb1kb1r/ppp1pppp/3q1n2/3p4/3P1B2/4P3/PPP2PPP/RN1QKBNR w KQkq - 1 4",
+    "reply": {
+      "schemaVersion": 1,
+      "kind": "punish_opponent",
+      "message": "Black's queen has jumped out to d6. Look at the diagonal from your f4 bishop. What is the queen standing on, and can a check with your other bishop make that problem worse for Black?",
+      "reveal": "Bb5+ is the punishment. Black's queen on d6 sits right in front of your f4 bishop. The check forces Black to deal with the king first, so the queen can't simply escape, and Black ends up losing a lot of material. Before you move your queen out early, always check which of the opponent's pieces can attack it.",
+      "revealMove": "f1b5",
+      "arrows": [
+        {
+          "from": "f4",
+          "to": "d6"
+        },
+        {
+          "from": "b5",
+          "to": "e8"
+        }
+      ]
+    },
+    "ok": true,
+    "ms": 9440,
+    "usage": {
+      "requests": 1,
+      "inputTokens": 445,
+      "outputTokens": 784,
+      "cacheReadInputTokens": 3225,
+      "cacheCreationInputTokens": 0
+    },
+    "toolCalls": []
+  },
+  {
+    "id": "kid-trompowsky:claude-opus-5-5:low",
+    "model": "claude-opus-5-5",
+    "effort": "low",
+    "kind": "opponent_left_book",
+    "playerColor": "b",
+    "history": [
+      "d2d4",
+      "g8f6",
+      "c1g5"
+    ],
+    "fen": "rnbqkb1r/pppppppp/5n2/6B1/3P4/8/PPP1PPPP/RN1QKBNR b KQkq - 2 2",
+    "attemptFen": "rnbqkb1r/pppppppp/5n2/6B1/3P4/8/PPP1PPPP/RN1QKBNR b KQkq - 2 2",
+    "reply": {
+      "schemaVersion": 1,
+      "kind": "opponent_left_book",
+      "message": "Your opponent played Bg5 (this is called the Trompowsky) instead of c4 or Bf4. Their bishop is pinning your knight and could take it. Can you still build your King's Indian setup on the kingside?",
+      "reveal": "Play g6, just like in your normal King's Indian. Your dark-squared bishop goes to the long diagonal behind that pawn, and then you castle short to keep your king safe. Later, aim for the pawn break c5 to hit White's centre. The engine rates d5 slightly higher, but g6 is a sound choice and keeps you in positions you know.",
+      "revealMove": "g7g6",
+      "arrows": [
+        {
+          "from": "g5",
+          "to": "f6"
+        }
+      ]
+    },
+    "ok": true,
+    "ms": 10765,
+    "usage": {
+      "requests": 4,
+      "inputTokens": 4715,
+      "outputTokens": 775,
+      "cacheReadInputTokens": 12932,
+      "cacheCreationInputTokens": 0
+    },
+    "toolCalls": [
+      "opening_explorer({\"fen\":\"rnbqkb1r/pppppppp/5n2/6B1/3P4/8/PPP1PPPP/RN1QKBNR b KQkq - 2 2\"})",
+      "evaluate_move({\"fen\":\"rnbqkb1r/pppppppp/5n2/6B1/3P4/8/PPP1PPPP/RN1QKBNR b KQkq - 2 2\",\"move\":\"g6\"})"
+    ]
+  },
+  {
+    "id": "london-hint-bd3:claude-opus-5-5:low",
+    "model": "claude-opus-5-5",
+    "effort": "low",
+    "kind": "hint",
+    "playerColor": "w",
+    "history": [
+      "d2d4",
+      "d7d5",
+      "c1f4",
+      "g8f6",
+      "e2e3",
+      "e7e6",
+      "g1f3",
+      "c7c5",
+      "c2c3",
+      "b8c6",
+      "b1d2",
+      "f8d6",
+      "f4g3",
+      "e8g8"
+    ],
+    "fen": "r1bq1rk1/pp3ppp/2nbpn2/2pp4/3P4/2P1PNB1/PP1N1PPP/R2QKB1R w KQ - 5 8",
+    "attemptFen": "r1bq1rk1/pp3ppp/2nbpn2/2pp4/3P4/2P1PNB1/PP1N1PPP/R2QKB1R w KQ - 5 8",
+    "reply": {
+      "schemaVersion": 1,
+      "kind": "hint",
+      "message": "Your kingside bishop is the last minor piece still at home, and your king is still in the centre. Which square lets that bishop join the game and also aim at Black's castled king?",
+      "reveal": "Bd3 is the usual London move here, and it is the next move in your repertoire line. The bishop points down the long diagonal toward h7, and it clears the way so you can castle next turn.",
+      "revealMove": "f1d3",
+      "arrows": [
+        {
+          "from": "f1",
+          "to": "h7"
+        }
+      ]
+    },
+    "ok": true,
+    "ms": 4908,
+    "usage": {
+      "requests": 2,
+      "inputTokens": 1089,
+      "outputTokens": 293,
+      "cacheReadInputTokens": 6450,
+      "cacheCreationInputTokens": 0
+    },
+    "toolCalls": [
+      "get_repertoire_context({\"fen\":\"r1bq1rk1/pp3ppp/2nbpn2/2pp4/3P4/2P1PNB1/PP1N1PPP/R2QKB1R w KQ - 5 8\"})"
+    ]
+  }
+]

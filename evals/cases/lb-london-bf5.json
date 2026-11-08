@@ -1,0 +1,25 @@
+{
+  "id": "lb-london-bf5",
+  "kind": "opponent_left_book",
+  "playerColor": "w",
+  "history": [
+    "d2d4",
+    "d7d5",
+    "c1f4",
+    "c8f5"
+  ],
+  "fen": "rn1qkbnr/ppp1pppp/8/3p1b2/3P1B2/8/PPP1PPPP/RN1QKBNR w KQkq - 2 3",
+  "moment": {
+    "kind": "opponent_left_book",
+    "line": "London vs 1...d5",
+    "expected": [
+      "Nf6",
+      "c5"
+    ],
+    "played": "Bf5"
+  },
+  "attemptFen": "rn1qkbnr/ppp1pppp/8/3p1b2/3P1B2/8/PPP1PPPP/RN1QKBNR w KQkq - 2 3",
+  "engineBest": "c2c4",
+  "engineBestCp": 24,
+  "source": "London: symmetrical 2...Bf5"
+}

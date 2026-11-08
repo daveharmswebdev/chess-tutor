@@ -1,0 +1,28 @@
+{
+  "id": "pb-kid-nh5",
+  "kind": "player_blunder",
+  "playerColor": "b",
+  "history": [
+    "d2d4",
+    "g8f6",
+    "c2c4",
+    "g7g6",
+    "b1c3",
+    "f8g7",
+    "e2e4",
+    "e8g8",
+    "e4e5",
+    "f6h5"
+  ],
+  "fen": "rnbq1rk1/ppppppbp/6p1/4P2n/2PP4/2N5/PP3PPP/R1BQKBNR w KQ - 1 6",
+  "moment": {
+    "kind": "player_blunder",
+    "played": "Nh5",
+    "cpLoss": 513,
+    "best": "Ne8"
+  },
+  "attemptFen": "rnbq1rk1/ppppppbp/5np1/4P3/2PP4/2N5/PP3PPP/R1BQKBNR b KQ - 0 5",
+  "engineBest": "f6e8",
+  "engineBestCp": -13,
+  "source": "KID: knight to the rim after e5, g4 traps it"
+}

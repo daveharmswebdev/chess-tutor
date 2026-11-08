@@ -1,0 +1,26 @@
+{
+  "id": "pb-kid-ng4",
+  "kind": "player_blunder",
+  "playerColor": "b",
+  "history": [
+    "d2d4",
+    "g8f6",
+    "c2c4",
+    "g7g6",
+    "b1c3",
+    "f8g7",
+    "e2e4",
+    "f6g4"
+  ],
+  "fen": "rnbqk2r/ppppppbp/6p1/8/2PPP1n1/2N5/PP3PPP/R1BQKBNR w KQkq - 1 5",
+  "moment": {
+    "kind": "player_blunder",
+    "played": "Ng4",
+    "cpLoss": 559,
+    "best": "d6"
+  },
+  "attemptFen": "rnbqk2r/ppppppbp/5np1/8/2PPP3/2N5/PP3PPP/R1BQKBNR b KQkq - 0 4",
+  "engineBest": "d7d6",
+  "engineBestCp": -49,
+  "source": "KID: knight to g4 hangs to the d1 queen"
+}

@@ -1,0 +1,28 @@
+{
+  "id": "po-london-bg6-trap",
+  "kind": "punish_opponent",
+  "playerColor": "w",
+  "history": [
+    "d2d4",
+    "d7d5",
+    "c1f4",
+    "c8g4",
+    "f2f3",
+    "g4h5",
+    "g2g4",
+    "h5g6",
+    "h2h4",
+    "e7e6"
+  ],
+  "fen": "rn1qkbnr/ppp2ppp/4p1b1/3p4/3P1BPP/5P2/PPP1P3/RN1QKBNR w KQkq - 0 6",
+  "moment": {
+    "kind": "punish_opponent",
+    "opponentMove": "e6",
+    "refutation": "h5",
+    "gainCp": 580
+  },
+  "attemptFen": "rn1qkbnr/ppp2ppp/4p1b1/3p4/3P1BPP/5P2/PPP1P3/RN1QKBNR w KQkq - 0 6",
+  "engineBest": "h4h5",
+  "engineBestCp": 522,
+  "source": "London: Black ignores h4-h5 trapping the g6 bishop"
+}

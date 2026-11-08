@@ -1,0 +1,23 @@
+{
+  "id": "pb-london-nf3-qf6",
+  "kind": "player_blunder",
+  "playerColor": "w",
+  "history": [
+    "d2d4",
+    "e7e6",
+    "c1f4",
+    "d8f6",
+    "g1f3"
+  ],
+  "fen": "rnb1kbnr/pppp1ppp/4pq2/8/3P1B2/5N2/PPP1PPPP/RN1QKB1R b KQkq - 3 3",
+  "moment": {
+    "kind": "player_blunder",
+    "played": "Nf3",
+    "cpLoss": 753,
+    "best": "Bxc7"
+  },
+  "attemptFen": "rnb1kbnr/pppp1ppp/4pq2/8/3P1B2/8/PPP1PPPP/RN1QKBNR w KQkq - 2 3",
+  "engineBest": "f4c7",
+  "engineBestCp": 95,
+  "source": "London: leaves the f4 bishop to the f6 queen"
+}

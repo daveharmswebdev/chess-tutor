@@ -1,0 +1,24 @@
+{
+  "id": "po-london-qd6",
+  "kind": "punish_opponent",
+  "playerColor": "w",
+  "history": [
+    "d2d4",
+    "d7d5",
+    "c1f4",
+    "g8f6",
+    "e2e3",
+    "d8d6"
+  ],
+  "fen": "rnb1kb1r/ppp1pppp/3q1n2/3p4/3P1B2/4P3/PPP2PPP/RN1QKBNR w KQkq - 1 4",
+  "moment": {
+    "kind": "punish_opponent",
+    "opponentMove": "Qd6",
+    "refutation": "Bxd6",
+    "gainCp": 840
+  },
+  "attemptFen": "rnb1kb1r/ppp1pppp/3q1n2/3p4/3P1B2/4P3/PPP2PPP/RN1QKBNR w KQkq - 1 4",
+  "engineBest": "f4d6",
+  "engineBestCp": 854,
+  "source": "London: Black's queen walks into the f4 bishop"
+}

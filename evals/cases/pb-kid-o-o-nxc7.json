@@ -1,0 +1,26 @@
+{
+  "id": "pb-kid-o-o-nxc7",
+  "kind": "player_blunder",
+  "playerColor": "b",
+  "history": [
+    "d2d4",
+    "g8f6",
+    "c1f4",
+    "g7g6",
+    "b1c3",
+    "f8g7",
+    "c3b5",
+    "e8g8"
+  ],
+  "fen": "rnbq1rk1/ppppppbp/5np1/1N6/3P1B2/8/PPP1PPPP/R2QKBNR w KQ - 4 5",
+  "moment": {
+    "kind": "player_blunder",
+    "played": "O-O",
+    "cpLoss": 216,
+    "best": "d6"
+  },
+  "attemptFen": "rnbqk2r/ppppppbp/5np1/1N6/3P1B2/8/PPP1PPPP/R2QKBNR b KQkq - 3 4",
+  "engineBest": "d7d6",
+  "engineBestCp": 60,
+  "source": "KID vs London: castles into Nxc7"
+}

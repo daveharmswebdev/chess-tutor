@@ -1,0 +1,26 @@
+{
+  "id": "po-london-ng4",
+  "kind": "punish_opponent",
+  "playerColor": "w",
+  "history": [
+    "d2d4",
+    "d7d5",
+    "c1f4",
+    "e7e6",
+    "e2e3",
+    "g8f6",
+    "f1d3",
+    "f6g4"
+  ],
+  "fen": "rnbqkb1r/ppp2ppp/4p3/3p4/3P1Bn1/3BP3/PPP2PPP/RN1QK1NR w KQkq - 3 5",
+  "moment": {
+    "kind": "punish_opponent",
+    "opponentMove": "Ng4",
+    "refutation": "Qxg4",
+    "gainCp": 151
+  },
+  "attemptFen": "rnbqkb1r/ppp2ppp/4p3/3p4/3P1Bn1/3BP3/PPP2PPP/RN1QK1NR w KQkq - 3 5",
+  "engineBest": "d1g4",
+  "engineBestCp": 149,
+  "source": "London: Black's knight to g4 hangs to Qxg4"
+}

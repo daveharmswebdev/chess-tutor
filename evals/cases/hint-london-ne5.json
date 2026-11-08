@@ -1,0 +1,29 @@
+{
+  "id": "hint-london-ne5",
+  "kind": "hint",
+  "playerColor": "w",
+  "history": [
+    "d2d4",
+    "d7d5",
+    "c1f4",
+    "g8f6",
+    "e2e3",
+    "e7e6",
+    "g1f3",
+    "c7c5",
+    "c2c3",
+    "b8c6",
+    "b1d2",
+    "f8d6",
+    "f4g3",
+    "e8g8",
+    "f1d3",
+    "b7b6"
+  ],
+  "fen": "r1bq1rk1/p4ppp/1pnbpn2/2pp4/3P4/2PBPNB1/PP1N1PPP/R2QK2R w KQ - 0 9",
+  "moment": null,
+  "attemptFen": "r1bq1rk1/p4ppp/1pnbpn2/2pp4/3P4/2PBPNB1/PP1N1PPP/R2QK2R w KQ - 0 9",
+  "engineBest": "e3e4",
+  "engineBestCp": 36,
+  "source": "London: end of line, Ne5"
+}

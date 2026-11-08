@@ -1,0 +1,25 @@
+{
+  "id": "pb-london-qf3-nxc2",
+  "kind": "player_blunder",
+  "playerColor": "w",
+  "history": [
+    "d2d4",
+    "d7d5",
+    "c1f4",
+    "b8c6",
+    "e2e3",
+    "c6b4",
+    "d1f3"
+  ],
+  "fen": "r1bqkbnr/ppp1pppp/8/3p4/1n1P1B2/4PQ2/PPP2PPP/RN2KBNR b KQkq - 2 4",
+  "moment": {
+    "kind": "player_blunder",
+    "played": "Qf3",
+    "cpLoss": 736,
+    "best": "a3"
+  },
+  "attemptFen": "r1bqkbnr/ppp1pppp/8/3p4/1n1P1B2/4P3/PPP2PPP/RN1QKBNR w KQkq - 1 4",
+  "engineBest": "a2a3",
+  "engineBestCp": 130,
+  "source": "London: queen leaves c2, so ...Nxc2+ forks king and rook"
+}

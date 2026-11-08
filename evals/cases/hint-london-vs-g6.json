@@ -1,0 +1,21 @@
+{
+  "id": "hint-london-vs-g6",
+  "kind": "hint",
+  "playerColor": "w",
+  "history": [
+    "d2d4",
+    "g8f6",
+    "c1f4",
+    "g7g6",
+    "e2e3",
+    "f8g7",
+    "g1f3",
+    "d7d6"
+  ],
+  "fen": "rnbqk2r/ppp1ppbp/3p1np1/8/3P1B2/4PN2/PPP2PPP/RN1QKB1R w KQkq - 0 5",
+  "moment": null,
+  "attemptFen": "rnbqk2r/ppp1ppbp/3p1np1/8/3P1B2/4PN2/PPP2PPP/RN1QKB1R w KQkq - 0 5",
+  "engineBest": "h2h3",
+  "engineBestCp": 13,
+  "source": "London vs KID setup"
+}

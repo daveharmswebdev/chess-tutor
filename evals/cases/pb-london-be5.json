@@ -1,0 +1,31 @@
+{
+  "id": "pb-london-be5",
+  "kind": "player_blunder",
+  "playerColor": "w",
+  "history": [
+    "d2d4",
+    "g8f6",
+    "c1f4",
+    "g7g6",
+    "e2e3",
+    "f8g7",
+    "g1f3",
+    "e8g8",
+    "f1e2",
+    "d7d6",
+    "h2h3",
+    "f6h5",
+    "f4e5"
+  ],
+  "fen": "rnbq1rk1/ppp1ppbp/3p2p1/4B2n/3P4/4PN1P/PPP1BPP1/RN1QK2R b KQ - 2 7",
+  "moment": {
+    "kind": "player_blunder",
+    "played": "Be5",
+    "cpLoss": 702,
+    "best": "Bh2"
+  },
+  "attemptFen": "rnbq1rk1/ppp1ppbp/3p2p1/7n/3P1B2/4PN1P/PPP1BPP1/RN1QK2R w KQ - 1 7",
+  "engineBest": "f4h2",
+  "engineBestCp": 40,
+  "source": "London vs KID setup: bishop runs to e5 where the d6 pawn takes it"
+}
