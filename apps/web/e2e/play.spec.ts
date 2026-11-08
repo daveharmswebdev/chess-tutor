@@ -22,6 +22,9 @@ test("play as White, take back, then start as Black", async ({ page }) => {
   await page.getByTestId("new-game").click();
   await expect(status).toHaveText("Your move.");
   await expect(moves).toHaveCount(0);
+  // No ANTHROPIC_API_KEY in e2e: the tutor panel says why coaching is off and Hint is disabled (NFR-9).
+  await expect(page.getByTestId("tutor-unavailable")).toBeVisible();
+  await expect(page.getByTestId("tutor-hint")).toBeDisabled();
 
   // 1. d4, wait for the bot's reply.
   await clickMove(page, "d2", "d4");

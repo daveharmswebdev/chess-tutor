@@ -34,6 +34,27 @@ import type { Color } from "./types.ts";
  *        resign sends game_over), so a client that ignores a reply still catches up.
  *
  * Finished and abandoned games are saved as PGN (FR-5). The bot replies within 2 s (NFR-3).
+ *
+ * Tutor (#7: FR-7 to FR-12, NFR-1, NFR-8, NFR-9). The server runs the key-moment detector after
+ * every move (the player's and the bot's), and calls the tutor only at a key moment or on Hint.
+ * At most one tutor question is open per game; a new key moment or Hint replaces it.
+ *   POST /api/games/:id/tutor/hint  -> 202 {} ; the reply arrives over SSE (FR-12).
+ *        409 while the tutor is already working, when the game is not "playing", or when it is
+ *        not the player's turn; 503 when the tutor is unavailable (TutorStatus.available false).
+ *   POST /api/games/:id/tutor/reveal -> 200 TutorReveal for the open question ("Show me"), with
+ *        no Claude call; 409 when there is no open question. Also sent as "tutor_reveal" over SSE.
+ *   Trying again: while a question is open, the player's next move played from the question's
+ *        attemptFen (after a takeback, for the player's own mistakes) is graded by the engine,
+ *        not by Claude: correct when its centipawn loss against the best move is at most
+ *        config tutor.attemptToleranceCp. The server sends "tutor_attempt", and on a wrong try
+ *        also "tutor_reveal". Either way the question then closes.
+ *   SSE order at a key moment: "tutor_thinking" within 200 ms of detection, then any number of
+ *        "tutor_progress" (the first within 1 s), then exactly one of "tutor_reply" or
+ *        "tutor_failed". The game never waits for the tutor: the bot replies as usual.
+ *   GameView.tutor tells the client whether coaching is available and why not (NFR-9), e.g. no
+ *        ANTHROPIC_API_KEY, or the API is down. The first "state" on every connection carries it.
+ * Only `message` and `arrows` reach the browser before a reveal; the reveal text and move stay
+ * on the server until "Show me" or a wrong try (architecture §3.5).
  */
 
 export type GameStatus = "playing" | "finished" | "abandoned";
@@ -66,6 +87,49 @@ export interface GameView {
   endReason: GameEndReason | null;
   /** True while the server is choosing the bot's reply; the board accepts no player move then. */
   botThinking: boolean;
+  tutor: TutorStatus;
+}
+
+export interface TutorStatus {
+  /** False when coaching is off for this game; the game itself still works (NFR-9). */
+  available: boolean;
+  /** Plain-language reason when not available, e.g. "Coaching is off: no API key is set." */
+  reason: string | null;
+  /** True while the tutor is working on a key moment or a hint. */
+  thinking: boolean;
+  /** The open question, if any. */
+  question: TutorQuestion | null;
+}
+
+export type TutorKind = "opponent_left_book" | "player_blunder" | "missed_win" | "punish_opponent" | "hint";
+
+export interface TutorArrow {
+  /** Squares, e.g. "e2", "e4". */
+  from: string;
+  to: string;
+}
+
+/** What the browser sees of a tutor reply before any reveal (FR-8, FR-11). */
+export interface TutorQuestion {
+  id: string;
+  kind: TutorKind;
+  /** The Socratic question or explanation shown now. */
+  message: string;
+  /** At most 3. */
+  arrows: TutorArrow[];
+  /** FEN where the player's next move counts as an attempt at this question. */
+  attemptFen: string;
+  /** True when a reveal is held on the server ("Show me" is enabled). */
+  canReveal: boolean;
+}
+
+export interface TutorReveal {
+  questionId: string;
+  /** The full answer. */
+  text: string;
+  /** The answer move, checked legal in attemptFen, or null. */
+  move: MoveView | null;
+  arrows: TutorArrow[];
 }
 
 export interface NewGameRequest {
@@ -81,7 +145,15 @@ export type GameEvent =
   | { type: "state"; game: GameView }
   | { type: "bot_move"; move: MoveView; game: GameView }
   | { type: "game_over"; game: GameView }
-  | { type: "error"; message: string };
+  | { type: "error"; message: string }
+  | { type: "tutor_thinking"; kind: TutorKind }
+  /** e.g. "Tutor is looking at the position…", "Checking Nf3…" (from tool calls). */
+  | { type: "tutor_progress"; label: string }
+  | { type: "tutor_reply"; question: TutorQuestion }
+  /** NFR-8 failure path ended, or the API failed: show `message`, never unvalidated output. */
+  | { type: "tutor_failed"; message: string }
+  | { type: "tutor_reveal"; reveal: TutorReveal }
+  | { type: "tutor_attempt"; questionId: string; move: MoveView; correct: boolean; cpLoss: number };
 
 export interface ApiError {
   error: string;

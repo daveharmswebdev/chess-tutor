@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { ApiRequestError, createApiClient } from "../src/api.ts";
-import { view } from "./fixtures.ts";
+import { reveal, view } from "./fixtures.ts";
 
 interface Call {
   url: string;
@@ -92,6 +92,26 @@ describe("api client", () => {
     const err = await rejection(api.resign("g1"));
     expect(err.status).toBe(500);
     expect(err.message).toBe("Server error (500).");
+  });
+
+  it("asks for a hint with POST /tutor/hint (202 {}) and reveals with POST /tutor/reveal (#7)", async () => {
+    const calls: Call[] = [];
+    await createApiClient({ fetch: fakeFetch(202, {}, calls) }).tutorHint("g1");
+    const r = await createApiClient({ fetch: fakeFetch(200, reveal(), calls) }).tutorReveal("g1");
+    expect(r).toEqual(reveal());
+    expect(calls.map((c) => `${c.method} ${c.url}`)).toEqual(["POST /api/games/g1/tutor/hint", "POST /api/games/g1/tutor/reveal"]);
+  });
+
+  it("accepts a 202 hint reply with an empty body", async () => {
+    const api = createApiClient({ fetch: (async () => new Response(null, { status: 202 })) as typeof fetch });
+    await expect(api.tutorHint("g1")).resolves.toBeUndefined();
+  });
+
+  it("maps 503 to a readable coaching-unavailable error", async () => {
+    const api = createApiClient({ fetch: fakeFetch(503, { error: "no API key" }) });
+    const err = await rejection(api.tutorHint("g1"));
+    expect(err.status).toBe(503);
+    expect(err.message).toBe("Coaching is not available right now: no API key");
   });
 
   it("reports a network failure as status 0 with a readable message", async () => {

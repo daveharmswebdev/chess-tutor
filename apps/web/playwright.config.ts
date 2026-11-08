@@ -22,7 +22,8 @@ export default defineConfig({
     {
       command: process.env["E2E_API_COMMAND"] ?? "pnpm --filter @chess-tutor/server start",
       port: API_PORT,
-      env: { PORT: String(API_PORT), DB_PATH: ":memory:", LICHESS_TOKEN: "" },
+      // No Claude key: e2e never calls the API, and the tutor panel shows why coaching is off (NFR-9).
+      env: { PORT: String(API_PORT), DB_PATH: ":memory:", LICHESS_TOKEN: "", ANTHROPIC_API_KEY: "" },
       reuseExistingServer: !ci,
       timeout: 60_000,
       stdout: "pipe",
