@@ -1,0 +1,30 @@
+{
+  "brief_id": "031-review-tutor-r2",
+  "agent": "reviewer",
+  "issue": 7,
+  "base_sha": "30fa663",
+  "scratch_dir": "/private/tmp/claude-501/-Users-daveharms-personal-workspace-chess-tutor/029814ab-5fb1-4dfa-a9cc-a73999ef0392/scratchpad/031-review-tutor-r2",
+  "objective": "Re-review #7 after round 2: the range git diff 2e70c88..30fa663 on branch contract-7 (read with git diff / git show). For each finding of review 028 (listed below) say fixed / not fixed / partly, with evidence (re-run the reviewer probes in-process where possible). Report any new defect the fixes introduced as blocking / major / minor. Then give a ship / no-ship verdict for #7 with each 'Done when' criterion marked met / not met / unverifiable.",
+  "requirements": [
+    "FR-7",
+    "FR-8",
+    "FR-10",
+    "NFR-1",
+    "NFR-3",
+    "NFR-8"
+  ],
+  "contract": "Review 028 findings (at 2e70c88): BLOCKING evidence.ts:16 FR-10 backs a move by SAN alone in any position (probe: history e4 e5 Nf3 Nc6 Bc4 Nf6 O-O Bc5 d3 d6 c3, Black to move, hint, no tools: 'Why not castle with O-O now?' / reveal 'Play O-O.' / revealMove e8g8 all passed). MAJOR claims.ts:17 evaluations unchecked ('+4.2, completely winning'), pawn pushes skipped ('Push h5! It wins'), long algebraic/figurines/'Knight to g4' not tokenised. MAJOR games.ts:573 a reply for a position the player has left still opens a question (hint then move; bot key moment after the player moved). MAJOR main.ts:73 NFR-3 tutor tool searches can queue ahead of the bot on the shared FIFO engine. MAJOR claims.ts:62 FR-8 leak via an arrow equal to revealMove. MINORS: resign/checkmate did not cancel the ask; gradeAttempt for a taken-back move; first progress label sent twice; bot key moment replaced the player's own lesson; session abort not observed during the tool phase; explorer 'no_token' cast (deferred, not in this round).\n\nRound 2: tutor-agent c9b8fa0 (claims.ts, evidence.ts, request.ts, session.ts, tools.ts + tests): (position, UCI) evidence with a game-history tier that cannot back focus-position moves; eval check with 0.3-pawn tolerance, mate exact; pawn pushes in move contexts; long algebraic, figurines, '<piece> to <square>'; arrow/message give-away rejected; tool phase races the AbortSignal. server-agent c6ea7cf (coaching.ts, games.ts, main.ts, tutor-setup.ts + tests): reachability rule (attemptFen current, or one takeback away for player_blunder/missed_win) enforced after every move/takeback and in finishAsk; per-game TutorEngine wrapper (one tutor search at a time, waits for the bot, waiting calls reject with AbortError on abort); end() aborts the ask; gradeAttempt checks the move is still played; server no longer sends its own first label; a bot key moment does not replace an in-flight/open player lesson. Coordinator gate on 30fa663: pnpm test 566 passed (34 files), pnpm typecheck exit 0.\n\nPoints to check in particular: the wrapper's AbortError rejections reach the tutor session as the abort path, not as an is_error tool result sent to the model; the claims heuristics' new false-rejection risk on normal prose ('is d5 weak?', 'Play e5 later?', 'consider h4' when not backed) and how the retry/unsupported_claim path then behaves for the user; that tutor_thinking still precedes the first tutor_progress within 200 ms now the server's own label is gone; that the web reducer copes with a question closing silently via state (enforceReachable).",
+  "scope": [],
+  "negative": [
+    "Read-only: do not edit, commit, or run anything that writes to the repo.",
+    "Do not run the e2e or start servers; running pnpm test / vitest and in-process node probes is fine.",
+    "Do not re-review code outside 2e70c88..30fa663 except to confirm a 028 finding."
+  ],
+  "rubric": [
+    "Each 028 finding marked fixed / not fixed / partly with evidence (probe output or file:line).",
+    "New findings cite file:line and a concrete failure scenario.",
+    "Explicit ship / no-ship verdict and per-criterion 'Done when' status."
+  ],
+  "concurrency": null,
+  "round": 2
+}

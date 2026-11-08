@@ -1,0 +1,31 @@
+{
+  "brief_id": "030-tutor-server-r2",
+  "agent": "server-agent",
+  "issue": 7,
+  "base_sha": "c1ca7c8",
+  "scratch_dir": "/private/tmp/claude-501/-Users-daveharms-personal-workspace-chess-tutor/029814ab-5fb1-4dfa-a9cc-a73999ef0392/scratchpad/030-tutor-server-r2",
+  "objective": "Fix the review's server findings in apps/server: (1) a tutor reply never opens a question whose attemptFen the player can no longer reach; (2) the tutor's engine searches cannot delay the bot (NFR-3); (3) resign/checkmate cancel the ask in flight and no reply opens a question in a finished game; (4) gradeAttempt checks the graded move is still on the board; (5) the first progress label is sent once; (6) when both the player's move and the bot's reply are key moments, the player's own lesson (player_blunder / missed_win) is kept. Each with a red-then-green test for the exact sequence.",
+  "requirements": [
+    "FR-7",
+    "FR-8",
+    "NFR-1",
+    "NFR-3"
+  ],
+  "contract": "Round 2 for #7. Your round-1 commit was merged with the other two spokes' work on branch contract-7 (integration head 2e70c88: pnpm test 535 passed, pnpm typecheck exit 0). The reviewer (brief 028) then ran the range 6b08b1d..2e70c88. Continue on your own branch from your round-1 commit; the coordinator merges again. The findings below are quoted from that review with file:line at 2e70c88 (your files are unchanged there from your commit).\n\nMAJOR apps/server/src/games.ts:573 — A reply for a position the player has already left is still opened as a question. play() never cancels the ask in flight, and finishAsk (l.435-458) never checks that attemptFen can still be reached. Sequence: POST /tutor/hint (202, attemptFen F0) -> POST /moves e2e4 (g.question=null; no cancelAsk) -> bot replies -> tutor resolves -> finishAsk opens {attemptFen:F0} and emits tutor_reply -> the web draws its arrows on the new board, and Show me draws revealMove legal only in F0. Same for a bot key moment: detectAndAsk's 'moved on' check (l.390, diff > 2) lets a punish_opponent/opponent_left_book ask start after the player already moved from its attemptFen (diff 1). Required rule (document it in the games.ts header): a question may be open only while its attemptFen is the current position or is reachable by one takeback (the position before the player's last move, for player_blunder/missed_win). A player move that makes an in-flight ask's attemptFen unreachable cancels it (abort + clear thinking via the next state); detectAndAsk does not start an ask whose attemptFen is already unreachable; finishAsk re-checks and drops (with a state so thinking clears) instead of opening.\n\nMAJOR apps/server/src/main.ts:73 — NFR-3: the tutor's tool calls go to the same FIFO Stockfish as the bot and do not wait for it (each search up to 1 s; evaluate_move runs 2; parallel tool_use blocks queue one after another). If the player moves during an ask's tool phase, the bot's search lands behind up to ~2-6 s of tutor searches. Aborting the ask does not stop queued searches. Required: the TutorEngine given to each session is a server-side wrapper that (a) lets at most one tutor search be submitted to the engine at a time, (b) before submitting, waits for any bot search pending or in flight for that game (your afterBot()), and (c) rejects its waiting calls when that game's current ask is aborted. Then at most one tutor search (<= movetimeCapMs 1000) can be ahead of the bot. Add a test with a fake engine that records submission order: bot search requested while tutor searches are waiting -> the bot's search is submitted before the waiting tutor searches.\n\nMINOR games.ts:628 — resign() and a checkmate in play() (checkOutcome) do not cancel the ask in flight, unlike abandon() (l.291-295); finishAsk has no status check, so after the game ends a tutor_reply still opens a question with Show me.\nMINOR games.ts:471 — gradeAttempt does not check stillPlayed(g, m): retry move -> bot replies -> POST /takeback before analysisOf(fenAfter) resolves -> tutor_attempt still emitted for a taken-back move. detectAndAsk guards this at l.371/373.\nMINOR games.ts:413 — every ask sends the first progress label twice: startAsk emits FIRST_PROGRESS_LABEL and session.ask() emits the same label synchronously (packages/tutor/src/session.ts:156). The session's label meets NFR-1; stop emitting the server's own copy, but keep tutor_thinking within 200 ms.\nMINOR games.ts:404 — when the player's move and the bot's reply are both key moments, the bot's always replaces the player's (startAsk -> cancelAsk), dropping the player_blunder/missed_win lesson after it may already be billed. Rule: a bot-move key moment does not replace an in-flight or open player_blunder/missed_win; it is skipped (FR-7 still holds). A Hint still replaces anything.\n\nNot in this round (follow-ups, the coordinator tracks them): the explorer 'no_token' cast (explorer-env.ts:27).",
+  "scope": [
+    "apps/server/**"
+  ],
+  "negative": [
+    "Do not edit files outside scope, docs, config, .github, root files or the lockfile.",
+    "No new dependencies."
+  ],
+  "rubric": [
+    "Tests first (red then green) for each sequence: hint then move before the reply -> no tutor_reply, thinking cleared; bot key moment after the player already moved -> no ask; player_blunder question survives the bot's reply and the takeback; reply after resign/checkmate -> no question; retry graded then taken back -> no tutor_attempt; one first-progress label per ask; player_blunder then bot opponent_left_book -> player's lesson kept, one ask.",
+    "NFR-3 wrapper: fake engine submission order shows the bot's search submitted ahead of waiting tutor searches, and aborting the ask rejects the waiting tutor calls; the WASM integration test still passes.",
+    "Existing tests (SSE order, #6/#23) still pass.",
+    "pnpm test green; pnpm --filter @chess-tutor/server typecheck clean.",
+    "files_changed lists every file changed in c1ca7c8..your head. Commit message references FR-7, FR-8, NFR-1, NFR-3 and #7."
+  ],
+  "concurrency": "tutor-agent (brief 029) fixes packages/tutor/** in parallel from its own round-1 commit (claims check, abort during tools). No file overlap. TutorSession/TutorEngine contract unchanged.",
+  "round": 2
+}

@@ -1,0 +1,33 @@
+{
+  "brief_id": "029-tutor-loop-r2",
+  "agent": "tutor-agent",
+  "issue": 7,
+  "base_sha": "137d55d",
+  "scratch_dir": "/private/tmp/claude-501/-Users-daveharms-personal-workspace-chess-tutor/029814ab-5fb1-4dfa-a9cc-a73999ef0392/scratchpad/029-tutor-loop-r2",
+  "objective": "Fix the review's FR-10 and FR-8 findings in packages/tutor so that: (1) a move is backed only by evidence for that move in that position (no SAN-anywhere backing); (2) evaluations quoted in message/reveal are checked against this turn's tool scores and the key-moment data; (3) pawn-push moves are recognised as moves in move-like contexts and checked; (4) neither the message (including a pawn-push answer) nor a pre-reveal arrow gives away revealMove; (5) an aborted ask stops before its next API call and between tool calls. Each with a red-then-green test, including the reviewer's exact probes.",
+  "requirements": [
+    "FR-8",
+    "FR-10",
+    "NFR-1",
+    "NFR-8"
+  ],
+  "contract": "Round 2 for #7. Your round-1 commit was merged with the other two spokes' work on branch contract-7 (integration head 2e70c88: pnpm test 535 passed, pnpm typecheck exit 0). The reviewer (brief 028) then ran the range 6b08b1d..2e70c88. Continue on your own branch from your round-1 commit; the coordinator merges again. The findings below are quoted from that review with file:line at 2e70c88 (your files are unchanged there from your commit).\n\nBLOCKING packages/tutor/src/evidence.ts:16 \u2014 Evidence backs a move by its normalised SAN alone, whatever the position or colour. Every SAN from the game history (request.ts:94) and every ply of every engine line backs the same SAN in any other position; this covers message tokens and revealMove (claims.ts:56, :71). Castling is colour-blind. Reviewer probe: history e4 e5 Nf3 Nc6 Bc4 Nf6 O-O Bc5 d3 d6 c3, Black to move, hint, no tool calls: checkClaims(message 'Why not castle with O-O now?', reveal 'Play O-O.') -> [] and revealMove 'e8g8' -> []. Required: back (position, move) pairs \u2014 key each backed move by the position it is played from (e.g. FEN without move counters, or placement+side+castling+ep) and its UCI. Engine lines: each ply keyed by the position reached so far in that line. Game history: each move keyed by the position it was played in. Key-moment data: played/best at fenBefore (the position before the triggering move: derive from request.history), refutation at fen, expected (opponent_left_book) at fenBefore. A token is OK only if, for some shown position P where it is legal, (P, uci) is backed. That probe must now be rejected; Nf3-style mentions of a move actually in an engine line from the current position must still pass.\n\nMAJOR packages/tutor/src/claims.ts:17 \u2014 (a) evaluations never checked: '+4.2, completely winning' passes with no tool call. Check eval-looking numbers (+N.N / -N.N / N.N pawns, 'mate in N', 'M3', centipawn figures like '150 cp') against the scores in this turn's tool results and the key-moment data (cpLoss, gainCp, converted to pawns), from either side's perspective; choose and document a tolerance (suggested: within 0.3 pawns of some backed score; mate in N exact). Unbacked -> invalid (retry once, then unsupported_claim). Plain words like 'two pawns up' are out of scope. (b) plain pawn pushes skipped: 'Push h5! It wins' passes. Treat a square token as a move when followed by ! or ?, preceded by push/play/plays/playing/advance, or by a move number ('12.h4', '12...h5', '...h5'). (c) Long algebraic (Nb1-c3, Bc4xf7), lowercase piece letters, figurines (\u2658f3), 'Knight to g4' produce no token: normalise long algebraic and figurines to SAN candidates; for 'Knight to g4' style phrases at least recognise '<piece name> to <square>' and check it. Probe: extractMoveTokens('Nb1-c3, Ng8-f6, nf6, \u2658f3, Bc4xf7, Knight to g4') should yield candidates for each.\n\nMAJOR claims.ts:62 \u2014 FR-8 leak through arrows: no check rejects a pre-reveal arrow equal to revealMove's from->to; TutorQuestion.arrows reach the browser at once. Reject (invalid, retry once) a reply whose arrows include revealMove's from/to. Same for message naming revealMove when it is a pawn push (claims.ts:75 currently misses it).\n\nMINOR session.ts:157 \u2014 abort is only checked at the top of the loop; Promise.all(runOne) at l.115 does not observe the signal, so a new ask waits behind an aborted ask's tool searches. Check the signal before each tool run and after the tool phase; an aborted ask returns promptly (ok:false api_unavailable, as now). TutorEngine has no signal parameter (contract fixed); the server is also adding a gate on its side.\n\nCoordinator note: contract.ts's comment for unsupported_claim now reads 'a move or evaluation ...' on contract-7; no type change.",
+  "scope": [
+    "packages/tutor/**",
+    "prompts/**",
+    "evals/**"
+  ],
+  "negative": [
+    "Do not edit files outside scope, docs, config, .github, root files or the lockfile.",
+    "No new dependencies."
+  ],
+  "rubric": [
+    "Tests first (red then green), including each reviewer probe verbatim: Black O-O / e8g8 backed only by White's history -> rejected; '+4.2 completely winning' with no tool call -> rejected; 'Push h5! It wins' -> checked; the long-algebraic/figurine/'Knight to g4' string -> tokens; arrow equal to revealMove -> rejected; pawn-push revealMove named in message -> rejected.",
+    "No false rejections: existing claims tests still pass; a message naming a move from an engine line of the current position, a quoted eval that matches a tool score, and plain prose with squares ('the e5 square', 'the a-file') all pass.",
+    "Abort: an ask aborted during its tool phase returns before running the remaining tools and makes no further API call (fake client counts calls).",
+    "pnpm test green; pnpm --filter @chess-tutor/tutor typecheck clean.",
+    "files_changed lists every file changed in 137d55d..your head. Commit message references FR-8, FR-10, NFR-8 and #7."
+  ],
+  "concurrency": "server-agent (brief 030) fixes apps/server/** in parallel from its own round-1 commit. No file overlap.",
+  "round": 2
+}

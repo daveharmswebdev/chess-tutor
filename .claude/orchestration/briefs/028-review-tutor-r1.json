@@ -1,0 +1,40 @@
+{
+  "brief_id": "028-review-tutor-r1",
+  "agent": "reviewer",
+  "issue": 7,
+  "base_sha": "2e70c88",
+  "scratch_dir": "/private/tmp/claude-501/-Users-daveharms-personal-workspace-chess-tutor/029814ab-5fb1-4dfa-a9cc-a73999ef0392/scratchpad/028-review-tutor-r1",
+  "objective": "Review issue #7 (tutor coaching at key moments) as integrated on branch contract-7: the range git diff 6b08b1d..2e70c88 (6b08b1d = main). Read with git diff / git show only. Find correctness bugs, requirement gaps against the IDs listed, and contract violations against packages/chess-core/src/api.ts and packages/tutor/src/contract.ts. Report each as blocking / major / minor. Say explicitly whether each #7 'Done when' criterion is met.",
+  "requirements": [
+    "FR-7",
+    "FR-8",
+    "FR-10",
+    "FR-11",
+    "FR-12",
+    "FR-16",
+    "FR-17",
+    "FR-18",
+    "FR-19",
+    "NFR-1",
+    "NFR-3",
+    "NFR-8",
+    "NFR-9"
+  ],
+  "contract": "Issue #7 'Done when': the tutor speaks at key moments and stays silent otherwise (FR-7); Socratic question first, the answer only on request or after a wrong try (FR-8); every move or evaluation it mentions comes from Stockfish (FR-10), checked automatically; 'Show me' and checking a retry need no extra AI call; progress within 1 s, reply about 6 s typical / 12 s worst (NFR-1); a Hint button works at any time (FR-12); tests pass in CI with the Claude API mocked.\n\nWhat landed (three parallel spokes, merged by the coordinator): coordinator commits 28a2218..307bd56 (api.ts tutor contract, config tutor.attemptToleranceCp 50, server deps, chess-core index exports); tutor-agent 137d55d (packages/tutor: tool loop, 4 tools, FR-10 claims check, prompts/tutor-system.v1.md); server-agent c1ca7c8 (apps/server: coaching.ts, games.ts detection + question lifecycle, hint/reveal endpoints, engine attempt grading, tutor-setup.ts, main.ts); web-agent 4abdce7 (apps/web: TutorPanel, reducer, arrows, Show me/Hint). Coordinator gate on 2e70c88: pnpm test 535 passed (34 files), pnpm typecheck exit 0.\n\nDecisions the spokes made where the contract was silent (check that the three parts agree on them):\n- Server: 'Show me' closes the question (a second reveal is 409, the next move is not graded). A move from a position other than attemptFen closes the question with no event; the next state has question:null. Takebacks keep the question. A new key moment or Hint aborts the ask in flight via AbortSignal; a late reply is dropped by token.\n- Tutor: an aborted ask (APIUserAbortError) returns ok:false reason 'api_unavailable'. Check the server never emits tutor_failed for an ask it aborted itself.\n- Tutor: history grows only on successful asks. max_tokens is a constant 16000. FR-10 backing also accepts moves from the game history.\n- Server: its analysis and grading wait for the bot's search in flight (afterBot()) to protect NFR-3 on the shared FIFO engine. The server spoke flags (major) that the tutor's own tool calls during an ask can still queue ahead of the bot's next search. Assess how likely and how bad that is, and whether it blocks shipping or is a follow-up.\n- Server: engine-only tutor explorer stub casts 'no_token' as OutOfBookReason (explorer-env.ts).\n- Web: a GameView without tutor counts as unavailable; HTTP replies keep the newer tutor state when a tutor event arrived first; reveal is idempotent per questionId in either order.",
+  "scope": [],
+  "negative": [
+    "Read-only: do not edit, commit, or run anything that writes to the repo.",
+    "Do not run the e2e or start servers; reason from code and tests (running pnpm test / vitest is fine).",
+    "Do not review outside the range; earlier work (f7ee999 skeleton, #6, #23) only as context."
+  ],
+  "rubric": [
+    "Every finding cites file:line and a concrete failure scenario (request sequence, event order, or input).",
+    "Reveal leakage: confirm reveal text and revealMove never reach the browser before Show me or a wrong try (GameView, every SSE event, HTTP replies, logs sent to client).",
+    "Races: key moment then Hint; Hint then player move; takeback while the tutor works; new game / resign while the tutor works; reveal after the question closed; the bot's move being a key moment while the player's was too; auth failure mid-game.",
+    "FR-10: try to get an unsupported move past the claims check (SAN with check marks, castling spellings, promotions, a move legal only in an untested position); also look for false rejections of normal prose.",
+    "Cross-part agreement: server close/reveal rules vs the web reducer; event shapes vs api.ts; TutorRequest attemptFen per kind; NFR-9 reasons shown.",
+    "Say explicitly whether each #7 'Done when' criterion is met."
+  ],
+  "concurrency": null,
+  "round": 1
+}

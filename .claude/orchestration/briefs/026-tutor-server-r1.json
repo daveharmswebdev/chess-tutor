@@ -1,0 +1,44 @@
+{
+  "brief_id": "026-tutor-server-r1",
+  "agent": "server-agent",
+  "issue": 7,
+  "base_sha": "54b8f99",
+  "scratch_dir": "/private/tmp/claude-501/-Users-daveharms-personal-workspace-chess-tutor/029814ab-5fb1-4dfa-a9cc-a73999ef0392/scratchpad/026-tutor-server-r1",
+  "objective": "Wire coaching into apps/server as packages/chess-core/src/api.ts (at 54b8f99) specifies: analyze every position, run the key-moment detector after every move (player's and bot's), ask the tutor only at a key moment or on Hint, send the tutor SSE events in the contracted order, keep reveal/revealMove on the server, serve POST /tutor/hint and /tutor/reveal, grade the player's next move from attemptFen with the engine (no Claude call), fill GameView.tutor (availability and reason, NFR-9), and start the tutor from main.ts with the real Anthropic client when ANTHROPIC_API_KEY is set. Tests use a fake TutorSession and fake engine; no network.",
+  "requirements": [
+    "FR-7",
+    "FR-8",
+    "FR-10",
+    "FR-11",
+    "FR-12",
+    "NFR-1",
+    "NFR-3",
+    "NFR-8",
+    "NFR-9"
+  ],
+  "contract": "Issue #7 is built by three spokes in parallel, all from 54b8f99: tutor-agent (packages/tutor, prompts, the tool loop), server-agent (apps/server: detection, tutor wiring, endpoints, attempt grading), web-agent (apps/web: tutor panel, Show me, Hint, arrows). Their branches are merged together by the coordinator; none edits another's files. Coordinator-owned contracts (do not edit; report gaps in contract_gaps): packages/chess-core/src/api.ts (HTTP + SSE), packages/tutor/src/contract.ts (tutor public API), config/tutor.json.\n\nThe tutor package's implementation is being written in parallel. At base, createTutorSession exists with the declared signature but its ask() throws \"not implemented\". Code only against contract.ts (inlined below) and inject the session factory so tests pass a fake: e.g. GameManagerOptions gets an optional tutor: { createSession(game): TutorSession } | null and an analyzer: { analyze(fen): Promise<Analysis> }. Treat a throwing ask() like an { ok:false, reason:\"api_unavailable\" } outcome.\n\nThe api.ts contract is inlined below; its header comment is the spec for endpoints, SSE order and GameView.tutor. Key points:\n- Detection: keep the previous position's Analysis; after each move analyze the new position and call detect({ playerColor, fenBefore, move, history, before, after, repertoire, thresholds }) from @chess-tutor/chess-core. Thresholds from config/tutor.json keyMoments (blunderCp 150, missedWinCp 150, punishCp 150, stillWinningCp 500). The repertoire is already loaded in main.ts (currently void-ed). FR-7: no tutor call on a move that is not a key moment; test it by counting ask() calls.\n- At a key moment: \"tutor_thinking\" within 200 ms of detection, forward onProgress labels as \"tutor_progress\", then exactly one of \"tutor_reply\" (question built from the reply: message, arrows, attemptFen, canReveal = reveal or revealMove present) or \"tutor_failed\" (plain message; never unvalidated output). The bot replies as usual and never waits for the tutor (NFR-3: bot within 2 s). attemptFen per TutorRequest docs: before the player's move for player_blunder and missed_win, otherwise the position after the move.\n- At most one open question per game; a new key moment or Hint replaces it (abort the old ask via AbortSignal; a late reply for a replaced question is dropped). GameView.tutor.question/thinking reflect this and the first \"state\" on each connection carries them.\n- POST /api/games/:id/tutor/hint -> 202 {}; 409 while the tutor is working, game not playing, or not the player's turn; 503 when unavailable. Request kind \"hint\" with the current fen/history.\n- POST /api/games/:id/tutor/reveal -> 200 TutorReveal (no Claude call), also sent as \"tutor_reveal\"; 409 with no open question. revealMove must be legal in attemptFen (else move: null), as a MoveView by \"player\".\n- Attempt grading: while a question is open, the player's next move played from attemptFen (after a takeback for their own mistake) is graded by the engine: cpLoss vs best <= config tutor.attemptToleranceCp (50, new in config/tutor.json at this base; read it in config.ts) -> correct. Send \"tutor_attempt\", on a wrong try also \"tutor_reveal\"; the question then closes. A move from any other position (no takeback, and the attempt position has passed) just closes the question when the position moves past attemptFen? Decide sensibly, document it in the code and in the return.\n- Availability (NFR-9): no ANTHROPIC_API_KEY -> available false, reason \"Coaching is off: no API key is set.\"; an \"auth\" outcome turns coaching off for the process with a reason; rate_limited/api_unavailable -> tutor_failed for that moment only. Games always keep working. A missing prompt file also means coaching off with a reason, never a crash.\n- main.ts: new Anthropic() from @anthropic-ai/sdk (now a server dependency at this base, as is @chess-tutor/tutor); model from config/models.json[APP_ENV || \"development\"].tutor; effort, maxToolRounds, engine settings and explorer ratings/speeds from config/tutor.json; systemPrompt read from TUTOR_PROMPT_PATH or <repo>/prompts/tutor-system.v1.md (being written in parallel: absent at your base); explorer = the bot's explorer (NO_TOKEN_EXPLORER when engine-only returns unavailable results, which the tutor handles); one session per game, playerProfile a short string (around 1000 on Chess.com, plays the London as White and the King's Indian as Black). Document the new env vars in main.ts's header comment.\n- The engine is one shared Stockfish process, one search at a time, queued: analysis, bot searches and tutor tool calls share it. Analysis uses config engine depth/movetimeCapMs. Known, not required here: a stale bot search is discarded but not cancelled (review 019); mention in the return if sharing the engine makes it matter.\n\nCoordinator gate at base 54b8f99 (branch contract-7): pnpm test 378 passed (25 files). pnpm typecheck has exactly 7 errors, all in apps/web (controller.ts:50, game-state.ts:87-94: GameEvent members without `game`; test/fixtures.ts:11: GameView now requires `tutor`). Those are web-agent's to fix in parallel; apps/server and packages typecheck clean.",
+  "contract_files": [
+    "packages/chess-core/src/api.ts",
+    "packages/tutor/src/contract.ts"
+  ],
+  "scope": [
+    "apps/server/**"
+  ],
+  "negative": [
+    "Do not edit packages/**, apps/web, docs, config, .github, root files or the lockfile (the dependencies you need are already added at this base).",
+    "No new dependencies.",
+    "No real Anthropic or Lichess calls in tests; the existing WASM engine integration test may stay.",
+    "Do not send reveal text or revealMove to the browser before a reveal (architecture §3.5)."
+  ],
+  "rubric": [
+    "Tests first (red then green) with a fake TutorSession and fake analyzer: FR-7 (no ask on a quiet move, one ask on a key moment, for both the player's and the bot's move); SSE order tutor_thinking -> tutor_progress* -> tutor_reply|tutor_failed, and the bot reply is not delayed by a slow ask; reply never includes reveal/revealMove before reveal.",
+    "hint: 202, each 409 case, 503 when unavailable; reveal: 200 + tutor_reveal event, 409 without an open question, no ask() call; illegal revealMove -> move null.",
+    "Attempt: correct (within 50 cp) and wrong (wrong -> tutor_attempt then tutor_reveal) both tested; question closes; replaced question's late reply dropped.",
+    "GameView.tutor filled everywhere (first state, after moves); availability false with reason when no key, when the prompt file is missing, and after an auth outcome; games still playable in all three.",
+    "Existing tests still pass, including SSE ordering tests from #6/#23.",
+    "pnpm test green from the repo root; pnpm --filter @chess-tutor/server typecheck clean (the 7 apps/web errors at base are expected and not yours).",
+    "files_changed lists every file changed in 54b8f99..your head. Commit message references FR-7, FR-8, FR-12, NFR-1, NFR-9 and #7."
+  ],
+  "concurrency": "tutor-agent (brief 025) implements packages/tutor/** and prompts/** and web-agent (brief 027) apps/web/** at the same time, from the same base. No file overlap. Code against contract.ts, not against the tutor's internals.",
+  "round": 1
+}

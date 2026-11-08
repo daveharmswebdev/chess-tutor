@@ -95,3 +95,22 @@
 {"ts":"2026-11-08T00:13:29.197Z","event":"return_invalid","agent_id":"a01cb5e945b0b73a8","agent_type":"web-agent","attempt":1,"errors":["/tests_run: a 'gate' check failed, so this is not a success"]}
 {"ts":"2026-11-08T00:13:57.363Z","event":"return_valid","agent_id":"a01cb5e945b0b73a8","agent_type":"web-agent","via":"handback"}
 {"ts":"2026-11-08T00:14:41.247Z","event":"coordinator_verdict","brief_id":"027-tutor-web-r1","agent":"web-agent","verdict":"accepted","reason":"failure was a brief defect: base typecheck premise wrong (pnpm -r fail-fast hid 2 server errors, fixed by brief 026). Re-ran: 432 passed, web typecheck clean, diff == files_changed, in scope. Merge with 026.","tokens":111811,"duration_ms":576957}
+{"ts":"2026-11-08T00:16:47.315Z","event":"return_valid","agent_id":"a462498ccce8e1af8","agent_type":"tutor-agent","via":"handback"}
+{"ts":"2026-11-08T00:17:25.607Z","event":"coordinator_verdict","brief_id":"025-tutor-loop-r1","agent":"tutor-agent","verdict":"accepted","reason":"diff == files_changed (16), contract.ts/index.ts untouched; re-ran 443 passed, tutor typecheck clean. Gaps: max_tokens const 16000, abort->api_unavailable, no line name in TutorGame.","tokens":116216,"duration_ms":746859}
+{"ts":"2026-11-08T00:19:39.763Z","event":"return_invalid","agent_id":"a4271a147d2588f1e","agent_type":"server-agent","attempt":1,"errors":["/tests_run: a 'gate' check failed, so this is not a success"]}
+{"ts":"2026-11-08T00:20:05.498Z","event":"return_valid","agent_id":"a4271a147d2588f1e","agent_type":"server-agent","via":"handback"}
+{"ts":"2026-11-08T00:20:47.595Z","event":"coordinator_verdict","brief_id":"026-tutor-server-r1","agent":"server-agent","verdict":"accepted","reason":"diff == files_changed (14), in scope; merged 025+026+027 on contract-7 2e70c88: 535 passed, typecheck 0. Major: tutor tool calls can queue ahead of bot on shared engine (NFR-3).","tokens":141483,"duration_ms":945101}
+{"ts":"2026-11-08T00:21:36.771Z","event":"dispatch","subagent_type":"reviewer","brief_id":"028-review-tutor-r1","base_sha":"2e70c88","spoke":true}
+{"ts":"2026-11-08T00:21:37.043Z","event":"agent_complete","subagent_type":"reviewer","brief_id":"028-review-tutor-r1","agent_id":"a717391c6a0a884bb","status":"async_launched","contract":"pending"}
+{"ts":"2026-11-08T00:26:17.539Z","event":"return_valid","agent_id":"a717391c6a0a884bb","agent_type":"reviewer","via":"handback"}
+{"ts":"2026-11-08T00:26:51.829Z","event":"coordinator_verdict","brief_id":"028-review-tutor-r1","agent":"reviewer","verdict":"review","reason":"1 blocking (FR-10 SAN-only evidence), 4 major (evals/pawn pushes unchecked, stale reply opens question, arrow leaks answer, NFR-3 tutor engine queue), 6 minor. Round 2 for tutor + server."}
+{"ts":"2026-11-08T00:27:38.901Z","event":"coordinator_verdict","brief_id":"028-review-tutor-r1","agent":"reviewer","verdict":"review","reason":"cost entry","tokens":100568,"duration_ms":280826}
+{"ts":"2026-11-08T00:37:00.625Z","event":"return_valid","agent_id":"a4271a147d2588f1e","agent_type":"server-agent","via":"handback"}
+{"ts":"2026-11-08T00:37:00.867Z","event":"return_valid","agent_id":"a462498ccce8e1af8","agent_type":"tutor-agent","via":"handback"}
+{"ts":"2026-11-08T00:38:29.134Z","event":"coordinator_verdict","brief_id":"029-tutor-loop-r2","agent":"tutor-agent","verdict":"accepted","reason":"diff == files_changed (8); merged on contract-7 30fa663: 566 passed, typecheck 0","tokens":176352,"duration_ms":506853}
+{"ts":"2026-11-08T00:38:29.135Z","event":"coordinator_verdict","brief_id":"030-tutor-server-r2","agent":"server-agent","verdict":"accepted","reason":"diff == files_changed (7); server 117 passed, typecheck 0; merged 30fa663: 566 passed","tokens":207314,"duration_ms":506534}
+{"ts":"2026-11-08T00:38:49.204Z","event":"dispatch","subagent_type":"reviewer","brief_id":"031-review-tutor-r2","base_sha":"30fa663","spoke":true}
+{"ts":"2026-11-08T00:38:49.475Z","event":"agent_complete","subagent_type":"reviewer","brief_id":"031-review-tutor-r2","agent_id":"aacd1bb82b200a10e","status":"async_launched","contract":"pending"}
+{"ts":"2026-11-08T00:43:13.003Z","event":"return_valid","agent_id":"aacd1bb82b200a10e","agent_type":"reviewer","via":"handback"}
+{"ts":"2026-11-08T00:43:20.540Z","event":"coordinator_verdict","brief_id":"031-review-tutor-r2","agent":"reviewer","verdict":"review","reason":"SHIP. All 028 findings fixed except deferred no_token. New: major eval sign/deltas (follow-up), 4 minors."}
+{"ts":"2026-11-08T00:46:42.541Z","event":"shipped","issue":7,"pr":27}

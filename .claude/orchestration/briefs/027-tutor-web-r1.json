@@ -1,0 +1,36 @@
+{
+  "brief_id": "027-tutor-web-r1",
+  "agent": "web-agent",
+  "issue": 7,
+  "base_sha": "54b8f99",
+  "scratch_dir": "/private/tmp/claude-501/-Users-daveharms-personal-workspace-chess-tutor/029814ab-5fb1-4dfa-a9cc-a73999ef0392/scratchpad/027-tutor-web-r1",
+  "objective": "Add the tutor to apps/web against packages/chess-core/src/api.ts at 54b8f99: a tutor panel that shows 'tutor is thinking' on tutor_thinking, the latest tutor_progress label, the question (tutor_reply) with its arrows drawn on the board (at most 3), a 'Show me' button (POST /tutor/reveal; enabled when question.canReveal) that shows the reveal text and the reveal move as an arrow, a 'Hint' button (POST /tutor/hint) available whenever the player may move and coaching is available, the attempt result from tutor_attempt (correct / not quite, with the cp loss), tutor_failed as a plain message, and the not-available reason from GameView.tutor (NFR-9) with Hint disabled. Also fix the 7 typecheck errors the new GameEvent members and GameView.tutor cause at base.",
+  "requirements": [
+    "FR-8",
+    "FR-11",
+    "FR-12",
+    "NFR-1",
+    "NFR-9"
+  ],
+  "contract": "Issue #7 is built by three spokes in parallel, all from 54b8f99: tutor-agent (packages/tutor, prompts, the tool loop), server-agent (apps/server: detection, tutor wiring, endpoints, attempt grading), web-agent (apps/web: tutor panel, Show me, Hint, arrows). Their branches are merged together by the coordinator; none edits another's files. Coordinator-owned contracts (do not edit; report gaps in contract_gaps): packages/chess-core/src/api.ts (HTTP + SSE), packages/tutor/src/contract.ts (tutor public API), config/tutor.json.\n\nThe api.ts contract (inlined below) is the spec; its header comment covers the two new endpoints, the SSE order, and GameView.tutor. The server side is being built in parallel: test against the fake API the existing web tests use (apps/web/test/fixtures.ts, controller.test.ts).\n\nBehaviour to get right:\n- The first \"state\" on each connection carries GameView.tutor (available, reason, thinking, question), so a reload restores the panel from state alone. Later \"state\" events also carry it; the reducer should treat GameView.tutor as the source of truth and the tutor_* events as the live updates between states.\n- tutor_thinking within 200 ms of detection, first tutor_progress within 1 s, reply in about 6 s (NFR-1): show something immediately on tutor_thinking; replace the label on each tutor_progress.\n- Only message and arrows arrive before a reveal; reveal text/move come only from POST /tutor/reveal (200 TutorReveal) or a \"tutor_reveal\" event (after a wrong try). Handle both, idempotently for the same questionId.\n- Hint: 202 {} and the reply comes over SSE; 409 (tutor busy, not playing, not the player's turn) and 503 (unavailable) show a short message, not a crash.\n- Arrows: react-chessboard (already a dependency) supports custom arrows; check the installed version's prop name in node_modules. Show the question's arrows, or the reveal's arrows/move once revealed. Clear them when the question closes (tutor_attempt, a new question, a new game).\n- \"Trying again\" is just playing a move (after Takeback for the player's own mistake); the server grades it and sends tutor_attempt { questionId, move, correct, cpLoss }. Show the result in the panel.\n- Coaching unavailable: show GameView.tutor.reason in the panel; the game works as before.\n\nCoordinator gate at base 54b8f99 (branch contract-7): pnpm test 378 passed (25 files). pnpm typecheck has exactly 7 errors, all in apps/web (controller.ts:50, game-state.ts:87-94: GameEvent members without `game`; test/fixtures.ts:11: GameView now requires `tutor`). Those are web-agent's to fix in parallel; apps/server and packages typecheck clean. Those 7 errors are yours to fix (narrow the event union by type before reading .game; give the fixture a default tutor: { available: true, reason: null, thinking: false, question: null } or similar).",
+  "contract_files": [
+    "packages/chess-core/src/api.ts"
+  ],
+  "scope": [
+    "apps/web/**"
+  ],
+  "negative": [
+    "Do not edit packages/**, apps/server, docs, config, .github, root files or the lockfile.",
+    "No new dependencies.",
+    "No e2e test that needs a real Claude key; unit/component tests with the fake API. The existing e2e spec (apps/web/e2e/play.spec.ts) must still pass: with no ANTHROPIC_API_KEY the panel shows the not-available reason."
+  ],
+  "rubric": [
+    "Tests first (red then green) for the reducer: tutor_thinking, tutor_progress (label replaced), tutor_reply (question + arrows), tutor_reveal and the reveal response (idempotent per questionId), tutor_attempt (closes, shows correct/cp loss), tutor_failed, state with tutor restoring the panel, new game clears it.",
+    "Predicates and controller: canHint (playing, player's turn, not bot thinking, tutor available and not thinking), canReveal (open question with canReveal); controller calls api.tutorHint / api.tutorReveal and handles 409/503 without throwing.",
+    "Panel component tested: shows reason when unavailable, thinking/progress, question, Show me, Hint; arrows passed to the board (at most 3).",
+    "pnpm test and pnpm typecheck clean from the repo root (you fix the 7 web errors at base; server/tutor packages already typecheck).",
+    "files_changed lists every file changed in 54b8f99..your head. Commit message references FR-8, FR-11, FR-12, NFR-1, NFR-9 and #7."
+  ],
+  "concurrency": "tutor-agent (brief 025) on packages/tutor/** and prompts/**, server-agent (brief 026) on apps/server/** at the same time, from the same base. No file overlap. Code against api.ts only.",
+  "round": 1
+}
