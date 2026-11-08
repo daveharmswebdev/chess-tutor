@@ -1,0 +1,26 @@
+{
+  "id": "pb-kid-nd7-bxf7",
+  "kind": "player_blunder",
+  "playerColor": "b",
+  "history": [
+    "e2e4",
+    "g7g6",
+    "d2d4",
+    "f8g7",
+    "g1f3",
+    "d7d6",
+    "f1c4",
+    "b8d7"
+  ],
+  "fen": "r1bqk1nr/pppnppbp/3p2p1/8/2BPP3/5N2/PPP2PPP/RNBQK2R w KQkq - 2 5",
+  "moment": {
+    "kind": "player_blunder",
+    "played": "Nd7",
+    "cpLoss": 595,
+    "best": "Nf6"
+  },
+  "attemptFen": "rnbqk1nr/ppp1ppbp/3p2p1/8/2BPP3/5N2/PPP2PPP/RNBQK2R b KQkq - 1 4",
+  "engineBest": "g8f6",
+  "engineBestCp": -41,
+  "source": "Modern: ...Nd7 allows Bxf7+ and Ng5-e6 trapping the queen"
+}

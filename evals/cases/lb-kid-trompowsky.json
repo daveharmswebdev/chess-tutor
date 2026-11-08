@@ -1,0 +1,24 @@
+{
+  "id": "lb-kid-trompowsky",
+  "kind": "opponent_left_book",
+  "playerColor": "b",
+  "history": [
+    "d2d4",
+    "g8f6",
+    "c1g5"
+  ],
+  "fen": "rnbqkb1r/pppppppp/5n2/6B1/3P4/8/PPP1PPPP/RN1QKBNR b KQkq - 2 2",
+  "moment": {
+    "kind": "opponent_left_book",
+    "line": "KID Classical",
+    "expected": [
+      "c4",
+      "Bf4"
+    ],
+    "played": "Bg5"
+  },
+  "attemptFen": "rnbqkb1r/pppppppp/5n2/6B1/3P4/8/PPP1PPPP/RN1QKBNR b KQkq - 2 2",
+  "engineBest": "d7d5",
+  "engineBestCp": -5,
+  "source": "KID: 2.Bg5 Trompowsky"
+}

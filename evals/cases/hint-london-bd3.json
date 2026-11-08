@@ -1,0 +1,27 @@
+{
+  "id": "hint-london-bd3",
+  "kind": "hint",
+  "playerColor": "w",
+  "history": [
+    "d2d4",
+    "d7d5",
+    "c1f4",
+    "g8f6",
+    "e2e3",
+    "e7e6",
+    "g1f3",
+    "c7c5",
+    "c2c3",
+    "b8c6",
+    "b1d2",
+    "f8d6",
+    "f4g3",
+    "e8g8"
+  ],
+  "fen": "r1bq1rk1/pp3ppp/2nbpn2/2pp4/3P4/2P1PNB1/PP1N1PPP/R2QKB1R w KQ - 5 8",
+  "moment": null,
+  "attemptFen": "r1bq1rk1/pp3ppp/2nbpn2/2pp4/3P4/2P1PNB1/PP1N1PPP/R2QKB1R w KQ - 5 8",
+  "engineBest": "f1d3",
+  "engineBestCp": 18,
+  "source": "London middlegame, Bd3 next"
+}

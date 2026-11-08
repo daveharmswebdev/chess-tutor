@@ -1,0 +1,23 @@
+{
+  "id": "lb-london-c5",
+  "kind": "opponent_left_book",
+  "playerColor": "w",
+  "history": [
+    "d2d4",
+    "c7c5"
+  ],
+  "fen": "rnbqkbnr/pp1ppppp/8/2p5/3P4/8/PPP1PPPP/RNBQKBNR w KQkq - 0 2",
+  "moment": {
+    "kind": "opponent_left_book",
+    "line": "London vs 1...d5",
+    "expected": [
+      "d5",
+      "Nf6"
+    ],
+    "played": "c5"
+  },
+  "attemptFen": "rnbqkbnr/pp1ppppp/8/2p5/3P4/8/PPP1PPPP/RNBQKBNR w KQkq - 0 2",
+  "engineBest": "d4d5",
+  "engineBestCp": 68,
+  "source": "London: 1...c5 Benoni-style"
+}

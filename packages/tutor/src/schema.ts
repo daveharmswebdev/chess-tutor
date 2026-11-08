@@ -60,9 +60,14 @@ export function parseReply(text: string, expectedKind: TutorReply["kind"]): Pars
   if (reply.kind !== expectedKind) {
     return { ok: false, problem: `kind must be "${expectedKind}" for this request, not "${reply.kind}".` };
   }
-  const badArrow = reply.arrows.find((a) => !SQUARE.test(a.from) || !SQUARE.test(a.to));
-  if (badArrow) {
-    return { ok: false, problem: `arrow ${badArrow.from}-${badArrow.to} must go from one square to another, e.g. "e2" to "e4".` };
-  }
   return { ok: true, reply };
+}
+
+/**
+ * FR-11: drops arrows that are not between two different real squares (h7->h7, e2->e9). They
+ * cannot be drawn and are not worth a correction round; the rest of the reply stays as it is.
+ */
+export function dropMalformedArrows(reply: TutorReply): TutorReply {
+  const arrows = reply.arrows.filter((a) => SQUARE.test(a.from) && SQUARE.test(a.to) && a.from !== a.to);
+  return arrows.length === reply.arrows.length ? reply : { ...reply, arrows };
 }

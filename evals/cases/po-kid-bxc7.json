@@ -1,0 +1,29 @@
+{
+  "id": "po-kid-bxc7",
+  "kind": "punish_opponent",
+  "playerColor": "b",
+  "history": [
+    "d2d4",
+    "g8f6",
+    "c1f4",
+    "g7g6",
+    "b1c3",
+    "d7d5",
+    "e2e3",
+    "f8g7",
+    "c3b5",
+    "b8a6",
+    "f4c7"
+  ],
+  "fen": "r1bqk2r/ppB1ppbp/n4np1/1N1p4/3P4/4P3/PPP2PPP/R2QKBNR b KQkq - 0 6",
+  "moment": {
+    "kind": "punish_opponent",
+    "opponentMove": "Bxc7",
+    "refutation": "Nxc7",
+    "gainCp": 707
+  },
+  "attemptFen": "r1bqk2r/ppB1ppbp/n4np1/1N1p4/3P4/4P3/PPP2PPP/R2QKBNR b KQkq - 0 6",
+  "engineBest": "a6c7",
+  "engineBestCp": 698,
+  "source": "KID vs London: Bxc7 loses a piece to ...Nxc7"
+}

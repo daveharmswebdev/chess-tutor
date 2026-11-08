@@ -1,0 +1,32 @@
+{
+  "id": "pb-kid-nxe4",
+  "kind": "player_blunder",
+  "playerColor": "b",
+  "history": [
+    "d2d4",
+    "g8f6",
+    "c2c4",
+    "g7g6",
+    "b1c3",
+    "f8g7",
+    "e2e4",
+    "d7d6",
+    "g1f3",
+    "e8g8",
+    "f1e2",
+    "e7e5",
+    "e1g1",
+    "f6e4"
+  ],
+  "fen": "rnbq1rk1/ppp2pbp/3p2p1/4p3/2PPn3/2N2N2/PP2BPPP/R1BQ1RK1 w - - 0 8",
+  "moment": {
+    "kind": "player_blunder",
+    "played": "Nxe4",
+    "cpLoss": 462,
+    "best": "h6"
+  },
+  "attemptFen": "rnbq1rk1/ppp2pbp/3p1np1/4p3/2PPP3/2N2N2/PP2BPPP/R1BQ1RK1 b - - 1 7",
+  "engineBest": "h7h6",
+  "engineBestCp": -48,
+  "source": "KID: fork trick that does not work, Nc3 takes back"
+}

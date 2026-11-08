@@ -1,0 +1,176 @@
+{
+  "id": "hint-london-c5",
+  "caseId": "hint-london-c5",
+  "repeat": 1,
+  "kind": "hint",
+  "model": "claude-sonnet-5-5",
+  "effort": "medium",
+  "ok": true,
+  "reason": null,
+  "failureMessage": null,
+  "reply": {
+    "schemaVersion": 1,
+    "kind": "hint",
+    "message": "Your d4 pawn is under pressure from the pawns and knight on c5 and c6. Which quiet pawn move would support d4 and also give your queen's knight a good square on d2?",
+    "reveal": "c3 is the London move against ...c5. It makes d4 solid, so the c5 pawn and the c6 knight can't easily win it. It also frees b1 and d2 for your pieces. The engine rates it as equal, and it is your repertoire move.",
+    "revealMove": "c2c3",
+    "arrows": [
+      {
+        "from": "c5",
+        "to": "d4"
+      },
+      {
+        "from": "c6",
+        "to": "d4"
+      }
+    ]
+  },
+  "ms": 4753,
+  "firstRoundMs": 1643,
+  "toolCalls": 2,
+  "retries": 0,
+  "usage": {
+    "requests": 2,
+    "inputTokens": 1579,
+    "outputTokens": 439,
+    "cacheReadInputTokens": 6450,
+    "cacheCreationInputTokens": 0
+  },
+  "costUsd": 0.008838,
+  "revealCpLoss": 12,
+  "progress": [
+    "Tutor is looking at the position…",
+    "Checking your repertoire…",
+    "Looking at the engine lines…"
+  ],
+  "rounds": [
+    {
+      "ms": 1643,
+      "stopReason": "tool_use",
+      "toolUses": [
+        {
+          "id": "toolu_016qLkzqXTesiuV1yScSTEBh",
+          "name": "get_repertoire_context",
+          "input": {
+            "fen": "r1bqkbnr/pp2pppp/2n5/2pp4/3P1B2/4P3/PPP2PPP/RN1QKBNR w KQkq - 1 4"
+          }
+        },
+        {
+          "id": "toolu_01DhrGhjwJT2FMNrC2zJ9RCU",
+          "name": "analyze_position",
+          "input": {
+            "fen": "r1bqkbnr/pp2pppp/2n5/2pp4/3P1B2/4P3/PPP2PPP/RN1QKBNR w KQkq - 1 4"
+          }
+        }
+      ],
+      "toolResults": [
+        {
+          "id": "toolu_016qLkzqXTesiuV1yScSTEBh",
+          "name": "get_repertoire_context",
+          "input": {
+            "fen": "r1bqkbnr/pp2pppp/2n5/2pp4/3P1B2/4P3/PPP2PPP/RN1QKBNR w KQkq - 1 4"
+          },
+          "content": "{\"color\":\"white\",\"in_repertoire\":true,\"line\":\"London vs ...c5\",\"next_moves\":[{\"san\":\"c3\",\"uci\":\"c2c3\"}],\"end_of_line\":false}",
+          "isError": false
+        },
+        {
+          "id": "toolu_01DhrGhjwJT2FMNrC2zJ9RCU",
+          "name": "analyze_position",
+          "input": {
+            "fen": "r1bqkbnr/pp2pppp/2n5/2pp4/3P1B2/4P3/PPP2PPP/RN1QKBNR w KQkq - 1 4"
+          },
+          "content": "{\"fen\":\"r1bqkbnr/pp2pppp/2n5/2pp4/3P1B2/4P3/PPP2PPP/RN1QKBNR w KQkq - 1 4\",\"side_to_move\":\"white\",\"depth\":18,\"lines\":[{\"rank\":1,\"eval_cp\":10,\"mate_in\":null,\"moves\":[{\"san\":\"Nf3\",\"uci\":\"g1f3\"},{\"san\":\"Nf6\",\"uci\":\"g8f6\"},{\"san\":\"Be2\",\"uci\":\"f1e2\"},{\"san\":\"cxd4\",\"uci\":\"c5d4\"},{\"san\":\"exd4\",\"uci\":\"e3d4\"},{\"san\":\"Bf5\",\"uci\":\"c8f5\"},{\"san\":\"O-O\",\"uci\":\"e1g1\"},{\"san\":\"e6\",\"uci\":\"e7e6\"}]},{\"rank\":2,\"eval_cp\":1,\"mate_in\":null,\"moves\":[{\"san\":\"Be2\",\"uci\":\"f1e2\"},{\"san\":\"cxd4\",\"uci\":\"c5d4\"},{\"san\":\"exd4\",\"uci\":\"e3d4\"},{\"san\":\"Bf5\",\"uci\":\"c8f5\"},{\"san\":\"Nf3\",\"uci\":\"g1f3\"},{\"san\":\"e6\",\"uci\":\"e7e6\"},{\"san\":\"O-O\",\"uci\":\"e1g1\"},{\"san\":\"Bd6\",\"uci\":\"f8d6\"}]},{\"rank\":3,\"eval_cp\":0,\"mate_in\":null,\"moves\":[{\"san\":\"c3\",\"uci\":\"c2c3\"},{\"san\":\"Nf6\",\"uci\":\"g8f6\"},{\"san\":\"Nd2\",\"uci\":\"b1d2\"},{\"san\":\"Bf5\",\"uci\":\"c8f5\"},{\"san\":\"Ngf3\",\"uci\":\"g1f3\"},{\"san\":\"Qb6\",\"uci\":\"d8b6\"},{\"san\":\"dxc5\",\"uci\":\"d4c5\"},{\"san\":\"Qxb2\",\"uci\":\"b6b2\"}]}]}",
+          "isError": false
+        }
+      ],
+      "text": "",
+      "usage": {
+        "input_tokens": 291,
+        "cache_creation_input_tokens": 0,
+        "cache_read_input_tokens": 3225,
+        "cache_creation": {
+          "ephemeral_5m_input_tokens": 0,
+          "ephemeral_1h_input_tokens": 0
+        },
+        "output_tokens": 220,
+        "service_tier": "standard",
+        "inference_geo": "global",
+        "speed": "standard",
+        "output_tokens_details": {
+          "thinking_tokens": 0
+        }
+      },
+      "error": null
+    },
+    {
+      "ms": 2547,
+      "stopReason": "end_turn",
+      "toolUses": [],
+      "toolResults": [],
+      "text": "{\"schemaVersion\":1,\"kind\":\"hint\",\"message\":\"Your d4 pawn is under pressure from the pawns and knight on c5 and c6. Which quiet pawn move would support d4 and also give your queen's knight a good square on d2?\",\"reveal\":\"c3 is the London move against ...c5. It makes d4 solid, so the c5 pawn and the c6 knight can't easily win it. It also frees b1 and d2 for your pieces. The engine rates it as equal, and it is your repertoire move.\",\"revealMove\":\"c2c3\",\"arrows\":[{\"from\":\"c5\",\"to\":\"d4\"},{\"from\":\"c6\",\"to\":\"d4\"}]}",
+      "usage": {
+        "input_tokens": 1288,
+        "cache_creation_input_tokens": 0,
+        "cache_read_input_tokens": 3225,
+        "cache_creation": {
+          "ephemeral_5m_input_tokens": 0,
+          "ephemeral_1h_input_tokens": 0
+        },
+        "output_tokens": 219,
+        "service_tier": "standard",
+        "inference_geo": "global",
+        "speed": "standard",
+        "output_tokens_details": {
+          "thinking_tokens": 0
+        }
+      },
+      "error": null
+    }
+  ],
+  "grades": {
+    "schema": {
+      "pass": true,
+      "problems": []
+    },
+    "moves": {
+      "pass": false,
+      "mentions": [
+        {
+          "field": "message",
+          "raw": "d2?",
+          "legal": false
+        },
+        {
+          "field": "reveal",
+          "raw": "c5",
+          "legal": true
+        }
+      ],
+      "illegal": [
+        "d2?"
+      ]
+    },
+    "evals": {
+      "pass": true,
+      "quotes": []
+    },
+    "giveAway": {
+      "pass": true,
+      "problems": []
+    },
+    "arrows": {
+      "pass": true,
+      "problems": []
+    },
+    "reveal": {
+      "pass": true,
+      "legal": true,
+      "equalsBest": false,
+      "cpLoss": 12,
+      "problems": []
+    },
+    "nfr6Moves": false,
+    "nfr6Evals": true,
+    "nfr7": true
+  }
+}

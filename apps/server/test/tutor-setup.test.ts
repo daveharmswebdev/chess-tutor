@@ -123,7 +123,7 @@ describe("config/tutor.json coaching settings", () => {
     expect(loadKeyMomentThresholds()).toEqual({ blunderCp: 150, missedWinCp: 150, punishCp: 150, stillWinningCp: 500 });
     expect(loadAttemptToleranceCp()).toBe(50);
     expect(loadTutorConfig("development")).toEqual({
-      model: "claude-opus-5-5",
+      model: "claude-sonnet-5-5", // pinned after the #10 evals (docs/evals/2026-11-08-q3-model-choice.md)
       effort: "medium",
       maxToolRounds: 4,
       engine: { depth: 18, movetimeCapMs: 1000, multiPv: 3 },

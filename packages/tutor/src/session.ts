@@ -14,7 +14,7 @@ import type {
 import { classifyError } from "./errors.ts";
 import { Evidence } from "./evidence.ts";
 import { buildEvidence, playerBlock, requestTurn } from "./request.ts";
-import { TUTOR_REPLY_JSON_SCHEMA, parseReply } from "./schema.ts";
+import { TUTOR_REPLY_JSON_SCHEMA, dropMalformedArrows, parseReply } from "./schema.ts";
 import { TOOL_DEFINITIONS, runTool, toolLabel, type ToolContext } from "./tools.ts";
 
 /** Room for adaptive thinking plus a short JSON reply. Not in config/tutor.json (see the #7 return). */
@@ -133,10 +133,11 @@ export function createTutorSession(deps: TutorDeps, game: TutorGame): TutorSessi
       const parsed = parseReply(text, expectedKind);
       let problem: { reason: TutorFailureReason; text: string };
       if (parsed.ok) {
-        const claims = checkClaims(parsed.reply, evidence, revealFen);
+        const reply = dropMalformedArrows(parsed.reply); // FR-11: after validation, before the claims check
+        const claims = checkClaims(reply, evidence, revealFen);
         if (claims.length === 0) {
           history.push(...staged);
-          return done({ ok: true, reply: parsed.reply });
+          return done({ ok: true, reply });
         }
         problem = { reason: "unsupported_claim", text: claims.join(" ") };
       } else {

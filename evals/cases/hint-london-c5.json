@@ -1,0 +1,19 @@
+{
+  "id": "hint-london-c5",
+  "kind": "hint",
+  "playerColor": "w",
+  "history": [
+    "d2d4",
+    "d7d5",
+    "c1f4",
+    "c7c5",
+    "e2e3",
+    "b8c6"
+  ],
+  "fen": "r1bqkbnr/pp2pppp/2n5/2pp4/3P1B2/4P3/PPP2PPP/RN1QKBNR w KQkq - 1 4",
+  "moment": null,
+  "attemptFen": "r1bqkbnr/pp2pppp/2n5/2pp4/3P1B2/4P3/PPP2PPP/RN1QKBNR w KQkq - 1 4",
+  "engineBest": "g1f3",
+  "engineBestCp": 10,
+  "source": "London vs c5"
+}

@@ -1,0 +1,24 @@
+{
+  "id": "hint-kid-e5",
+  "kind": "hint",
+  "playerColor": "b",
+  "history": [
+    "d2d4",
+    "g8f6",
+    "c2c4",
+    "g7g6",
+    "b1c3",
+    "f8g7",
+    "e2e4",
+    "d7d6",
+    "g1f3",
+    "e8g8",
+    "f1e2"
+  ],
+  "fen": "rnbq1rk1/ppp1ppbp/3p1np1/8/2PPP3/2N2N2/PP2BPPP/R1BQK2R b KQ - 3 6",
+  "moment": null,
+  "attemptFen": "rnbq1rk1/ppp1ppbp/3p1np1/8/2PPP3/2N2N2/PP2BPPP/R1BQK2R b KQ - 3 6",
+  "engineBest": "e7e5",
+  "engineBestCp": -54,
+  "source": "KID: the ...e5 break"
+}

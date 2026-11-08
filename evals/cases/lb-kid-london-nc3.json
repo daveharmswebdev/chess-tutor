@@ -1,0 +1,25 @@
+{
+  "id": "lb-kid-london-nc3",
+  "kind": "opponent_left_book",
+  "playerColor": "b",
+  "history": [
+    "d2d4",
+    "g8f6",
+    "c1f4",
+    "g7g6",
+    "b1c3"
+  ],
+  "fen": "rnbqkb1r/pppppp1p/5np1/8/3P1B2/2N5/PPP1PPPP/R2QKBNR b KQkq - 1 3",
+  "moment": {
+    "kind": "opponent_left_book",
+    "line": "KID vs London",
+    "expected": [
+      "e3"
+    ],
+    "played": "Nc3"
+  },
+  "attemptFen": "rnbqkb1r/pppppp1p/5np1/8/3P1B2/2N5/PPP1PPPP/R2QKBNR b KQkq - 1 3",
+  "engineBest": "d7d5",
+  "engineBestCp": -12,
+  "source": "KID vs London: 3.Nc3 instead of 3.e3"
+}

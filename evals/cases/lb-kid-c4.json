@@ -1,0 +1,21 @@
+{
+  "id": "lb-kid-c4",
+  "kind": "opponent_left_book",
+  "playerColor": "b",
+  "history": [
+    "c2c4"
+  ],
+  "fen": "rnbqkbnr/pppppppp/8/8/2P5/8/PP1PPPPP/RNBQKBNR b KQkq - 0 1",
+  "moment": {
+    "kind": "opponent_left_book",
+    "line": "KID Classical",
+    "expected": [
+      "d4"
+    ],
+    "played": "c4"
+  },
+  "attemptFen": "rnbqkbnr/pppppppp/8/8/2P5/8/PP1PPPPP/RNBQKBNR b KQkq - 0 1",
+  "engineBest": "e7e5",
+  "engineBestCp": -18,
+  "source": "KID player: 1.c4 English"
+}

@@ -1,0 +1,31 @@
+{
+  "id": "po-kid-ne5",
+  "kind": "punish_opponent",
+  "playerColor": "b",
+  "history": [
+    "d2d4",
+    "g8f6",
+    "c1f4",
+    "g7g6",
+    "e2e3",
+    "f8g7",
+    "g1f3",
+    "e8g8",
+    "f1e2",
+    "d7d6",
+    "e1g1",
+    "b8d7",
+    "f3e5"
+  ],
+  "fen": "r1bq1rk1/pppnppbp/3p1np1/4N3/3P1B2/4P3/PPP1BPPP/RN1Q1RK1 b - - 3 7",
+  "moment": {
+    "kind": "punish_opponent",
+    "opponentMove": "Ne5",
+    "refutation": "dxe5",
+    "gainCp": 549
+  },
+  "attemptFen": "r1bq1rk1/pppnppbp/3p1np1/4N3/3P1B2/4P3/PPP1BPPP/RN1Q1RK1 b - - 3 7",
+  "engineBest": "d6e5",
+  "engineBestCp": 539,
+  "source": "KID vs London: White's knight jumps to e5, ...dxe5 wins it"
+}

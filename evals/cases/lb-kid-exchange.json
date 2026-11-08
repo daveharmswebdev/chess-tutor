@@ -1,0 +1,33 @@
+{
+  "id": "lb-kid-exchange",
+  "kind": "opponent_left_book",
+  "playerColor": "b",
+  "history": [
+    "d2d4",
+    "g8f6",
+    "c2c4",
+    "g7g6",
+    "b1c3",
+    "f8g7",
+    "e2e4",
+    "d7d6",
+    "g1f3",
+    "e8g8",
+    "f1e2",
+    "e7e5",
+    "d4e5"
+  ],
+  "fen": "rnbq1rk1/ppp2pbp/3p1np1/4P3/2P1P3/2N2N2/PP2BPPP/R1BQK2R b KQ - 0 7",
+  "moment": {
+    "kind": "opponent_left_book",
+    "line": "KID Classical",
+    "expected": [
+      "O-O"
+    ],
+    "played": "dxe5"
+  },
+  "attemptFen": "rnbq1rk1/ppp2pbp/3p1np1/4P3/2P1P3/2N2N2/PP2BPPP/R1BQK2R b KQ - 0 7",
+  "engineBest": "d6e5",
+  "engineBestCp": -2,
+  "source": "KID: exchange 7.dxe5"
+}

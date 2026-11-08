@@ -99,6 +99,27 @@ function session(script: Parameters<typeof fakeClient>[0], extra: Partial<Parame
 
 const noop = () => {};
 
+describe("TutorSession.ask: malformed arrows (FR-11)", () => {
+  it("drops arrows that are not two different real squares and returns the reply, without a retry", async () => {
+    const arrows = [
+      { from: "d8", to: "d8" },
+      { from: "e2", to: "e9" },
+      { from: "d8", to: "b6" },
+      { from: "h7", to: "h7" },
+    ].slice(0, 3);
+    const { s, calls } = session([endTurnMsg({ ...SIMPLE_REPLY, arrows })]);
+    const out = await s.ask(KEY_REQUEST, noop);
+    expect(out).toMatchObject({ ok: true, reply: { ...SIMPLE_REPLY, arrows: [{ from: "d8", to: "b6" }] } });
+    expect(calls).toHaveLength(1);
+  });
+
+  it("keeps well-formed arrows untouched", async () => {
+    const { s } = session([endTurnMsg({ ...SIMPLE_REPLY, arrows: [{ from: "d8", to: "b6" }, { from: "b6", to: "b2" }] })]);
+    const out = await s.ask(KEY_REQUEST, noop);
+    expect(out.ok && out.reply.arrows).toEqual([{ from: "d8", to: "b6" }, { from: "b6", to: "b2" }]);
+  });
+});
+
 describe("TutorSession.ask: the tool loop", () => {
   it("key moment: tool_use (parallel) -> one tool_result turn -> end_turn gives a validated reply", async () => {
     const { s, calls } = session([keyMomentToolUse(), endTurnMsg(BLUNDER_REPLY)]);

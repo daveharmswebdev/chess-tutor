@@ -1,0 +1,27 @@
+{
+  "id": "mw-london-h6-e3",
+  "kind": "missed_win",
+  "playerColor": "w",
+  "history": [
+    "d2d4",
+    "d7d5",
+    "c1f4",
+    "g8f6",
+    "b1c3",
+    "e7e6",
+    "c3b5",
+    "h7h6",
+    "e2e3"
+  ],
+  "fen": "rnbqkb1r/ppp2pp1/4pn1p/1N1p4/3P1B2/4P3/PPP2PPP/R2QKBNR b KQkq - 0 5",
+  "moment": {
+    "kind": "missed_win",
+    "played": "e3",
+    "best": "Nxc7+",
+    "gainCp": 663
+  },
+  "attemptFen": "rnbqkb1r/ppp2pp1/4pn1p/1N1p4/3P1B2/8/PPP1PPPP/R2QKBNR w KQkq - 0 5",
+  "engineBest": "b5c7",
+  "engineBestCp": 686,
+  "source": "London: misses Nxc7+"
+}

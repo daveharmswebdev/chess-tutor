@@ -1,0 +1,25 @@
+{
+  "id": "pb-london-bg5",
+  "kind": "player_blunder",
+  "playerColor": "w",
+  "history": [
+    "d2d4",
+    "d7d5",
+    "c1f4",
+    "e7e6",
+    "e2e3",
+    "f8d6",
+    "f4g5"
+  ],
+  "fen": "rnbqk1nr/ppp2ppp/3bp3/3p2B1/3P4/4P3/PPP2PPP/RN1QKBNR b KQkq - 2 4",
+  "moment": {
+    "kind": "player_blunder",
+    "played": "Bg5",
+    "cpLoss": 788,
+    "best": "Bxd6"
+  },
+  "attemptFen": "rnbqk1nr/ppp2ppp/3bp3/3p4/3P1B2/4P3/PPP2PPP/RN1QKBNR w KQkq - 1 4",
+  "engineBest": "f4d6",
+  "engineBestCp": 12,
+  "source": "London: bishop dodges the trade to g5, where the d8 queen takes it"
+}

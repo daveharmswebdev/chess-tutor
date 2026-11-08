@@ -1,0 +1,22 @@
+{
+  "id": "hint-kid-vs-london",
+  "kind": "hint",
+  "playerColor": "b",
+  "history": [
+    "d2d4",
+    "g8f6",
+    "c1f4",
+    "g7g6",
+    "e2e3",
+    "f8g7",
+    "g1f3",
+    "d7d6",
+    "h2h3"
+  ],
+  "fen": "rnbqk2r/ppp1ppbp/3p1np1/8/3P1B2/4PN1P/PPP2PP1/RN1QKB1R b KQkq - 0 5",
+  "moment": null,
+  "attemptFen": "rnbqk2r/ppp1ppbp/3p1np1/8/3P1B2/4PN1P/PPP2PP1/RN1QKB1R b KQkq - 0 5",
+  "engineBest": "b8d7",
+  "engineBestCp": -6,
+  "source": "KID vs London: castle"
+}

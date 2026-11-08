@@ -1,0 +1,37 @@
+{
+  "id": "po-kid-nxe5",
+  "kind": "punish_opponent",
+  "playerColor": "b",
+  "history": [
+    "d2d4",
+    "g8f6",
+    "c1f4",
+    "g7g6",
+    "e2e3",
+    "f8g7",
+    "g1f3",
+    "e8g8",
+    "f1e2",
+    "d7d6",
+    "h2h3",
+    "b8d7",
+    "e1g1",
+    "d8e8",
+    "f4h2",
+    "e7e5",
+    "d4e5",
+    "d6e5",
+    "f3e5"
+  ],
+  "fen": "r1b1qrk1/pppn1pbp/5np1/4N3/8/4P2P/PPP1BPPB/RN1Q1RK1 b - - 0 10",
+  "moment": {
+    "kind": "punish_opponent",
+    "opponentMove": "Nxe5",
+    "refutation": "Nxe5",
+    "gainCp": 591
+  },
+  "attemptFen": "r1b1qrk1/pppn1pbp/5np1/4N3/8/4P2P/PPP1BPPB/RN1Q1RK1 b - - 0 10",
+  "engineBest": "d7e5",
+  "engineBestCp": 563,
+  "source": "KID vs London: White takes on e5 and loses a piece"
+}

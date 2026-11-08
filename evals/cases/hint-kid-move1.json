@@ -1,0 +1,14 @@
+{
+  "id": "hint-kid-move1",
+  "kind": "hint",
+  "playerColor": "b",
+  "history": [
+    "d2d4"
+  ],
+  "fen": "rnbqkbnr/pppppppp/8/8/3P4/8/PPP1PPPP/RNBQKBNR b KQkq - 0 1",
+  "moment": null,
+  "attemptFen": "rnbqkbnr/pppppppp/8/8/3P4/8/PPP1PPPP/RNBQKBNR b KQkq - 0 1",
+  "engineBest": "g8f6",
+  "engineBestCp": -25,
+  "source": "KID: first move"
+}

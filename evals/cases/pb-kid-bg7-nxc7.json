@@ -1,0 +1,26 @@
+{
+  "id": "pb-kid-bg7-nxc7",
+  "kind": "player_blunder",
+  "playerColor": "b",
+  "history": [
+    "d2d4",
+    "g8f6",
+    "c1f4",
+    "g7g6",
+    "b1c3",
+    "d7d5",
+    "c3b5",
+    "f8g7"
+  ],
+  "fen": "rnbqk2r/ppp1ppbp/5np1/1N1p4/3P1B2/8/PPP1PPPP/R2QKBNR w KQkq - 2 5",
+  "moment": {
+    "kind": "player_blunder",
+    "played": "Bg7",
+    "cpLoss": 681,
+    "best": "Na6"
+  },
+  "attemptFen": "rnbqkb1r/ppp1pp1p/5np1/1N1p4/3P1B2/8/PPP1PPPP/R2QKBNR b KQkq - 1 4",
+  "engineBest": "b8a6",
+  "engineBestCp": 0,
+  "source": "KID vs London: ignores Nb5 and the Nxc7+ fork"
+}

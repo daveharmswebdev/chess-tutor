@@ -1,0 +1,33 @@
+{
+  "id": "po-kid-g4",
+  "kind": "punish_opponent",
+  "playerColor": "b",
+  "history": [
+    "d2d4",
+    "g8f6",
+    "c2c4",
+    "g7g6",
+    "b1c3",
+    "f8g7",
+    "e2e4",
+    "d7d6",
+    "f1d3",
+    "e8g8",
+    "g1e2",
+    "e7e5",
+    "d4d5",
+    "f6h5",
+    "g2g4"
+  ],
+  "fen": "rnbq1rk1/ppp2pbp/3p2p1/3Pp2n/2P1P1P1/2NB4/PP2NP1P/R1BQK2R b KQ - 0 8",
+  "moment": {
+    "kind": "punish_opponent",
+    "opponentMove": "g4",
+    "refutation": "Bxg4",
+    "gainCp": 388
+  },
+  "attemptFen": "rnbq1rk1/ppp2pbp/3p2p1/3Pp2n/2P1P1P1/2NB4/PP2NP1P/R1BQK2R b KQ - 0 8",
+  "engineBest": "c8g4",
+  "engineBestCp": 326,
+  "source": "KID: g4 against the h5 knight weakens f4 and h4"
+}

@@ -1,0 +1,32 @@
+{
+  "id": "mw-kid-ne5-re8",
+  "kind": "missed_win",
+  "playerColor": "b",
+  "history": [
+    "d2d4",
+    "g8f6",
+    "c1f4",
+    "g7g6",
+    "e2e3",
+    "f8g7",
+    "g1f3",
+    "e8g8",
+    "f1e2",
+    "d7d6",
+    "e1g1",
+    "b8d7",
+    "f3e5",
+    "f8e8"
+  ],
+  "fen": "r1bqr1k1/pppnppbp/3p1np1/4N3/3P1B2/4P3/PPP1BPPP/RN1Q1RK1 w - - 4 8",
+  "moment": {
+    "kind": "missed_win",
+    "played": "Re8",
+    "best": "dxe5",
+    "gainCp": 528
+  },
+  "attemptFen": "r1bq1rk1/pppnppbp/3p1np1/4N3/3P1B2/4P3/PPP1BPPP/RN1Q1RK1 b - - 3 7",
+  "engineBest": "d6e5",
+  "engineBestCp": 533,
+  "source": "KID vs London: misses ...dxe5"
+}

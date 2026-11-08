@@ -1,0 +1,1459 @@
+[
+  {
+    "id": "pb-london-qh5",
+    "kind": "player_blunder",
+    "playerColor": "w",
+    "san": [
+      "d4",
+      "d5",
+      "Bf4",
+      "Nf6",
+      "e3",
+      "e6",
+      "Qh5"
+    ],
+    "source": "London: early queen sortie to h5, covered by the f6 knight"
+  },
+  {
+    "id": "pb-london-bg5",
+    "kind": "player_blunder",
+    "playerColor": "w",
+    "san": [
+      "d4",
+      "d5",
+      "Bf4",
+      "e6",
+      "e3",
+      "Bd6",
+      "Bg5"
+    ],
+    "source": "London: bishop dodges the trade to g5, where the d8 queen takes it"
+  },
+  {
+    "id": "pb-london-e4-fork",
+    "kind": "player_blunder",
+    "playerColor": "w",
+    "san": [
+      "d4",
+      "d5",
+      "Bf4",
+      "Nf6",
+      "e3",
+      "e6",
+      "Nf3",
+      "c5",
+      "c3",
+      "Nc6",
+      "Bd3",
+      "Bd6",
+      "Bxd6",
+      "Qxd6",
+      "e4"
+    ],
+    "source": "London: e4 push allows ...dxe4 forking bishop and knight"
+  },
+  {
+    "id": "pb-london-be5",
+    "kind": "player_blunder",
+    "playerColor": "w",
+    "san": [
+      "d4",
+      "Nf6",
+      "Bf4",
+      "g6",
+      "e3",
+      "Bg7",
+      "Nf3",
+      "O-O",
+      "Be2",
+      "d6",
+      "h3",
+      "Nh5",
+      "Be5"
+    ],
+    "source": "London vs KID setup: bishop runs to e5 where the d6 pawn takes it"
+  },
+  {
+    "id": "pb-london-qf3-nxc2",
+    "kind": "player_blunder",
+    "playerColor": "w",
+    "san": [
+      "d4",
+      "d5",
+      "Bf4",
+      "Nc6",
+      "e3",
+      "Nb4",
+      "Qf3"
+    ],
+    "source": "London: queen leaves c2, so ...Nxc2+ forks king and rook"
+  },
+  {
+    "id": "pb-london-nf3-b2",
+    "kind": "player_blunder",
+    "playerColor": "w",
+    "san": [
+      "d4",
+      "d5",
+      "Bf4",
+      "Nf6",
+      "e3",
+      "c5",
+      "c3",
+      "Qb6",
+      "Nf3"
+    ],
+    "source": "London: ignores the b2 pawn after ...Qb6"
+  },
+  {
+    "id": "pb-london-qxb7",
+    "kind": "player_blunder",
+    "playerColor": "w",
+    "san": [
+      "d4",
+      "d5",
+      "Bf4",
+      "Nf6",
+      "e3",
+      "Bf5",
+      "c4",
+      "e6",
+      "Qb3",
+      "Nc6",
+      "Qxb7"
+    ],
+    "source": "London: greedy Qxb7 lets ...Nb4 trap ideas in"
+  },
+  {
+    "id": "pb-london-nf3-qf6",
+    "kind": "player_blunder",
+    "playerColor": "w",
+    "san": [
+      "d4",
+      "e6",
+      "Bf4",
+      "Qf6",
+      "Nf3"
+    ],
+    "source": "London: leaves the f4 bishop to the f6 queen"
+  },
+  {
+    "id": "pb-kid-ng4",
+    "kind": "player_blunder",
+    "playerColor": "b",
+    "san": [
+      "d4",
+      "Nf6",
+      "c4",
+      "g6",
+      "Nc3",
+      "Bg7",
+      "e4",
+      "Ng4"
+    ],
+    "source": "KID: knight to g4 hangs to the d1 queen"
+  },
+  {
+    "id": "pb-kid-nxe4",
+    "kind": "player_blunder",
+    "playerColor": "b",
+    "san": [
+      "d4",
+      "Nf6",
+      "c4",
+      "g6",
+      "Nc3",
+      "Bg7",
+      "e4",
+      "d6",
+      "Nf3",
+      "O-O",
+      "Be2",
+      "e5",
+      "O-O",
+      "Nxe4"
+    ],
+    "source": "KID: fork trick that does not work, Nc3 takes back"
+  },
+  {
+    "id": "pb-kid-bg7-nxc7",
+    "kind": "player_blunder",
+    "playerColor": "b",
+    "san": [
+      "d4",
+      "Nf6",
+      "Bf4",
+      "g6",
+      "Nc3",
+      "d5",
+      "Nb5",
+      "Bg7"
+    ],
+    "source": "KID vs London: ignores Nb5 and the Nxc7+ fork"
+  },
+  {
+    "id": "pb-kid-o-o-nxc7",
+    "kind": "player_blunder",
+    "playerColor": "b",
+    "san": [
+      "d4",
+      "Nf6",
+      "Bf4",
+      "g6",
+      "Nc3",
+      "Bg7",
+      "Nb5",
+      "O-O"
+    ],
+    "source": "KID vs London: castles into Nxc7"
+  },
+  {
+    "id": "pb-kid-nd7-bxf7",
+    "kind": "player_blunder",
+    "playerColor": "b",
+    "san": [
+      "e4",
+      "g6",
+      "d4",
+      "Bg7",
+      "Nf3",
+      "d6",
+      "Bc4",
+      "Nd7"
+    ],
+    "source": "Modern: ...Nd7 allows Bxf7+ and Ng5-e6 trapping the queen"
+  },
+  {
+    "id": "pb-kid-nh5",
+    "kind": "player_blunder",
+    "playerColor": "b",
+    "san": [
+      "d4",
+      "Nf6",
+      "c4",
+      "g6",
+      "Nc3",
+      "Bg7",
+      "e4",
+      "O-O",
+      "e5",
+      "Nh5"
+    ],
+    "source": "KID: knight to the rim after e5, g4 traps it"
+  },
+  {
+    "id": "pb-kid-nxe4-early",
+    "kind": "player_blunder",
+    "playerColor": "b",
+    "san": [
+      "d4",
+      "Nf6",
+      "c4",
+      "g6",
+      "Nc3",
+      "Bg7",
+      "e4",
+      "Nxe4"
+    ],
+    "source": "KID: grabs e4, Nc3 takes back"
+  },
+  {
+    "id": "po-london-qd6",
+    "kind": "punish_opponent",
+    "playerColor": "w",
+    "san": [
+      "d4",
+      "d5",
+      "Bf4",
+      "Nf6",
+      "e3",
+      "Qd6"
+    ],
+    "source": "London: Black's queen walks into the f4 bishop"
+  },
+  {
+    "id": "po-london-ng4",
+    "kind": "punish_opponent",
+    "playerColor": "w",
+    "san": [
+      "d4",
+      "d5",
+      "Bf4",
+      "e6",
+      "e3",
+      "Nf6",
+      "Bd3",
+      "Ng4"
+    ],
+    "source": "London: Black's knight to g4 hangs to Qxg4"
+  },
+  {
+    "id": "po-london-h6-nxc7",
+    "kind": "punish_opponent",
+    "playerColor": "w",
+    "san": [
+      "d4",
+      "d5",
+      "Bf4",
+      "Nf6",
+      "Nc3",
+      "e6",
+      "Nb5",
+      "h6"
+    ],
+    "source": "Jobava/London: Black ignores Nxc7+"
+  },
+  {
+    "id": "po-london-qxb2",
+    "kind": "punish_opponent",
+    "playerColor": "w",
+    "san": [
+      "d4",
+      "d5",
+      "Bf4",
+      "c5",
+      "e3",
+      "Qb6",
+      "Nc3",
+      "Qxb2"
+    ],
+    "source": "London: ...Qxb2 lets Nb5 hit c7"
+  },
+  {
+    "id": "po-london-e5",
+    "kind": "punish_opponent",
+    "playerColor": "w",
+    "san": [
+      "d4",
+      "d5",
+      "Bf4",
+      "Nc6",
+      "e3",
+      "e5"
+    ],
+    "source": "London: Black pushes ...e5 into the bishop"
+  },
+  {
+    "id": "po-london-qxb2-trap",
+    "kind": "punish_opponent",
+    "playerColor": "w",
+    "san": [
+      "d4",
+      "d5",
+      "Bf4",
+      "Nf6",
+      "e3",
+      "e6",
+      "Nf3",
+      "Bd6",
+      "Bxd6",
+      "Qxd6",
+      "Nbd2",
+      "Qb4",
+      "c3",
+      "Qxb2"
+    ],
+    "source": "London: queen grabs b2"
+  },
+  {
+    "id": "po-london-bg6-trap",
+    "kind": "punish_opponent",
+    "playerColor": "w",
+    "san": [
+      "d4",
+      "d5",
+      "Bf4",
+      "Bg4",
+      "f3",
+      "Bh5",
+      "g4",
+      "Bg6",
+      "h4",
+      "e6"
+    ],
+    "source": "London: Black ignores h4-h5 trapping the g6 bishop"
+  },
+  {
+    "id": "po-london-nb4",
+    "kind": "punish_opponent",
+    "playerColor": "w",
+    "san": [
+      "d4",
+      "d5",
+      "Bf4",
+      "Nf6",
+      "e3",
+      "Bf5",
+      "Bd3",
+      "Bxd3",
+      "Qxd3",
+      "Nc6",
+      "Nf3",
+      "Nb4"
+    ],
+    "source": "London: ...Nb4 hits the queen but Qb5+ picks the knight up"
+  },
+  {
+    "id": "po-kid-ne5",
+    "kind": "punish_opponent",
+    "playerColor": "b",
+    "san": [
+      "d4",
+      "Nf6",
+      "Bf4",
+      "g6",
+      "e3",
+      "Bg7",
+      "Nf3",
+      "O-O",
+      "Be2",
+      "d6",
+      "O-O",
+      "Nbd7",
+      "Ne5"
+    ],
+    "source": "KID vs London: White's knight jumps to e5, ...dxe5 wins it"
+  },
+  {
+    "id": "po-kid-nxe5",
+    "kind": "punish_opponent",
+    "playerColor": "b",
+    "san": [
+      "d4",
+      "Nf6",
+      "Bf4",
+      "g6",
+      "e3",
+      "Bg7",
+      "Nf3",
+      "O-O",
+      "Be2",
+      "d6",
+      "h3",
+      "Nbd7",
+      "O-O",
+      "Qe8",
+      "Bh2",
+      "e5",
+      "dxe5",
+      "dxe5",
+      "Nxe5"
+    ],
+    "source": "KID vs London: White takes on e5 and loses a piece"
+  },
+  {
+    "id": "po-kid-nxe5-endgame",
+    "kind": "punish_opponent",
+    "playerColor": "b",
+    "san": [
+      "d4",
+      "Nf6",
+      "c4",
+      "g6",
+      "Nc3",
+      "Bg7",
+      "e4",
+      "d6",
+      "Nf3",
+      "O-O",
+      "Be2",
+      "e5",
+      "dxe5",
+      "dxe5",
+      "Qxd8",
+      "Rxd8",
+      "Nxe5"
+    ],
+    "source": "KID exchange: Nxe5 runs into ...Nxe4"
+  },
+  {
+    "id": "po-kid-e5-push",
+    "kind": "punish_opponent",
+    "playerColor": "b",
+    "san": [
+      "d4",
+      "Nf6",
+      "c4",
+      "g6",
+      "Nc3",
+      "Bg7",
+      "e4",
+      "d6",
+      "e5"
+    ],
+    "source": "KID: premature e5 push"
+  },
+  {
+    "id": "po-kid-nxe5-bd3",
+    "kind": "punish_opponent",
+    "playerColor": "b",
+    "san": [
+      "d4",
+      "Nf6",
+      "Bf4",
+      "g6",
+      "e3",
+      "Bg7",
+      "Bd3",
+      "d6",
+      "Nf3",
+      "O-O",
+      "O-O",
+      "Nc6",
+      "c3",
+      "e5",
+      "dxe5",
+      "dxe5",
+      "Nxe5"
+    ],
+    "source": "KID vs London: Nxe5 drops material"
+  },
+  {
+    "id": "po-kid-g4",
+    "kind": "punish_opponent",
+    "playerColor": "b",
+    "san": [
+      "d4",
+      "Nf6",
+      "c4",
+      "g6",
+      "Nc3",
+      "Bg7",
+      "e4",
+      "d6",
+      "Bd3",
+      "O-O",
+      "Nge2",
+      "e5",
+      "d5",
+      "Nh5",
+      "g4"
+    ],
+    "source": "KID: g4 against the h5 knight weakens f4 and h4"
+  },
+  {
+    "id": "po-kid-bxc7",
+    "kind": "punish_opponent",
+    "playerColor": "b",
+    "san": [
+      "d4",
+      "Nf6",
+      "Bf4",
+      "g6",
+      "Nc3",
+      "d5",
+      "e3",
+      "Bg7",
+      "Nb5",
+      "Na6",
+      "Bxc7"
+    ],
+    "source": "KID vs London: Bxc7 loses a piece to ...Nxc7"
+  },
+  {
+    "id": "mw-london-qd6-nf3",
+    "kind": "missed_win",
+    "playerColor": "w",
+    "san": [
+      "d4",
+      "d5",
+      "Bf4",
+      "Nf6",
+      "e3",
+      "Qd6",
+      "Nf3"
+    ],
+    "source": "London: misses Bxd6 winning the queen"
+  },
+  {
+    "id": "mw-london-qd6-nc3",
+    "kind": "missed_win",
+    "playerColor": "w",
+    "san": [
+      "d4",
+      "d5",
+      "Bf4",
+      "Nf6",
+      "e3",
+      "Qd6",
+      "Nc3"
+    ],
+    "source": "London: misses Bxd6 winning the queen"
+  },
+  {
+    "id": "mw-london-ng4-nf3",
+    "kind": "missed_win",
+    "playerColor": "w",
+    "san": [
+      "d4",
+      "d5",
+      "Bf4",
+      "e6",
+      "e3",
+      "Nf6",
+      "Bd3",
+      "Ng4",
+      "Nf3"
+    ],
+    "source": "London: misses Qxg4"
+  },
+  {
+    "id": "mw-london-ng4-h3",
+    "kind": "missed_win",
+    "playerColor": "w",
+    "san": [
+      "d4",
+      "d5",
+      "Bf4",
+      "e6",
+      "e3",
+      "Nf6",
+      "Bd3",
+      "Ng4",
+      "h3"
+    ],
+    "source": "London: kicks the knight instead of Qxg4"
+  },
+  {
+    "id": "mw-london-h6-e3",
+    "kind": "missed_win",
+    "playerColor": "w",
+    "san": [
+      "d4",
+      "d5",
+      "Bf4",
+      "Nf6",
+      "Nc3",
+      "e6",
+      "Nb5",
+      "h6",
+      "e3"
+    ],
+    "source": "London: misses Nxc7+"
+  },
+  {
+    "id": "mw-london-qxb2-nf3",
+    "kind": "missed_win",
+    "playerColor": "w",
+    "san": [
+      "d4",
+      "d5",
+      "Bf4",
+      "c5",
+      "e3",
+      "Qb6",
+      "Nc3",
+      "Qxb2",
+      "Nf3"
+    ],
+    "source": "London: misses Nb5 after ...Qxb2"
+  },
+  {
+    "id": "mw-london-bg6-nc3",
+    "kind": "missed_win",
+    "playerColor": "w",
+    "san": [
+      "d4",
+      "d5",
+      "Bf4",
+      "Bg4",
+      "f3",
+      "Bh5",
+      "g4",
+      "Bg6",
+      "h4",
+      "e6",
+      "Nc3"
+    ],
+    "source": "London: misses h5 trapping the bishop"
+  },
+  {
+    "id": "mw-london-nb4-qe2",
+    "kind": "missed_win",
+    "playerColor": "w",
+    "san": [
+      "d4",
+      "d5",
+      "Bf4",
+      "Nf6",
+      "e3",
+      "Bf5",
+      "Bd3",
+      "Bxd3",
+      "Qxd3",
+      "Nc6",
+      "Nf3",
+      "Nb4",
+      "Qe2"
+    ],
+    "source": "London: misses Qb5+ picking up the knight"
+  },
+  {
+    "id": "mw-london-qd6-bd3",
+    "kind": "missed_win",
+    "playerColor": "w",
+    "san": [
+      "d4",
+      "d5",
+      "Bf4",
+      "Nf6",
+      "e3",
+      "Qd6",
+      "Bd3"
+    ],
+    "source": "London: develops instead of Bxd6"
+  },
+  {
+    "id": "mw-london-h6-nf3",
+    "kind": "missed_win",
+    "playerColor": "w",
+    "san": [
+      "d4",
+      "d5",
+      "Bf4",
+      "Nf6",
+      "Nc3",
+      "e6",
+      "Nb5",
+      "h6",
+      "Nf3"
+    ],
+    "source": "London: misses Nxc7+"
+  },
+  {
+    "id": "mw-london-h6-a3",
+    "kind": "missed_win",
+    "playerColor": "w",
+    "san": [
+      "d4",
+      "d5",
+      "Bf4",
+      "Nf6",
+      "Nc3",
+      "e6",
+      "Nb5",
+      "h6",
+      "a3"
+    ],
+    "source": "London: misses Nxc7+"
+  },
+  {
+    "id": "mw-london-nb4-qd1",
+    "kind": "missed_win",
+    "playerColor": "w",
+    "san": [
+      "d4",
+      "d5",
+      "Bf4",
+      "Nf6",
+      "e3",
+      "Bf5",
+      "Bd3",
+      "Bxd3",
+      "Qxd3",
+      "Nc6",
+      "Nf3",
+      "Nb4",
+      "Qd1"
+    ],
+    "source": "London: retreats instead of Qb5+"
+  },
+  {
+    "id": "mw-london-nb4-qd2",
+    "kind": "missed_win",
+    "playerColor": "w",
+    "san": [
+      "d4",
+      "d5",
+      "Bf4",
+      "Nf6",
+      "e3",
+      "Bf5",
+      "Bd3",
+      "Bxd3",
+      "Qxd3",
+      "Nc6",
+      "Nf3",
+      "Nb4",
+      "Qd2"
+    ],
+    "source": "London: retreats instead of Qb5+"
+  },
+  {
+    "id": "mw-kid-ne5-re8",
+    "kind": "missed_win",
+    "playerColor": "b",
+    "san": [
+      "d4",
+      "Nf6",
+      "Bf4",
+      "g6",
+      "e3",
+      "Bg7",
+      "Nf3",
+      "O-O",
+      "Be2",
+      "d6",
+      "O-O",
+      "Nbd7",
+      "Ne5",
+      "Re8"
+    ],
+    "source": "KID vs London: misses ...dxe5"
+  },
+  {
+    "id": "mw-kid-ne5-a6",
+    "kind": "missed_win",
+    "playerColor": "b",
+    "san": [
+      "d4",
+      "Nf6",
+      "Bf4",
+      "g6",
+      "e3",
+      "Bg7",
+      "Nf3",
+      "O-O",
+      "Be2",
+      "d6",
+      "O-O",
+      "Nbd7",
+      "Ne5",
+      "a6"
+    ],
+    "source": "KID vs London: misses ...dxe5"
+  },
+  {
+    "id": "mw-kid-ne5-e6",
+    "kind": "missed_win",
+    "playerColor": "b",
+    "san": [
+      "d4",
+      "Nf6",
+      "Bf4",
+      "g6",
+      "e3",
+      "Bg7",
+      "Nf3",
+      "O-O",
+      "Be2",
+      "d6",
+      "O-O",
+      "Nbd7",
+      "Ne5",
+      "e6"
+    ],
+    "source": "KID vs London: misses ...dxe5"
+  },
+  {
+    "id": "mw-kid-ne5-c6",
+    "kind": "missed_win",
+    "playerColor": "b",
+    "san": [
+      "d4",
+      "Nf6",
+      "Bf4",
+      "g6",
+      "e3",
+      "Bg7",
+      "Nf3",
+      "O-O",
+      "Be2",
+      "d6",
+      "O-O",
+      "Nbd7",
+      "Ne5",
+      "c6"
+    ],
+    "source": "KID vs London: misses ...dxe5"
+  },
+  {
+    "id": "mw-kid-ne5-c5",
+    "kind": "missed_win",
+    "playerColor": "b",
+    "san": [
+      "d4",
+      "Nf6",
+      "Bf4",
+      "g6",
+      "e3",
+      "Bg7",
+      "Nf3",
+      "O-O",
+      "Be2",
+      "d6",
+      "O-O",
+      "Nbd7",
+      "Ne5",
+      "c5"
+    ],
+    "source": "KID vs London: misses ...dxe5"
+  },
+  {
+    "id": "mw-kid-ne5-b6",
+    "kind": "missed_win",
+    "playerColor": "b",
+    "san": [
+      "d4",
+      "Nf6",
+      "Bf4",
+      "g6",
+      "e3",
+      "Bg7",
+      "Nf3",
+      "O-O",
+      "Be2",
+      "d6",
+      "O-O",
+      "Nbd7",
+      "Ne5",
+      "b6"
+    ],
+    "source": "KID vs London: misses ...dxe5"
+  },
+  {
+    "id": "mw-kid-e5-nfd7",
+    "kind": "missed_win",
+    "playerColor": "b",
+    "san": [
+      "d4",
+      "Nf6",
+      "c4",
+      "g6",
+      "Nc3",
+      "Bg7",
+      "e4",
+      "d6",
+      "e5",
+      "Nfd7"
+    ],
+    "source": "KID: retreats instead of punishing e5"
+  },
+  {
+    "id": "mw-kid-nxe5-re8",
+    "kind": "missed_win",
+    "playerColor": "b",
+    "san": [
+      "d4",
+      "Nf6",
+      "c4",
+      "g6",
+      "Nc3",
+      "Bg7",
+      "e4",
+      "d6",
+      "Nf3",
+      "O-O",
+      "Be2",
+      "e5",
+      "dxe5",
+      "dxe5",
+      "Qxd8",
+      "Rxd8",
+      "Nxe5",
+      "Re8"
+    ],
+    "source": "KID exchange: misses ...Nxe4"
+  },
+  {
+    "id": "mw-kid-nxe5-c6",
+    "kind": "missed_win",
+    "playerColor": "b",
+    "san": [
+      "d4",
+      "Nf6",
+      "Bf4",
+      "g6",
+      "e3",
+      "Bg7",
+      "Nf3",
+      "O-O",
+      "Be2",
+      "d6",
+      "h3",
+      "Nbd7",
+      "O-O",
+      "Qe8",
+      "Bh2",
+      "e5",
+      "dxe5",
+      "dxe5",
+      "Nxe5",
+      "c6"
+    ],
+    "source": "KID vs London: misses ...Nxe5"
+  },
+  {
+    "id": "mw-kid-g4-nf6",
+    "kind": "missed_win",
+    "playerColor": "b",
+    "san": [
+      "d4",
+      "Nf6",
+      "c4",
+      "g6",
+      "Nc3",
+      "Bg7",
+      "e4",
+      "d6",
+      "Bd3",
+      "O-O",
+      "Nge2",
+      "e5",
+      "d5",
+      "Nh5",
+      "g4",
+      "Nf6"
+    ],
+    "source": "KID: retreats instead of ...Qh4 / ...Nf4 after g4"
+  },
+  {
+    "id": "mw-kid-bxc7-qd7",
+    "kind": "missed_win",
+    "playerColor": "b",
+    "san": [
+      "d4",
+      "Nf6",
+      "Bf4",
+      "g6",
+      "Nc3",
+      "d5",
+      "e3",
+      "Bg7",
+      "Nb5",
+      "Na6",
+      "Bxc7",
+      "Qd7"
+    ],
+    "source": "KID vs London: misses ...Nxc7"
+  },
+  {
+    "id": "lb-london-dutch",
+    "kind": "opponent_left_book",
+    "playerColor": "w",
+    "san": [
+      "d4",
+      "f5"
+    ],
+    "source": "London: 1...f5 Dutch"
+  },
+  {
+    "id": "lb-london-e6",
+    "kind": "opponent_left_book",
+    "playerColor": "w",
+    "san": [
+      "d4",
+      "e6"
+    ],
+    "source": "London: 1...e6"
+  },
+  {
+    "id": "lb-london-c5",
+    "kind": "opponent_left_book",
+    "playerColor": "w",
+    "san": [
+      "d4",
+      "c5"
+    ],
+    "source": "London: 1...c5 Benoni-style"
+  },
+  {
+    "id": "lb-london-bf5",
+    "kind": "opponent_left_book",
+    "playerColor": "w",
+    "san": [
+      "d4",
+      "d5",
+      "Bf4",
+      "Bf5"
+    ],
+    "source": "London: symmetrical 2...Bf5"
+  },
+  {
+    "id": "lb-london-nc6",
+    "kind": "opponent_left_book",
+    "playerColor": "w",
+    "san": [
+      "d4",
+      "d5",
+      "Bf4",
+      "Nc6"
+    ],
+    "source": "London: 2...Nc6"
+  },
+  {
+    "id": "lb-london-c5-move3",
+    "kind": "opponent_left_book",
+    "playerColor": "w",
+    "san": [
+      "d4",
+      "d5",
+      "Bf4",
+      "Nf6",
+      "e3",
+      "c5"
+    ],
+    "source": "London: 3...c5 instead of 3...e6"
+  },
+  {
+    "id": "lb-london-d5-move2",
+    "kind": "opponent_left_book",
+    "playerColor": "w",
+    "san": [
+      "d4",
+      "Nf6",
+      "Bf4",
+      "d5"
+    ],
+    "source": "London: 2...d5 after 1...Nf6"
+  },
+  {
+    "id": "lb-london-d6",
+    "kind": "opponent_left_book",
+    "playerColor": "w",
+    "san": [
+      "d4",
+      "Nf6",
+      "Bf4",
+      "g6",
+      "e3",
+      "d6"
+    ],
+    "source": "London vs g6: 3...d6 before ...Bg7"
+  },
+  {
+    "id": "lb-london-qb6",
+    "kind": "opponent_left_book",
+    "playerColor": "w",
+    "san": [
+      "d4",
+      "d5",
+      "Bf4",
+      "c5",
+      "e3",
+      "Qb6"
+    ],
+    "source": "London vs c5: 3...Qb6 hitting b2"
+  },
+  {
+    "id": "lb-kid-e4",
+    "kind": "opponent_left_book",
+    "playerColor": "b",
+    "san": [
+      "e4"
+    ],
+    "source": "KID player: 1.e4"
+  },
+  {
+    "id": "lb-kid-c4",
+    "kind": "opponent_left_book",
+    "playerColor": "b",
+    "san": [
+      "c4"
+    ],
+    "source": "KID player: 1.c4 English"
+  },
+  {
+    "id": "lb-kid-nf3",
+    "kind": "opponent_left_book",
+    "playerColor": "b",
+    "san": [
+      "Nf3"
+    ],
+    "source": "KID player: 1.Nf3"
+  },
+  {
+    "id": "lb-kid-trompowsky",
+    "kind": "opponent_left_book",
+    "playerColor": "b",
+    "san": [
+      "d4",
+      "Nf6",
+      "Bg5"
+    ],
+    "source": "KID: 2.Bg5 Trompowsky"
+  },
+  {
+    "id": "lb-kid-nf3-move2",
+    "kind": "opponent_left_book",
+    "playerColor": "b",
+    "san": [
+      "d4",
+      "Nf6",
+      "Nf3"
+    ],
+    "source": "KID: 2.Nf3"
+  },
+  {
+    "id": "lb-kid-saemisch",
+    "kind": "opponent_left_book",
+    "playerColor": "b",
+    "san": [
+      "d4",
+      "Nf6",
+      "c4",
+      "g6",
+      "Nc3",
+      "Bg7",
+      "e4",
+      "d6",
+      "f3"
+    ],
+    "source": "KID: Saemisch 5.f3"
+  },
+  {
+    "id": "lb-kid-four-pawns",
+    "kind": "opponent_left_book",
+    "playerColor": "b",
+    "san": [
+      "d4",
+      "Nf6",
+      "c4",
+      "g6",
+      "Nc3",
+      "Bg7",
+      "e4",
+      "d6",
+      "f4"
+    ],
+    "source": "KID: Four Pawns 5.f4"
+  },
+  {
+    "id": "lb-kid-petrosian",
+    "kind": "opponent_left_book",
+    "playerColor": "b",
+    "san": [
+      "d4",
+      "Nf6",
+      "c4",
+      "g6",
+      "Nc3",
+      "Bg7",
+      "e4",
+      "d6",
+      "Nf3",
+      "O-O",
+      "Be2",
+      "e5",
+      "d5"
+    ],
+    "source": "KID: Petrosian 7.d5"
+  },
+  {
+    "id": "lb-kid-exchange",
+    "kind": "opponent_left_book",
+    "playerColor": "b",
+    "san": [
+      "d4",
+      "Nf6",
+      "c4",
+      "g6",
+      "Nc3",
+      "Bg7",
+      "e4",
+      "d6",
+      "Nf3",
+      "O-O",
+      "Be2",
+      "e5",
+      "dxe5"
+    ],
+    "source": "KID: exchange 7.dxe5"
+  },
+  {
+    "id": "lb-kid-london-nc3",
+    "kind": "opponent_left_book",
+    "playerColor": "b",
+    "san": [
+      "d4",
+      "Nf6",
+      "Bf4",
+      "g6",
+      "Nc3"
+    ],
+    "source": "KID vs London: 3.Nc3 instead of 3.e3"
+  },
+  {
+    "id": "hint-london-bd3",
+    "kind": "hint",
+    "playerColor": "w",
+    "san": [
+      "d4",
+      "d5",
+      "Bf4",
+      "Nf6",
+      "e3",
+      "e6",
+      "Nf3",
+      "c5",
+      "c3",
+      "Nc6",
+      "Nbd2",
+      "Bd6",
+      "Bg3",
+      "O-O"
+    ],
+    "source": "London middlegame, Bd3 next"
+  },
+  {
+    "id": "hint-london-move2",
+    "kind": "hint",
+    "playerColor": "w",
+    "san": [
+      "d4",
+      "d5"
+    ],
+    "source": "London: second move"
+  },
+  {
+    "id": "hint-london-vs-g6",
+    "kind": "hint",
+    "playerColor": "w",
+    "san": [
+      "d4",
+      "Nf6",
+      "Bf4",
+      "g6",
+      "e3",
+      "Bg7",
+      "Nf3",
+      "d6"
+    ],
+    "source": "London vs KID setup"
+  },
+  {
+    "id": "hint-london-tactic-qd6",
+    "kind": "hint",
+    "playerColor": "w",
+    "san": [
+      "d4",
+      "d5",
+      "Bf4",
+      "Nf6",
+      "e3",
+      "Qd6"
+    ],
+    "source": "London: the queen on d6 can be taken"
+  },
+  {
+    "id": "hint-london-c5",
+    "kind": "hint",
+    "playerColor": "w",
+    "san": [
+      "d4",
+      "d5",
+      "Bf4",
+      "c5",
+      "e3",
+      "Nc6"
+    ],
+    "source": "London vs c5"
+  },
+  {
+    "id": "hint-london-ne5",
+    "kind": "hint",
+    "playerColor": "w",
+    "san": [
+      "d4",
+      "d5",
+      "Bf4",
+      "Nf6",
+      "e3",
+      "e6",
+      "Nf3",
+      "c5",
+      "c3",
+      "Nc6",
+      "Nbd2",
+      "Bd6",
+      "Bg3",
+      "O-O",
+      "Bd3",
+      "b6"
+    ],
+    "source": "London: end of line, Ne5"
+  },
+  {
+    "id": "hint-kid-move1",
+    "kind": "hint",
+    "playerColor": "b",
+    "san": [
+      "d4"
+    ],
+    "source": "KID: first move"
+  },
+  {
+    "id": "hint-kid-castle",
+    "kind": "hint",
+    "playerColor": "b",
+    "san": [
+      "d4",
+      "Nf6",
+      "c4",
+      "g6",
+      "Nc3",
+      "Bg7",
+      "e4",
+      "d6",
+      "Nf3"
+    ],
+    "source": "KID: time to castle"
+  },
+  {
+    "id": "hint-kid-e5",
+    "kind": "hint",
+    "playerColor": "b",
+    "san": [
+      "d4",
+      "Nf6",
+      "c4",
+      "g6",
+      "Nc3",
+      "Bg7",
+      "e4",
+      "d6",
+      "Nf3",
+      "O-O",
+      "Be2"
+    ],
+    "source": "KID: the ...e5 break"
+  },
+  {
+    "id": "hint-kid-tactic-ne5",
+    "kind": "hint",
+    "playerColor": "b",
+    "san": [
+      "d4",
+      "Nf6",
+      "Bf4",
+      "g6",
+      "e3",
+      "Bg7",
+      "Nf3",
+      "O-O",
+      "Be2",
+      "d6",
+      "O-O",
+      "Nbd7",
+      "Ne5"
+    ],
+    "source": "KID vs London: the e5 knight can be taken"
+  },
+  {
+    "id": "hint-kid-vs-london",
+    "kind": "hint",
+    "playerColor": "b",
+    "san": [
+      "d4",
+      "Nf6",
+      "Bf4",
+      "g6",
+      "e3",
+      "Bg7",
+      "Nf3",
+      "d6",
+      "h3"
+    ],
+    "source": "KID vs London: castle"
+  }
+]
