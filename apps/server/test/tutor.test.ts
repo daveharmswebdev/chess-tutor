@@ -6,9 +6,12 @@ import type { GameManager } from "../src/games.ts";
 import { NO_KEY_REASON } from "../src/tutor-setup.ts";
 import { createSqliteGameStore, type GameStore } from "../src/store.ts";
 import {
+  botOnEngine,
   createFakeAnalyzer,
   createFakeBot,
+  createFakeEngine,
   createFakeTutor,
+  SESSION_FIRST_LABEL,
   eventCollector,
   failOutcome,
   fenAfter,
@@ -108,7 +111,7 @@ describe("key moments (FR-6, FR-7)", () => {
       attemptFen: START,
       history: ["e2e4"],
     });
-    expect(tutor.sessions).toEqual([{ id, playerColor: "w" }]);
+    expect(tutor.sessions).toEqual([{ id, playerColor: "w", engine: expect.any(Object) }]);
   });
 
   it("the bot's mistake: exactly one ask (punish_opponent), attemptFen after the bot's move", async () => {
@@ -164,18 +167,19 @@ describe("key moments (FR-6, FR-7)", () => {
 
   it("the bot replies while the tutor is still working (NFR-3: the game never waits)", async () => {
     setup();
-    analyzer.set(fenAfter(["e2e4", "e7e5"]), 300); // the bot's e5 is a mistake: punish_opponent
+    scriptPlayerBlunder();
     const { id, events } = await newGame();
     await play(id, "e2e4");
     await tutor.ask(0); // held: never resolved
     expect(games.view(id)!.tutor.thinking).toBe(true);
-    // The player moves while the tutor is still working; the bot answers as usual.
-    const res = await post(`/api/games/${id}/moves`, { uci: "g1f3" });
+    // Take back and try another move while the tutor is still working (attemptFen START stays
+    // one takeback away, so the ask survives); the bot answers as usual.
+    expect((await post(`/api/games/${id}/takeback`)).status).toBe(200);
+    const res = await post(`/api/games/${id}/moves`, { uci: "d2d4" });
     expect(res.status).toBe(200);
     const botMove = await events.next("bot_move", 1);
-    expect(botMove).toMatchObject({ move: { uci: "b8c6" }, game: { tutor: { thinking: true } } });
+    expect(botMove).toMatchObject({ game: { tutor: { thinking: true } } });
     expect(tutorTypes(events.events)).not.toContain("tutor_reply");
-    await play(id, "f1c4");
   });
 
   it("the shared engine serves the bot first: no analysis starts until the bot's search has settled (NFR-3)", async () => {
@@ -245,17 +249,17 @@ describe("key moments (FR-6, FR-7)", () => {
     });
   }
 
-  it("a new key moment replaces an open ask: the old one is aborted and its late reply dropped", async () => {
+  it("a new key moment replaces an ask the player has moved past: the old one is aborted, its late reply dropped", async () => {
     setup();
-    analyzer.set(START, 0, "d2d4");
-    analyzer.set(fenAfter(["e2e4"]), -300); // player's blunder
-    analyzer.set(fenAfter(["e2e4", "e7e5"]), 300); // the bot blunders back
+    analyzer.set(fenAfter(["e2e4", "e7e5"]), 300, "d1h5"); // the bot's e5: punish_opponent
+    analyzer.set(fenAfter(["e2e4", "e7e5", "g1f3"]), 0); // the player misses it: missed_win
     const { id, events } = await newGame();
     await play(id, "e2e4");
     const first = await tutor.ask(0);
+    expect(first.request).toMatchObject({ moment: { kind: "punish_opponent" } });
+    await play(id, "g1f3");
     const second = await tutor.ask(1);
-    expect(first.request).toMatchObject({ moment: { kind: "player_blunder" } });
-    expect(second.request).toMatchObject({ moment: { kind: "punish_opponent" } });
+    expect(second.request).toMatchObject({ moment: { kind: "missed_win" } });
     expect(first.signal?.aborted).toBe(true);
     expect(second.signal?.aborted).toBe(false);
 
@@ -264,11 +268,220 @@ describe("key moments (FR-6, FR-7)", () => {
     expect(tutorTypes(events.events)).not.toContain("tutor_reply");
     expect(games.view(id)!.tutor.thinking).toBe(true);
 
-    second.resolve(okOutcome({ kind: "punish_opponent", message: "How can you punish e5?" }));
+    second.resolve(okOutcome({ kind: "missed_win", message: "What did e5 leave undefended?" }));
     const reply = await events.next("tutor_reply");
-    expect(reply).toMatchObject({ question: { kind: "punish_opponent", message: "How can you punish e5?" } });
+    expect(reply).toMatchObject({ question: { kind: "missed_win", attemptFen: fenAfter(["e2e4", "e7e5"]) } });
     expect(events.events.filter((e) => e.type === "tutor_reply")).toHaveLength(1);
     expect(JSON.stringify(events.events)).not.toContain("LATE");
+  });
+
+  // Review 028 (minor): the bot's key moment must not drop the player's own lesson.
+  const repertoire = {
+    continuations: (history: string[]) =>
+      history.join(" ") === "e2e4" ? { line: "Test line", moves: [{ uci: "c7c5", san: "c5" }] } : null,
+  };
+  for (const [name, arrange] of [
+    ["punish_opponent", () => analyzer.set(fenAfter(["e2e4", "e7e5"]), 300)],
+    ["opponent_left_book", () => undefined],
+  ] as const) {
+    it(`player_blunder, then the bot's reply is ${name}: the player's lesson is kept, one ask`, async () => {
+      setup({ coaching: { repertoire } });
+      analyzer.set(START, 0, "d2d4");
+      analyzer.set(fenAfter(["e2e4"]), -300);
+      analyzer.set(fenAfter(["e2e4", "e7e5"]), -300);
+      arrange();
+      const { id, events } = await newGame();
+      await play(id, "e2e4");
+      const ask = await tutor.ask(0);
+      await games.idle(id);
+      expect(tutor.asks).toHaveLength(1);
+      expect(ask.request).toMatchObject({ moment: { kind: "player_blunder" } });
+      expect(ask.signal?.aborted).toBe(false);
+      ask.resolve(okOutcome());
+      expect(await events.next("tutor_reply")).toMatchObject({ question: { kind: "player_blunder", attemptFen: START } });
+      expect(tutorTypes(events.events).filter((t) => t === "tutor_thinking")).toHaveLength(1);
+    });
+  }
+
+  it("an open player_blunder question is not replaced by the bot's later key moment either", async () => {
+    setup();
+    analyzer.set(START, 0, "d2d4");
+    analyzer.set(fenAfter(["e2e4"]), -300); // player_blunder
+    analyzer.set(fenAfter(["e2e4", "e7e5"]), 300); // and the bot's e5 is punish_opponent
+    tutor.auto = () => okOutcome(); // the player's question is open before the bot's detection runs
+    const { id, events } = await newGame();
+    await play(id, "e2e4");
+    const reply = await events.next("tutor_reply");
+    await games.idle(id);
+    if (reply.type !== "tutor_reply") throw new Error("unreachable");
+    expect(reply.question.kind).toBe("player_blunder");
+    expect(games.view(id)!.tutor.question).toEqual(reply.question);
+    expect(tutor.asks).toHaveLength(1);
+  });
+
+  it("a key moment of the bot's move is not coached once the player has moved past its attemptFen", async () => {
+    setup();
+    analyzer.set(fenAfter(["e2e4", "e7e5"]), 300); // punish_opponent, attemptFen after e5
+    analyzer.set(fenAfter(["e2e4", "e7e5", "g1f3"]), 300); // g1f3 keeps it: quiet
+    const { id, events } = await newGame();
+    analyzer.hold();
+    await post(`/api/games/${id}/moves`, { uci: "e2e4" });
+    await events.next("bot_move");
+    bot.hold(); // the bot's reply to g1f3 waits, so the e5 position is just one ply back
+    await post(`/api/games/${id}/moves`, { uci: "g1f3" }); // before the bot move's detection ran
+    analyzer.release();
+    await new Promise((r) => setTimeout(r, 20));
+    expect(tutor.asks).toHaveLength(0);
+    bot.release();
+    await games.idle(id);
+    expect(tutor.asks).toHaveLength(0);
+    expect(tutorTypes(events.events)).toEqual([]);
+  });
+
+  it("an in-flight player_blunder ask survives the bot's reply and the takeback, then opens at the current position", async () => {
+    setup();
+    scriptPlayerBlunder();
+    const { id, events } = await newGame();
+    await play(id, "e2e4");
+    const ask = await tutor.ask(0);
+    expect(games.view(id)!.moves).toHaveLength(2); // the bot has replied
+    expect((await post(`/api/games/${id}/takeback`)).status).toBe(200);
+    expect(games.view(id)!.tutor.thinking).toBe(true);
+    ask.resolve(okOutcome());
+    expect(await events.next("tutor_reply")).toMatchObject({ question: { attemptFen: START } });
+  });
+
+  it("each ask sends the first progress label once (the session's own)", async () => {
+    setup();
+    tutor.auto = () => okOutcome({ kind: "hint" });
+    const { id, events } = await newGame();
+    expect((await post(`/api/games/${id}/tutor/hint`)).status).toBe(202);
+    await events.next("tutor_reply");
+    const firsts = events.events.filter((e) => e.type === "tutor_progress" && e.label === SESSION_FIRST_LABEL);
+    expect(firsts).toHaveLength(1);
+    expect(tutorTypes(events.events)).toEqual(["tutor_thinking", "tutor_progress", "tutor_reply"]);
+  });
+});
+
+describe("a reply never opens a question the player cannot reach (review 028)", () => {
+  it("hint, then a move before the reply: the ask is aborted, thinking clears, no tutor_reply", async () => {
+    setup();
+    const { id, events } = await newGame();
+    expect((await post(`/api/games/${id}/tutor/hint`)).status).toBe(202);
+    const ask = await tutor.ask(0);
+    await play(id, "e2e4");
+    expect(ask.signal?.aborted).toBe(true);
+    const states = events.events.filter((e) => e.type === "state");
+    expect(states.at(-1)).toMatchObject({ game: { tutor: { thinking: false, question: null } } });
+    ask.resolve(okOutcome({ kind: "hint", arrows: [{ from: "e2", to: "e4" }] }));
+    await new Promise((r) => setTimeout(r, 10));
+    expect(tutorTypes(events.events)).not.toContain("tutor_reply");
+    expect(games.view(id)!.tutor).toMatchObject({ thinking: false, question: null });
+  });
+
+  it("a reply that arrives after a resign opens nothing; the ask is aborted", async () => {
+    setup();
+    const { id, events } = await newGame();
+    await post(`/api/games/${id}/tutor/hint`);
+    const ask = await tutor.ask(0);
+    expect((await post(`/api/games/${id}/resign`)).status).toBe(200);
+    expect(ask.signal?.aborted).toBe(true);
+    expect(events.events.at(-1)).toMatchObject({ type: "game_over", game: { tutor: { thinking: false } } });
+    ask.resolve(okOutcome({ kind: "hint", reveal: "x", revealMove: "e2e4" }));
+    await new Promise((r) => setTimeout(r, 10));
+    expect(tutorTypes(events.events)).not.toContain("tutor_reply");
+    expect(games.view(id)!.tutor.question).toBeNull();
+    expect((await post(`/api/games/${id}/tutor/reveal`)).status).toBe(409);
+  });
+
+  it("a reply that arrives after checkmate opens nothing (the ask was still reachable by a takeback)", async () => {
+    setup({ script: ["e7e5", "b8c6", "g8f6"] });
+    const { id, events } = await newGame();
+    for (const m of ["e2e4", "f1c4", "d1h5"]) await play(id, m);
+    const x = games.view(id)!.fen; // Qxf7# is on
+    analyzer.set(x, 0, "h5f7");
+    analyzer.set(fenAfter(["e2e4", "e7e5", "f1c4", "b8c6", "d1h5", "g8f6", "h5h6"]), -300);
+    await play(id, "h5h6"); // player_blunder, attemptFen x
+    const ask = await tutor.ask(0);
+    expect((await post(`/api/games/${id}/takeback`)).status).toBe(200);
+    expect(games.view(id)!.fen).toBe(x);
+    const mate = await play(id, "h5f7");
+    expect(mate).toMatchObject({ status: "finished", endReason: "checkmate", tutor: { thinking: false } });
+    expect(ask.signal?.aborted).toBe(true);
+    ask.resolve(okOutcome({ reveal: "Qxf7#", revealMove: "h5f7" }));
+    await new Promise((r) => setTimeout(r, 10));
+    expect(tutorTypes(events.events)).not.toContain("tutor_reply");
+    expect(games.view(id)!.tutor.question).toBeNull();
+  });
+});
+
+describe("the tutor's engine searches never delay the bot (NFR-3, review 028)", () => {
+  async function askWithEngine() {
+    const engine = createFakeEngine();
+    analyzer = createFakeAnalyzer();
+    tutor = createFakeTutor();
+    store = createSqliteGameStore(":memory:");
+    ({ app, games } = buildServer({
+      bot: botOnEngine(engine, 20),
+      store,
+      logger: false,
+      coaching: { analyzer, tutor, engine },
+    }));
+    scriptPlayerBlunder();
+    analyzer.set(fenAfter(["e2e4", "a7a6"]), -300);
+    const { id, events } = await newGame();
+    await play(id, "e2e4");
+    const ask = await tutor.ask(0);
+    expect(ask.request).toMatchObject({ moment: { kind: "player_blunder" } });
+    const tutorEngine = tutor.sessions[0]!.engine;
+    engine.hold();
+    const searches = ["8/8/8/8/8/8/8/K1k5 w - - 0 1", "8/8/8/8/8/8/8/K2k4 w - - 0 1", "8/8/8/8/8/8/8/K3k3 w - - 0 1"].map(
+      (fen) => {
+        const p = tutorEngine.analyze(fen, { depth: 18, movetimeMs: 1000, multiPv: 3 });
+        const settled = p.then(
+          () => "resolved",
+          (err: unknown) => `rejected: ${err instanceof Error ? err.name : String(err)}`,
+        );
+        return { fen, settled };
+      },
+    );
+    await new Promise((r) => setTimeout(r, 5));
+    return { id, events, ask, engine, searches };
+  }
+
+  it("at most one tutor search is submitted; the bot's search goes ahead of the waiting ones", async () => {
+    const { id, events, engine, searches } = await askWithEngine();
+    const tutorSubs = () => engine.submissions.filter((s) => searches.some((x) => s === `analyze ${x.fen}`));
+    expect(tutorSubs()).toEqual([`analyze ${searches[0]!.fen}`]);
+
+    // The player retries from the attempt position: the ask stays (attemptFen one takeback away).
+    expect((await post(`/api/games/${id}/takeback`)).status).toBe(200);
+    expect((await post(`/api/games/${id}/moves`, { uci: "d2d4" })).status).toBe(200);
+    engine.release(); // the first tutor search ends while the bot is still in its explorer lookup
+    await events.next("bot_move", 1);
+    await Promise.all(searches.map((s) => s.settled));
+
+    const order = engine.submissions.slice(engine.submissions.indexOf(`analyze ${searches[0]!.fen}`));
+    expect(order).toEqual([
+      `analyze ${searches[0]!.fen}`,
+      `bestMove ${fenAfter(["d2d4"])}`,
+      `analyze ${searches[1]!.fen}`,
+      `analyze ${searches[2]!.fen}`,
+    ]);
+    expect(await Promise.all(searches.map((s) => s.settled))).toEqual(["resolved", "resolved", "resolved"]);
+  });
+
+  it("aborting the ask rejects its waiting tutor searches; they never reach the engine", async () => {
+    const { id, ask, engine, searches } = await askWithEngine();
+    // Moving on (no takeback) makes attemptFen unreachable: the ask is aborted.
+    expect((await post(`/api/games/${id}/moves`, { uci: "g1f3" })).status).toBe(200);
+    expect(ask.signal?.aborted).toBe(true);
+    expect(await searches[1]!.settled).toBe("rejected: AbortError");
+    expect(await searches[2]!.settled).toBe("rejected: AbortError");
+    engine.release();
+    await games.idle(id);
+    expect(engine.submissions).not.toContain(`analyze ${searches[1]!.fen}`);
+    expect(engine.submissions).not.toContain(`analyze ${searches[2]!.fen}`);
   });
 });
 
@@ -440,6 +653,18 @@ describe("trying again: the engine grades the attempt (no Claude call)", () => {
     await play(id, "g1f3");
     expect(await events.next("tutor_attempt")).toMatchObject({ correct: false, cpLoss: 51 });
     await events.next("tutor_reveal");
+  });
+
+  it("a retry taken back before its grading finished sends no tutor_attempt (review 028)", async () => {
+    const { id, events } = await blunderQuestion();
+    analyzer.hold();
+    expect((await post(`/api/games/${id}/moves`, { uci: "g1f3" })).status).toBe(200);
+    await events.next("bot_move", 1);
+    expect((await post(`/api/games/${id}/takeback`)).status).toBe(200);
+    analyzer.release();
+    await games.idle(id);
+    expect(tutorTypes(events.events)).not.toContain("tutor_attempt");
+    expect(tutorTypes(events.events)).not.toContain("tutor_reveal");
   });
 
   it("moving on without a takeback closes the question without grading", async () => {

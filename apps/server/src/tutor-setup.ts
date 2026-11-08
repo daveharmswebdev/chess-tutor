@@ -19,7 +19,11 @@ export const PLAYER_PROFILE =
 
 /** Makes one TutorSession per game (one game is one conversation, architecture §3.5). */
 export interface TutorFactory {
-  createSession(game: { id: string; playerColor: Color }): TutorSession;
+  /**
+   * engine: the server's per-game wrapper around the shared Stockfish, which lets the bot go
+   * first and drops a cancelled ask's waiting searches (NFR-3).
+   */
+  createSession(game: { id: string; playerColor: Color; engine: TutorEngine }): TutorSession;
 }
 
 export interface TutorSetup {
@@ -35,7 +39,6 @@ export interface TutorSetupOptions {
   promptPath: string;
   /** Called once, only when a key and the prompt are present (main: `new Anthropic()`). */
   makeClient: () => TutorClient;
-  engine: TutorEngine;
   explorer: TutorExplorer;
   repertoire: Repertoire | null;
   config: TutorConfig;
@@ -57,9 +60,8 @@ export function setupTutor(opts: TutorSetupOptions): TutorSetup {
     return { tutor: null, offReason: `Coaching is off: the tutor prompt file ${basename(opts.promptPath)} is empty.` };
   }
   const client = opts.makeClient();
-  const deps = {
+  const shared = {
     client,
-    engine: opts.engine,
     explorer: opts.explorer,
     repertoire: opts.repertoire,
     config: opts.config,
@@ -67,7 +69,8 @@ export function setupTutor(opts: TutorSetupOptions): TutorSetup {
   };
   return {
     tutor: {
-      createSession: (game) => createTutorSession(deps, { playerColor: game.playerColor, playerProfile: PLAYER_PROFILE }),
+      createSession: (game) =>
+        createTutorSession({ ...shared, engine: game.engine }, { playerColor: game.playerColor, playerProfile: PLAYER_PROFILE }),
     },
     offReason: null,
   };
