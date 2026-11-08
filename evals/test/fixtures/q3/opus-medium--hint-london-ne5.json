@@ -1,0 +1,244 @@
+{
+  "id": "hint-london-ne5",
+  "caseId": "hint-london-ne5",
+  "repeat": 1,
+  "kind": "hint",
+  "model": "claude-opus-5-5",
+  "effort": "medium",
+  "ok": true,
+  "reason": null,
+  "failureMessage": null,
+  "reply": {
+    "schemaVersion": 1,
+    "kind": "hint",
+    "message": "Black has just played ...b6, so the bishop on c8 is still at home and Black is a little slow. Your pieces on d3 and d2 already help with one pawn push in the centre. Which pawn could you push two squares to open the centre and point your pieces at Black's king?",
+    "reveal": "e4! Your bishop on d3 and knight on d2 both support the e4 square, so Black is not ready for this push. The engine's main line goes e4 Be7 e5, which kicks the knight away from f6, its best defender of the king. Then Ng5 and Qxh5 bring your pieces right next to Black's king. The usual London move Ne5 is fine too, but e4 is more active here.",
+    "revealMove": "e3e4",
+    "arrows": [
+      {
+        "from": "d3",
+        "to": "e4"
+      },
+      {
+        "from": "d2",
+        "to": "e4"
+      }
+    ]
+  },
+  "ms": 9934,
+  "firstRoundMs": 2699,
+  "toolCalls": 3,
+  "retries": 0,
+  "usage": {
+    "requests": 3,
+    "inputTokens": 3999,
+    "outputTokens": 713,
+    "cacheReadInputTokens": 9675,
+    "cacheCreationInputTokens": 0
+  },
+  "costUsd": 0.032191,
+  "revealCpLoss": null,
+  "progress": [
+    "Tutor is looking at the position…",
+    "Looking at the engine lines…",
+    "Checking your repertoire…",
+    "Checking Ne5…"
+  ],
+  "rounds": [
+    {
+      "ms": 2699,
+      "stopReason": "tool_use",
+      "toolUses": [
+        {
+          "id": "toolu_01K7YokBz3taoC8pi3GaafPz",
+          "name": "analyze_position",
+          "input": {
+            "fen": "r1bq1rk1/p4ppp/1pnbpn2/2pp4/3P4/2PBPNB1/PP1N1PPP/R2QK2R w KQ - 0 9"
+          }
+        },
+        {
+          "id": "toolu_01KwW41c5TmGHjVPQuXXoWax",
+          "name": "get_repertoire_context",
+          "input": {
+            "fen": "r1bq1rk1/p4ppp/1pnbpn2/2pp4/3P4/2PBPNB1/PP1N1PPP/R2QK2R w KQ - 0 9"
+          }
+        }
+      ],
+      "toolResults": [
+        {
+          "id": "toolu_01K7YokBz3taoC8pi3GaafPz",
+          "name": "analyze_position",
+          "input": {
+            "fen": "r1bq1rk1/p4ppp/1pnbpn2/2pp4/3P4/2PBPNB1/PP1N1PPP/R2QK2R w KQ - 0 9"
+          },
+          "content": "{\"fen\":\"r1bq1rk1/p4ppp/1pnbpn2/2pp4/3P4/2PBPNB1/PP1N1PPP/R2QK2R w KQ - 0 9\",\"side_to_move\":\"white\",\"depth\":18,\"lines\":[{\"rank\":1,\"eval_cp\":40,\"mate_in\":null,\"moves\":[{\"san\":\"e4\",\"uci\":\"e3e4\"},{\"san\":\"Be7\",\"uci\":\"d6e7\"},{\"san\":\"e5\",\"uci\":\"e4e5\"},{\"san\":\"Nh5\",\"uci\":\"f6h5\"},{\"san\":\"Ng5\",\"uci\":\"f3g5\"},{\"san\":\"Bxg5\",\"uci\":\"e7g5\"},{\"san\":\"Qxh5\",\"uci\":\"d1h5\"},{\"san\":\"g6\",\"uci\":\"g7g6\"}]},{\"rank\":2,\"eval_cp\":13,\"mate_in\":null,\"moves\":[{\"san\":\"Qe2\",\"uci\":\"d1e2\"},{\"san\":\"Bb7\",\"uci\":\"c8b7\"},{\"san\":\"e4\",\"uci\":\"e3e4\"},{\"san\":\"dxe4\",\"uci\":\"d5e4\"},{\"san\":\"Nxe4\",\"uci\":\"d2e4\"},{\"san\":\"Nxe4\",\"uci\":\"f6e4\"},{\"san\":\"Qxe4\",\"uci\":\"e2e4\"},{\"san\":\"g6\",\"uci\":\"g7g6\"}]},{\"rank\":3,\"eval_cp\":3,\"mate_in\":null,\"moves\":[{\"san\":\"O-O\",\"uci\":\"e1g1\"},{\"san\":\"Bxg3\",\"uci\":\"d6g3\"},{\"san\":\"hxg3\",\"uci\":\"h2g3\"},{\"san\":\"Qc7\",\"uci\":\"d8c7\"},{\"san\":\"Re1\",\"uci\":\"f1e1\"},{\"san\":\"Bb7\",\"uci\":\"c8b7\"},{\"san\":\"Qe2\",\"uci\":\"d1e2\"},{\"san\":\"e5\",\"uci\":\"e6e5\"}]}]}",
+          "isError": false
+        },
+        {
+          "id": "toolu_01KwW41c5TmGHjVPQuXXoWax",
+          "name": "get_repertoire_context",
+          "input": {
+            "fen": "r1bq1rk1/p4ppp/1pnbpn2/2pp4/3P4/2PBPNB1/PP1N1PPP/R2QK2R w KQ - 0 9"
+          },
+          "content": "{\"color\":\"white\",\"in_repertoire\":true,\"line\":\"London vs 1...d5\",\"next_moves\":[{\"san\":\"Ne5\",\"uci\":\"f3e5\"}],\"end_of_line\":false}",
+          "isError": false
+        }
+      ],
+      "text": "",
+      "usage": {
+        "input_tokens": 488,
+        "cache_creation_input_tokens": 0,
+        "cache_read_input_tokens": 3225,
+        "cache_creation": {
+          "ephemeral_5m_input_tokens": 0,
+          "ephemeral_1h_input_tokens": 0
+        },
+        "output_tokens": 226,
+        "service_tier": "standard",
+        "inference_geo": "global",
+        "speed": "standard",
+        "output_tokens_details": {
+          "thinking_tokens": 0
+        }
+      },
+      "error": null
+    },
+    {
+      "ms": 1904,
+      "stopReason": "tool_use",
+      "toolUses": [
+        {
+          "id": "toolu_01WFLzWRK5WGUPxro82YDE67",
+          "name": "evaluate_move",
+          "input": {
+            "fen": "r1bq1rk1/p4ppp/1pnbpn2/2pp4/3P4/2PBPNB1/PP1N1PPP/R2QK2R w KQ - 0 9",
+            "move": "Ne5"
+          }
+        }
+      ],
+      "toolResults": [
+        {
+          "id": "toolu_01WFLzWRK5WGUPxro82YDE67",
+          "name": "evaluate_move",
+          "input": {
+            "fen": "r1bq1rk1/p4ppp/1pnbpn2/2pp4/3P4/2PBPNB1/PP1N1PPP/R2QK2R w KQ - 0 9",
+            "move": "Ne5"
+          },
+          "content": "{\"move\":{\"san\":\"Ne5\",\"uci\":\"f3e5\"},\"best\":{\"san\":\"e4\",\"uci\":\"e3e4\"},\"cp_loss\":49,\"best_eval\":{\"eval_cp\":47,\"mate_in\":null},\"played_eval\":{\"eval_cp\":-2,\"mate_in\":null},\"eval_pov\":\"white\",\"reply\":{\"san\":\"Bb7\",\"uci\":\"c8b7\"},\"reply_line\":[{\"san\":\"Bb7\",\"uci\":\"c8b7\"},{\"san\":\"O-O\",\"uci\":\"e1g1\"},{\"san\":\"Qc7\",\"uci\":\"d8c7\"},{\"san\":\"Nxc6\",\"uci\":\"e5c6\"},{\"san\":\"Bxc6\",\"uci\":\"b7c6\"},{\"san\":\"Bxd6\",\"uci\":\"g3d6\"},{\"san\":\"Qxd6\",\"uci\":\"c7d6\"},{\"san\":\"f4\",\"uci\":\"f2f4\"}],\"game_over_after_move\":false}",
+          "isError": false
+        }
+      ],
+      "text": "",
+      "usage": {
+        "input_tokens": 1498,
+        "cache_creation_input_tokens": 0,
+        "cache_read_input_tokens": 3225,
+        "cache_creation": {
+          "ephemeral_5m_input_tokens": 0,
+          "ephemeral_1h_input_tokens": 0
+        },
+        "output_tokens": 194,
+        "service_tier": "standard",
+        "inference_geo": "global",
+        "speed": "standard",
+        "output_tokens_details": {
+          "thinking_tokens": 55
+        }
+      },
+      "error": null
+    },
+    {
+      "ms": 3727,
+      "stopReason": "end_turn",
+      "toolUses": [],
+      "toolResults": [],
+      "text": "{\"schemaVersion\":1,\"kind\":\"hint\",\"message\":\"Black has just played ...b6, so the bishop on c8 is still at home and Black is a little slow. Your pieces on d3 and d2 already help with one pawn push in the centre. Which pawn could you push two squares to open the centre and point your pieces at Black's king?\",\"reveal\":\"e4! Your bishop on d3 and knight on d2 both support the e4 square, so Black is not ready for this push. The engine's main line goes e4 Be7 e5, which kicks the knight away from f6, its best defender of the king. Then Ng5 and Qxh5 bring your pieces right next to Black's king. The usual London move Ne5 is fine too, but e4 is more active here.\",\"revealMove\":\"e3e4\",\"arrows\":[{\"from\":\"d3\",\"to\":\"e4\"},{\"from\":\"d2\",\"to\":\"e4\"}]}",
+      "usage": {
+        "input_tokens": 2013,
+        "cache_creation_input_tokens": 0,
+        "cache_read_input_tokens": 3225,
+        "cache_creation": {
+          "ephemeral_5m_input_tokens": 0,
+          "ephemeral_1h_input_tokens": 0
+        },
+        "output_tokens": 293,
+        "service_tier": "standard",
+        "inference_geo": "global",
+        "speed": "standard",
+        "output_tokens_details": {
+          "thinking_tokens": 0
+        }
+      },
+      "error": null
+    }
+  ],
+  "grades": {
+    "schema": {
+      "pass": true,
+      "problems": []
+    },
+    "moves": {
+      "pass": false,
+      "mentions": [
+        {
+          "field": "message",
+          "raw": "b6",
+          "legal": true
+        },
+        {
+          "field": "reveal",
+          "raw": "e4!",
+          "legal": true
+        },
+        {
+          "field": "reveal",
+          "raw": "Be7",
+          "legal": true
+        },
+        {
+          "field": "reveal",
+          "raw": "Ng5",
+          "legal": true
+        },
+        {
+          "field": "reveal",
+          "raw": "Qxh5",
+          "legal": false
+        },
+        {
+          "field": "reveal",
+          "raw": "Ne5",
+          "legal": true
+        }
+      ],
+      "illegal": [
+        "Qxh5"
+      ]
+    },
+    "evals": {
+      "pass": true,
+      "quotes": []
+    },
+    "giveAway": {
+      "pass": false,
+      "problems": [
+        "arrow d3->e4 ends on the answer's to-square e4",
+        "arrow d2->e4 ends on the answer's to-square e4"
+      ]
+    },
+    "arrows": {
+      "pass": true,
+      "problems": []
+    },
+    "reveal": {
+      "pass": true,
+      "legal": true,
+      "equalsBest": true,
+      "cpLoss": 0,
+      "problems": []
+    },
+    "nfr6Moves": false,
+    "nfr6Evals": true,
+    "nfr7": false
+  }
+}

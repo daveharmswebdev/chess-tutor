@@ -5,6 +5,7 @@
  *   pnpm eval -- --model <id> --effort <level> [--cases <kind|glob|list>] [--max-usd N]
  *                [--concurrency N] [--repeat N] [--out <dir>] [--prompt <file>] [--live-explorer]
  *   pnpm eval -- compare <dir> <dir> ... [--out <dir>]
+ *   pnpm eval -- regrade <dir> ...      (offline: re-grades recorded cases, no API call)
  *
  * --model defaults to config/models.json "eval".tutor, --effort to config/tutor.json.
  */
@@ -14,6 +15,7 @@ import { parseArgs } from "node:util";
 import type { TutorConfig, TutorExplorer } from "@chess-tutor/tutor";
 import { loadCases, selectCases } from "./cases.ts";
 import { CASES_DIR, DEFAULT_PROMPT, loadRepertoire, loadSettings, RESULTS_DIR } from "./config.ts";
+import { regradeDir } from "./regrade.ts";
 import { compareRuns } from "./report.ts";
 import { runEval } from "./runner.ts";
 
@@ -44,6 +46,20 @@ async function compare(args: string[]): Promise<void> {
   writeFileSync(join(out, "compare.md"), markdown);
   console.log(markdown);
   console.log(`Wrote ${join(out, "compare.md")}`);
+}
+
+async function regrade(args: string[]): Promise<void> {
+  const { positionals } = parseArgs({ args, allowPositionals: true, options: {} });
+  if (positionals.length < 1) fail("regrade needs at least one run directory");
+  const tol = loadSettings().toleranceCp;
+  for (const dir of positionals.map((p) => resolve(p))) {
+    const s = regradeDir(dir, { toleranceCp: tol });
+    const m = s.metrics;
+    const p = (x: number | null) => (x === null ? "n/a" : `${Math.round(x * 100)}%`);
+    console.log(
+      `${dir}: ${s.model} ${s.effort} | moves legal ${p(m.moveLegalPct)} | evals matched ${p(m.evalMatchPct)} | no give-away ${p(m.noGiveAwayPct)} | points at answer ${p(m.pointsAtAnswerPct)}`,
+    );
+  }
 }
 
 async function run(args: string[]): Promise<void> {
@@ -123,7 +139,7 @@ async function run(args: string[]): Promise<void> {
 }
 
 const argv = process.argv.slice(2).filter((a, i) => !(i === 0 && a === "--"));
-const main = argv[0] === "compare" ? compare(argv.slice(1)) : run(argv);
+const main = argv[0] === "compare" ? compare(argv.slice(1)) : argv[0] === "regrade" ? regrade(argv.slice(1)) : run(argv);
 main.catch((err: unknown) => {
   console.error(err);
   process.exit(1);

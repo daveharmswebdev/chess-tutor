@@ -32,7 +32,7 @@ describe("compareRuns", () => {
 describe("computeMetrics", () => {
   const row = (over: Partial<CaseRow>): CaseRow => ({
     id: "x", caseId: "x", kind: "hint", ok: true, reason: null, nfr6Moves: true, nfr6Evals: true, nfr7: true, arrowsOk: true,
-    revealOk: true, schemaOk: true, toolCalls: 1, retries: 0, ms: 1000, firstRoundMs: 500, costUsd: 0.02, problems: [], ...over,
+    revealOk: true, schemaOk: true, pointsAtAnswer: false, toolCalls: 1, retries: 0, retryReasons: [], ms: 1000, firstRoundMs: 500, costUsd: 0.02, problems: [], ...over,
   });
 
   it("grades only replies, counts failure reasons, and prices a game as 10 asks", () => {

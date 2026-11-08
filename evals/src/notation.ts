@@ -8,8 +8,10 @@ import { Chess, type Move, type Square } from "chess.js";
  * (e8=Q), castling (O-O, O-O-O, 0-0), each with an optional + or #; UCI (g1f3, e7e8q); long
  * algebraic (Ng1-f3, e3-e4, Bc4xf7); "<piece> [goes/moves/...] to <square>"; and a bare square
  * as a pawn move only in a move context: after "...", a move number, a verb such as
- * play/push/try/then/move/break/with, after "and"/"or"/"," that follows another move mention,
- * or followed by ! ? + #. Elsewhere a square is a square ("the knight on f6").
+ * play/push/try/then/move/break, after "and"/"or"/"," that follows another move mention (the
+ * same piece's move when that mention was "<piece> to <square>"), or followed by an annotation
+ * (! !? ?! ?? + #; a lone "?" ends a question). Elsewhere a square is a square ("the knight on
+ * f6", "go after c7", "the rook on a8?").
  */
 
 export interface Mention {
@@ -18,6 +20,8 @@ export interface Mention {
   end: number;
   /** The move as parsed from the text. */
   spec: MoveSpec;
+  /** Found as "<piece> to <square>" (or chained to one). */
+  pieceTo?: boolean;
 }
 
 /** What a mention says about a move; null fields are unspecified. */
@@ -47,8 +51,11 @@ const PIECE_TO = new RegExp(
   "gi",
 );
 const SQUARE = new RegExp(`${B}([a-h][1-8])([!?+#]+)?${E}`, "g");
+// Not "after" or "with": "go after c7", "with c7 covered" name squares (#10 round 2).
 const MOVE_VERBS =
-  /(?:^|[^A-Za-z])(?:play|plays|played|playing|push|pushes|pushed|pushing|try|tries|tried|advance|advances|then|move|break|breaks|with|after|like|answer|answers|reply|replies)\s+$/i;
+  /(?:^|[^A-Za-z])(?:play|plays|played|playing|push|pushes|pushed|pushing|try|tries|tried|advance|advances|then|move|break|breaks|like|answer|answers|reply|replies)\s+$/i;
+/** A move annotation; a lone "?" ends a question ("the rook on a8?") and makes no move. */
+const ANNOTATION = /^(?:[!+#].*|\?[!?].*)$/;
 const MOVE_NUMBER = /(?:(?:^|[^\w.])\d+\.(?:\.\.)?\s?|(?:^|[^\w.])\.\.\.\s?)$/;
 const CHAIN = /^\s*(?:,|and|or|,\s*and|,\s*or|then|,\s*then)\s*$/i;
 
@@ -90,7 +97,9 @@ export function findMentions(text: string): Mention[] {
     add(m, spec({ piece: "p", fromFile: file!, to: to!, capture: true, promotion: promo?.toLowerCase() ?? null }));
   }
   for (const m of text.matchAll(PROMOTION)) add(m, spec({ piece: "p", to: m[1]!, promotion: m[2]!.toLowerCase() }));
-  for (const m of text.matchAll(PIECE_TO)) add(m, spec({ piece: PIECE_WORD[m[1]!.toLowerCase()]!, to: m[2]! }));
+  for (const m of text.matchAll(PIECE_TO)) {
+    found.push({ raw: m[0], start: m.index!, end: m.index! + m[0].length, spec: spec({ piece: PIECE_WORD[m[1]!.toLowerCase()]!, to: m[2]! }), pieceTo: true });
+  }
 
   let mentions = dedupe(found);
   // Bare squares as pawn moves, only in a move context (needs the other mentions for chains).
@@ -99,11 +108,14 @@ export function findMentions(text: string): Mention[] {
     const start = m.index!;
     if (mentions.some((x) => start >= x.start && start < x.end)) continue;
     const before = text.slice(0, start);
-    const annotated = m[2] !== undefined;
+    const annotated = m[2] !== undefined && ANNOTATION.test(m[2]);
     const prev = [...mentions, ...squares].filter((x) => x.end <= start).sort((a, b) => b.end - a.end)[0];
     const chained = prev !== undefined && CHAIN.test(text.slice(prev.end, start));
     if (annotated || MOVE_VERBS.test(before) || MOVE_NUMBER.test(before) || chained) {
-      squares.push({ raw: m[0], start, end: start + m[0].length, spec: spec({ piece: "p", to: m[1]! }) });
+      // "the knight can go to a6 or c7": a square chained to a piece-to-square mention is that piece's move.
+      const piece = chained && prev.pieceTo ? prev.spec.piece : "p";
+      const raw = m[0];
+      squares.push({ raw, start, end: start + raw.length, spec: spec({ piece, to: m[1]! }), pieceTo: chained && prev.pieceTo === true });
     }
   }
   mentions = dedupe([...mentions, ...squares]);

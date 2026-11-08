@@ -1,0 +1,189 @@
+{
+  "id": "po-london-bg6-trap",
+  "caseId": "po-london-bg6-trap",
+  "repeat": 1,
+  "kind": "punish_opponent",
+  "model": "claude-sonnet-5-5",
+  "effort": "medium",
+  "ok": true,
+  "reason": null,
+  "failureMessage": null,
+  "reply": {
+    "schemaVersion": 1,
+    "kind": "punish_opponent",
+    "message": "Black's bishop on g6 looks safe, but look at your h-pawn. Which pawn move attacks that bishop and leaves it with no good square?",
+    "reveal": "h5 is the move. It attacks the bishop on g6, and the bishop can't keep its place. If Black plays Bxh5, you take back with gxh5 and the h-file is open. Stockfish gives White a big edge, about +5 pawns.",
+    "revealMove": "h4h5",
+    "arrows": [
+      {
+        "from": "h4",
+        "to": "g5"
+      },
+      {
+        "from": "g6",
+        "to": "h5"
+      }
+    ]
+  },
+  "ms": 8057,
+  "firstRoundMs": 2971,
+  "toolCalls": 2,
+  "retries": 0,
+  "usage": {
+    "requests": 2,
+    "inputTokens": 2433,
+    "outputTokens": 593,
+    "cacheReadInputTokens": 6450,
+    "cacheCreationInputTokens": 0
+  },
+  "costUsd": 0.012086,
+  "revealCpLoss": null,
+  "progress": [
+    "Tutor is looking at the position…",
+    "Looking at the engine lines…",
+    "Checking h5…"
+  ],
+  "rounds": [
+    {
+      "ms": 2971,
+      "stopReason": "tool_use",
+      "toolUses": [
+        {
+          "id": "toolu_01P6DT4qKMQbsUQykYxjtA8M",
+          "name": "analyze_position",
+          "input": {
+            "fen": "rn1qkbnr/ppp2ppp/4p1b1/3p4/3P1BPP/5P2/PPP1P3/RN1QKBNR w KQkq - 0 6"
+          }
+        },
+        {
+          "id": "toolu_01GrscJwak3kc9h6ZPq2KiDo",
+          "name": "evaluate_move",
+          "input": {
+            "fen": "rn1qkbnr/ppp2ppp/4p1b1/3p4/3P1BPP/5P2/PPP1P3/RN1QKBNR w KQkq - 0 6",
+            "move": "h5"
+          }
+        }
+      ],
+      "toolResults": [
+        {
+          "id": "toolu_01P6DT4qKMQbsUQykYxjtA8M",
+          "name": "analyze_position",
+          "input": {
+            "fen": "rn1qkbnr/ppp2ppp/4p1b1/3p4/3P1BPP/5P2/PPP1P3/RN1QKBNR w KQkq - 0 6"
+          },
+          "content": "{\"fen\":\"rn1qkbnr/ppp2ppp/4p1b1/3p4/3P1BPP/5P2/PPP1P3/RN1QKBNR w KQkq - 0 6\",\"side_to_move\":\"white\",\"depth\":17,\"lines\":[{\"rank\":1,\"eval_cp\":515,\"mate_in\":null,\"moves\":[{\"san\":\"h5\",\"uci\":\"h4h5\"},{\"san\":\"Be7\",\"uci\":\"f8e7\"},{\"san\":\"Qd2\",\"uci\":\"d1d2\"},{\"san\":\"Bxh5\",\"uci\":\"g6h5\"},{\"san\":\"gxh5\",\"uci\":\"g4h5\"},{\"san\":\"c5\",\"uci\":\"c7c5\"},{\"san\":\"e3\",\"uci\":\"e2e3\"},{\"san\":\"Bh4+\",\"uci\":\"e7h4\"}]},{\"rank\":2,\"eval_cp\":-45,\"mate_in\":null,\"moves\":[{\"san\":\"Qd2\",\"uci\":\"d1d2\"},{\"san\":\"h5\",\"uci\":\"h7h5\"},{\"san\":\"Nc3\",\"uci\":\"b1c3\"},{\"san\":\"hxg4\",\"uci\":\"h5g4\"},{\"san\":\"fxg4\",\"uci\":\"f3g4\"},{\"san\":\"Nf6\",\"uci\":\"g8f6\"},{\"san\":\"g5\",\"uci\":\"g4g5\"},{\"san\":\"Ne4\",\"uci\":\"f6e4\"}]},{\"rank\":3,\"eval_cp\":-48,\"mate_in\":null,\"moves\":[{\"san\":\"Nc3\",\"uci\":\"b1c3\"},{\"san\":\"h5\",\"uci\":\"h7h5\"},{\"san\":\"Qd2\",\"uci\":\"d1d2\"},{\"san\":\"hxg4\",\"uci\":\"h5g4\"},{\"san\":\"fxg4\",\"uci\":\"f3g4\"},{\"san\":\"Nf6\",\"uci\":\"g8f6\"},{\"san\":\"g5\",\"uci\":\"g4g5\"},{\"san\":\"Ne4\",\"uci\":\"f6e4\"}]}]}",
+          "isError": false
+        },
+        {
+          "id": "toolu_01GrscJwak3kc9h6ZPq2KiDo",
+          "name": "evaluate_move",
+          "input": {
+            "fen": "rn1qkbnr/ppp2ppp/4p1b1/3p4/3P1BPP/5P2/PPP1P3/RN1QKBNR w KQkq - 0 6",
+            "move": "h5"
+          },
+          "content": "{\"move\":{\"san\":\"h5\",\"uci\":\"h4h5\"},\"best\":{\"san\":\"h5\",\"uci\":\"h4h5\"},\"cp_loss\":0,\"best_eval\":{\"eval_cp\":513,\"mate_in\":null},\"played_eval\":{\"eval_cp\":528,\"mate_in\":null},\"eval_pov\":\"white\",\"reply\":{\"san\":\"Bxh5\",\"uci\":\"g6h5\"},\"reply_line\":[{\"san\":\"Bxh5\",\"uci\":\"g6h5\"},{\"san\":\"gxh5\",\"uci\":\"g4h5\"},{\"san\":\"Be7\",\"uci\":\"f8e7\"},{\"san\":\"Qd2\",\"uci\":\"d1d2\"},{\"san\":\"c5\",\"uci\":\"c7c5\"},{\"san\":\"dxc5\",\"uci\":\"d4c5\"},{\"san\":\"Nd7\",\"uci\":\"b8d7\"},{\"san\":\"e4\",\"uci\":\"e2e4\"}],\"game_over_after_move\":false}",
+          "isError": false
+        }
+      ],
+      "text": "",
+      "usage": {
+        "input_tokens": 514,
+        "cache_creation_input_tokens": 0,
+        "cache_read_input_tokens": 3225,
+        "cache_creation": {
+          "ephemeral_5m_input_tokens": 0,
+          "ephemeral_1h_input_tokens": 0
+        },
+        "output_tokens": 382,
+        "service_tier": "standard",
+        "inference_geo": "global",
+        "speed": "standard",
+        "output_tokens_details": {
+          "thinking_tokens": 137
+        }
+      },
+      "error": null
+    },
+    {
+      "ms": 2220,
+      "stopReason": "end_turn",
+      "toolUses": [],
+      "toolResults": [],
+      "text": "{\"schemaVersion\":1,\"kind\":\"punish_opponent\",\"message\":\"Black's bishop on g6 looks safe, but look at your h-pawn. Which pawn move attacks that bishop and leaves it with no good square?\",\"reveal\":\"h5 is the move. It attacks the bishop on g6, and the bishop can't keep its place. If Black plays Bxh5, you take back with gxh5 and the h-file is open. Stockfish gives White a big edge, about +5 pawns.\",\"revealMove\":\"h4h5\",\"arrows\":[{\"from\":\"h4\",\"to\":\"g5\"},{\"from\":\"g6\",\"to\":\"h5\"}]}",
+      "usage": {
+        "input_tokens": 1919,
+        "cache_creation_input_tokens": 0,
+        "cache_read_input_tokens": 3225,
+        "cache_creation": {
+          "ephemeral_5m_input_tokens": 0,
+          "ephemeral_1h_input_tokens": 0
+        },
+        "output_tokens": 211,
+        "service_tier": "standard",
+        "inference_geo": "global",
+        "speed": "standard",
+        "output_tokens_details": {
+          "thinking_tokens": 0
+        }
+      },
+      "error": null
+    }
+  ],
+  "grades": {
+    "schema": {
+      "pass": true,
+      "problems": []
+    },
+    "moves": {
+      "pass": false,
+      "mentions": [
+        {
+          "field": "reveal",
+          "raw": "Bxh5",
+          "legal": false
+        },
+        {
+          "field": "reveal",
+          "raw": "gxh5",
+          "legal": true
+        }
+      ],
+      "illegal": [
+        "Bxh5"
+      ]
+    },
+    "evals": {
+      "pass": true,
+      "quotes": [
+        {
+          "raw": "+5 pawns",
+          "cp": 500,
+          "mate": null,
+          "side": "w",
+          "problem": null
+        }
+      ]
+    },
+    "giveAway": {
+      "pass": false,
+      "problems": [
+        "arrow h4->g5 starts on the answer's from-square h4",
+        "arrow g6->h5 ends on the answer's to-square h5"
+      ]
+    },
+    "arrows": {
+      "pass": true,
+      "problems": []
+    },
+    "reveal": {
+      "pass": true,
+      "legal": true,
+      "equalsBest": true,
+      "cpLoss": 0,
+      "problems": []
+    },
+    "nfr6Moves": false,
+    "nfr6Evals": true,
+    "nfr7": false
+  }
+}
