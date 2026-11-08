@@ -1,0 +1,56 @@
+name: Evals
+
+# Tutor eval suite (#10, NFR-10). Runs only on pull requests that change the tutor, its
+# prompt, the eval suite or the model config, because every run calls the Claude API and
+# costs money (about $1-2, capped by --max-usd).
+# Needs the ANTHROPIC_API_KEY repository secret; without it the job skips with a notice.
+# It reports, it does not block yet: thresholds (NFR-6 100%, NFR-7 >= 90%) become a failing
+# gate once the tutor meets them.
+
+on:
+  pull_request:
+    paths:
+      - "prompts/**"
+      - "packages/tutor/**"
+      - "evals/**"
+      - "config/models.json"
+      - "config/tutor.json"
+
+concurrency:
+  group: evals-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  evals:
+    name: Tutor evals (live Claude API)
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    env:
+      ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+    steps:
+      - name: Skip without the API key secret
+        if: env.ANTHROPIC_API_KEY == ''
+        run: echo "::notice title=Evals skipped::Add the ANTHROPIC_API_KEY repository secret to run the tutor evals on this PR."
+      - uses: actions/checkout@v4
+        if: env.ANTHROPIC_API_KEY != ''
+      - uses: pnpm/action-setup@v4
+        if: env.ANTHROPIC_API_KEY != ''
+      - uses: actions/setup-node@v4
+        if: env.ANTHROPIC_API_KEY != ''
+        with:
+          node-version-file: .nvmrc
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+        if: env.ANTHROPIC_API_KEY != ''
+      - name: Run the eval suite (model from config/models.json "eval")
+        if: env.ANTHROPIC_API_KEY != ''
+        run: pnpm eval -- --max-usd 2 --concurrency 2 --out evals/results/ci
+      - name: Add the report to the job summary
+        if: env.ANTHROPIC_API_KEY != '' && always()
+        run: cat evals/results/ci/report.md >> "$GITHUB_STEP_SUMMARY" || true
+      - uses: actions/upload-artifact@v4
+        if: env.ANTHROPIC_API_KEY != '' && always()
+        with:
+          name: eval-results
+          path: evals/results/ci/
+          retention-days: 30
