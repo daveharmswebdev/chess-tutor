@@ -237,6 +237,27 @@ importers:
         specifier: ^8.3.6
         version: 8.3.6(@types/node@26.6.6)
 
+  evals:
+    dependencies:
+      '@anthropic-ai/sdk':
+        specifier: ^1.6.0
+        version: 1.6.0(zod@4.6.7)
+      '@chess-tutor/chess-core':
+        specifier: workspace:*
+        version: link:../packages/chess-core
+      '@chess-tutor/engine':
+        specifier: workspace:*
+        version: link:../packages/engine
+      '@chess-tutor/explorer':
+        specifier: workspace:*
+        version: link:../packages/explorer
+      '@chess-tutor/tutor':
+        specifier: workspace:*
+        version: link:../packages/tutor
+      chess.js:
+        specifier: ^1.4.0
+        version: 1.4.0
+
   packages/chess-core:
     dependencies:
       chess.js:

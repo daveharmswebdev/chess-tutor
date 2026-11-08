@@ -202,8 +202,9 @@ SQLite through Node's built-in `node:sqlite` (`DatabaseSync`, no native dependen
   - `message` doesn't contain `revealMove` (NFR-7);
   - the reply parses against the schema.
 - **LLM-judge grader** (optional): a rubric on clarity and how well the explanation fits a 1000-rated player.
-- The runner uses the **Message Batches API**, at half price. Evals have no deadline, so a batch is the right tool.
-- CI runs the eval suite only on PRs that touch `prompts/`, `packages/tutor/`, or `config/models.json`, to keep cost down.
+- The runner makes **live calls** through the real tutor session (the same tool loop, tools, prompt and claims check the server uses, with real Stockfish). *Changed 2026-11-08:* the Message Batches API was the plan, but the tutor's tool loop needs 2–4 requests per case, so every loop round would be its own batch and a run could take hours. Live, a two-model run of about 40 cases costs about $1–2 and takes minutes (measured: 12 live asks cost $0.26).
+- Every run has a spending cap: the runner prices each response from `config/models.json` and stops starting new cases once the cap is reached.
+- CI runs the eval suite only on PRs that touch `prompts/`, `packages/tutor/`, `evals/`, or `config/models.json`, to keep cost down. Without the `ANTHROPIC_API_KEY` repository secret the job skips with a notice rather than failing; the gate (NFR-10) is enforced once the secret is added.
 - Q-3 (Opus vs Sonnet) gets answered by running the same suite with both model IDs.
 
 ## 6. Configuration and secrets, covering NFR-12, NFR-13 and IR-9

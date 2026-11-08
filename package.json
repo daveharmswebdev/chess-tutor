@@ -12,7 +12,8 @@
     "typecheck": "pnpm -r typecheck && tsc -p .claude/hooks --noEmit",
     "spike:engine": "pnpm --filter @chess-tutor/engine spike",
     "demo:bot": "pnpm --filter @chess-tutor/chess-core demo:bot",
-    "dev": "pnpm --parallel --filter \"./apps/*\" dev"
+    "dev": "pnpm --parallel --filter \"./apps/*\" dev",
+    "eval": "pnpm --filter @chess-tutor/evals eval"
   },
   "devDependencies": {
     "@types/node": "^26.6.6",
