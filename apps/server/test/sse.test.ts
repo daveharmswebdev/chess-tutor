@@ -4,15 +4,16 @@ import type { FastifyInstance } from "fastify";
 import type { GameEvent, GameView } from "@chess-tutor/chess-core";
 import { buildServer } from "../src/app.ts";
 import { createSqliteGameStore, type GameStore } from "../src/store.ts";
-import { createFakeBot, type FakeBot } from "./helpers.ts";
+import type { CoachingDeps } from "../src/app.ts";
+import { createFakeAnalyzer, createFakeBot, createFakeTutor, fenAfter, okOutcome, type FakeBot } from "./helpers.ts";
 
 let app: FastifyInstance;
 let store: GameStore;
 let base: string;
 
-async function start(bot: FakeBot) {
+async function start(bot: FakeBot, coaching?: CoachingDeps) {
   store = createSqliteGameStore(":memory:");
-  ({ app } = buildServer({ bot, store, logger: false }));
+  ({ app } = buildServer({ bot, store, logger: false, ...(coaching ? { coaching } : {}) }));
   await app.listen({ port: 0, host: "127.0.0.1" });
   base = `http://127.0.0.1:${(app.server.address() as AddressInfo).port}`;
 }
@@ -199,5 +200,50 @@ describe("GET /api/games/:id/events (real socket)", () => {
     const res = await fetch(`${base}/api/games/nope/events`);
     expect(res.status).toBe(404);
     expect(((await res.json()) as { error: string }).error).toEqual(expect.any(String));
+  });
+});
+
+describe("tutor over SSE (real socket, #7)", () => {
+  it("the first state on each connection carries tutor.thinking, then the open question; reveal text never sent", async () => {
+    const analyzer = createFakeAnalyzer();
+    const tutor = createFakeTutor();
+    analyzer.set("rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1", 0, "d2d4");
+    analyzer.set(fenAfter(["e2e4"]), -300);
+    analyzer.set(fenAfter(["e2e4", "e7e5"]), -300);
+    await start(createFakeBot(["e7e5"]), { analyzer, tutor });
+    const game = (await (await postJson("/api/games", { playerColor: "w" })).json()) as GameView;
+
+    // Player's blunder; read until the tutor starts thinking.
+    const first = await readEvents(
+      `/api/games/${game.id}/events`,
+      (m) => m.event === "tutor_thinking",
+      async () => void (await postJson(`/api/games/${game.id}/moves`, { uci: "e2e4" })),
+    );
+    expect(first.map((m) => m.event)).toContain("state");
+    const ask = await tutor.ask(0);
+
+    const whileThinking = await readEvents(`/api/games/${game.id}/events`, () => true);
+    expect(whileThinking[0]!.data).toMatchObject({ type: "state", game: { tutor: { available: true, thinking: true, question: null } } });
+
+    const replied = await readEvents(
+      `/api/games/${game.id}/events`,
+      (m) => m.event === "tutor_reply",
+      async () => {
+        ask.progress("Checking d4…");
+        ask.resolve(okOutcome({ reveal: "SECRET-REVEAL", revealMove: "d2d4" }));
+      },
+    );
+    expect(replied.slice(1).map((m) => m.event)).toEqual(["tutor_progress", "tutor_reply"]);
+
+    const later = await readEvents(`/api/games/${game.id}/events`, () => true);
+    expect(later[0]!.data).toMatchObject({
+      type: "state",
+      game: { tutor: { thinking: false, question: { kind: "player_blunder", canReveal: true } } },
+    });
+    expect(JSON.stringify([...first, ...whileThinking, ...replied, ...later])).not.toContain("SECRET-REVEAL");
+
+    const reveal = await postJson(`/api/games/${game.id}/tutor/reveal`, {});
+    expect(reveal.status).toBe(200);
+    expect(await reveal.json()).toMatchObject({ text: "SECRET-REVEAL", move: { uci: "d2d4", san: "d4" } });
   });
 });

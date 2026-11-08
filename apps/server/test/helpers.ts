@@ -1,5 +1,13 @@
 import { Chess } from "chess.js";
-import type { BotMove, GameEvent, GameView, SparringBot } from "@chess-tutor/chess-core";
+import type { Analysis, BotMove, Color, GameEvent, GameView, SparringBot } from "@chess-tutor/chess-core";
+import type {
+  TutorFailureReason,
+  TutorOutcome,
+  TutorReply,
+  TutorRequest,
+  TutorSession,
+  TutorUsage,
+} from "@chess-tutor/tutor";
 
 /**
  * Deterministic fake sparring bot. Plays the next scripted UCI move if it is legal,
@@ -110,4 +118,151 @@ export function eventCollector() {
 
 export function ucis(game: GameView): string[] {
   return game.moves.map((m) => m.uci);
+}
+
+// ---------------------------------------------------------------------------
+// Coaching fakes (#7): an analyzer with scripted evaluations and a scripted TutorSession.
+
+/** FEN after playing these UCI moves from the start position. */
+export function fenAfter(moves: string[]): string {
+  const chess = new Chess();
+  for (const uci of moves) {
+    chess.move({ from: uci.slice(0, 2), to: uci.slice(2, 4), ...(uci.length === 5 ? { promotion: uci[4] } : {}) });
+  }
+  return chess.fen();
+}
+
+export interface FakeAnalyzer {
+  analyze(fen: string): Promise<Analysis>;
+  calls: string[];
+  /** White-relative centipawns for a position (default 0), and optionally its best move. */
+  set(fen: string, cp: number, bestMove?: string): void;
+  hold(): void;
+  release(): void;
+}
+
+/**
+ * Every position scores 0 cp with the first legal move as best, unless set() says otherwise.
+ * One line per analysis, so the detector compares the best line with the analysis after the move.
+ */
+export function createFakeAnalyzer(): FakeAnalyzer {
+  const scores = new Map<string, { cp: number; best: string | undefined }>();
+  const calls: string[] = [];
+  let held = false;
+  let waiters: (() => void)[] = [];
+  return {
+    calls,
+    set(fen, cp, best) {
+      scores.set(fen, { cp, best });
+    },
+    hold() {
+      held = true;
+    },
+    release() {
+      held = false;
+      const w = waiters;
+      waiters = [];
+      for (const fn of w) fn();
+    },
+    async analyze(fen) {
+      calls.push(fen);
+      if (held) await new Promise<void>((r) => waiters.push(r));
+      const chess = new Chess(fen);
+      const legal = chess.moves({ verbose: true });
+      const entry = scores.get(fen);
+      const first = legal[0];
+      if (!first) return { fen, depth: 0, lines: [], bestMove: "", timeMs: 0 };
+      const bestMove = entry?.best ?? first.from + first.to + (first.promotion ?? "");
+      return {
+        fen,
+        depth: 10,
+        lines: [{ rank: 1, moves: [bestMove], score: { kind: "cp", value: entry?.cp ?? 0 }, depth: 10 }],
+        bestMove,
+        timeMs: 1,
+      };
+    },
+  };
+}
+
+export const NO_USAGE: TutorUsage = {
+  requests: 1,
+  inputTokens: 0,
+  outputTokens: 0,
+  cacheReadInputTokens: 0,
+  cacheCreationInputTokens: 0,
+};
+
+export function okOutcome(reply: Partial<TutorReply> = {}): TutorOutcome {
+  return {
+    ok: true,
+    reply: {
+      schemaVersion: 1,
+      kind: "player_blunder",
+      message: "What does your move leave undefended?",
+      reveal: null,
+      revealMove: null,
+      arrows: [],
+      ...reply,
+    },
+    usage: NO_USAGE,
+    ms: 5,
+  };
+}
+
+export function failOutcome(reason: TutorFailureReason, message = "raw failure text"): TutorOutcome {
+  return { ok: false, reason, message, usage: NO_USAGE, ms: 5 };
+}
+
+export interface FakeAsk {
+  request: TutorRequest;
+  signal: AbortSignal | undefined;
+  progress(label: string): void;
+  resolve(outcome: TutorOutcome): void;
+  reject(err: unknown): void;
+}
+
+export interface FakeTutor {
+  createSession(game: { id: string; playerColor: Color }): TutorSession;
+  sessions: { id: string; playerColor: Color }[];
+  asks: FakeAsk[];
+  /** Resolves with the n-th (0-based) ask once it has been made. */
+  ask(n: number, timeoutMs?: number): Promise<FakeAsk>;
+  /** When set, every ask resolves at once with this (after the autoProgress labels). */
+  auto: ((request: TutorRequest) => TutorOutcome) | null;
+  autoProgress: string[];
+}
+
+/** A scripted tutor: asks wait for the test to resolve them, unless `auto` is set. */
+export function createFakeTutor(): FakeTutor {
+  const asks: FakeAsk[] = [];
+  const tutor: FakeTutor = {
+    sessions: [],
+    asks,
+    auto: null,
+    autoProgress: [],
+    createSession(game) {
+      tutor.sessions.push(game);
+      return {
+        ask(request, onProgress, signal) {
+          return new Promise<TutorOutcome>((resolve, reject) => {
+            const ask: FakeAsk = { request, signal, progress: (label) => onProgress({ label }), resolve, reject };
+            asks.push(ask);
+            if (tutor.auto) {
+              for (const label of tutor.autoProgress) ask.progress(label);
+              resolve(tutor.auto(request));
+            }
+          });
+        },
+      };
+    },
+    async ask(n, timeoutMs = 3000) {
+      const deadline = Date.now() + timeoutMs;
+      while (asks.length <= n) {
+        if (Date.now() > deadline) throw new Error(`timed out waiting for ask #${n} (have ${asks.length})`);
+        await new Promise((r) => setTimeout(r, 5));
+      }
+      return asks[n]!;
+    },
+  };
+  return tutor;
 }

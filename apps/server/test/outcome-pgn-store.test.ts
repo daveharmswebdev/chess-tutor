@@ -35,6 +35,7 @@ function view(over: Partial<GameView>): GameView {
     result: "0-1",
     endReason: "resigned",
     botThinking: false,
+    tutor: { available: false, reason: "Coaching is off: no API key is set.", thinking: false, question: null },
     ...over,
   };
 }

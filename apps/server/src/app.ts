@@ -1,12 +1,17 @@
 import Fastify, { type FastifyInstance, type FastifyServerOptions } from "fastify";
 import type { ServerResponse } from "node:http";
 import type { ApiError, GameEvent, SparringBot } from "@chess-tutor/chess-core";
+import type { CoachingDeps } from "./coaching.ts";
 import { createGameManager, GameError, type GameManager } from "./games.ts";
 import type { GameStore } from "./store.ts";
+
+export type { CoachingDeps } from "./coaching.ts";
 
 export interface ServerDeps {
   bot: SparringBot;
   store: GameStore;
+  /** Key-moment detection and the tutor (#7). Without it, GameView.tutor reports coaching off. */
+  coaching?: CoachingDeps;
   newId?: () => string;
   now?: () => Date;
   /** Fastify logger option: false in tests, true or pino options in main. */
@@ -26,15 +31,17 @@ function sseMessage(event: GameEvent): string {
 }
 
 /**
- * The game API (#6: FR-1, FR-4, FR-5, IR-5) over injected dependencies, so tests use a
- * fake bot and fastify.inject. On close, games still playing are abandoned and saved and
- * open event streams are ended. The caller owns bot/engine and store lifetimes.
+ * The game API (#6: FR-1, FR-4, FR-5, IR-5; #7: FR-7 to FR-12, NFR-9) over injected
+ * dependencies, so tests use a fake bot, analyzer and tutor, and fastify.inject. On close,
+ * games still playing are abandoned and saved, tutor asks are aborted, and open event
+ * streams are ended. The caller owns bot/engine and store lifetimes.
  */
 export function buildServer(deps: ServerDeps): { app: FastifyInstance; games: GameManager } {
   const app = Fastify({ logger: deps.logger ?? false });
   const games = createGameManager({
     bot: deps.bot,
     store: deps.store,
+    ...(deps.coaching ? { coaching: deps.coaching } : {}),
     ...(deps.newId ? { newId: deps.newId } : {}),
     ...(deps.now ? { now: deps.now } : {}),
     log: app.log,
@@ -97,6 +104,14 @@ export function buildServer(deps: ServerDeps): { app: FastifyInstance; games: Ga
   app.post<{ Params: { id: string } }>("/api/games/:id/bot-retry", async (request) => games.botRetry(request.params.id));
 
   app.post<{ Params: { id: string } }>("/api/games/:id/resign", async (request) => games.resign(request.params.id));
+
+  // Tutor (#7, FR-12). The hint reply arrives over SSE; reveal makes no Claude call.
+  app.post<{ Params: { id: string } }>("/api/games/:id/tutor/hint", async (request, reply) => {
+    games.hint(request.params.id);
+    return reply.status(202).send({});
+  });
+
+  app.post<{ Params: { id: string } }>("/api/games/:id/tutor/reveal", async (request) => games.reveal(request.params.id));
 
   app.get<{ Params: { id: string } }>("/api/games/:id/events", (request, reply) => {
     const { id } = request.params;
