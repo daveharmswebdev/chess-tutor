@@ -176,3 +176,35 @@ button:disabled {
   color: var(--muted);
   margin: 0;
 }
+
+/* Tutor panel (#7) */
+.tutor p {
+  margin: 0 0 8px;
+}
+
+.tutor-thinking p:first-child {
+  font-weight: 600;
+}
+
+.tutor-question {
+  white-space: pre-line;
+}
+
+.tutor-attempt {
+  font-weight: 600;
+}
+
+.tutor-attempt.good {
+  color: var(--accent);
+}
+
+.tutor-attempt.bad,
+.tutor p.error {
+  color: var(--error);
+}
+
+.tutor-reveal {
+  border-left: 3px solid var(--accent);
+  padding-left: 8px;
+  white-space: pre-line;
+}

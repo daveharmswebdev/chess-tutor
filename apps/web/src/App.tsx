@@ -1,5 +1,5 @@
-// Board UI: choose a color, play the sparring bot, take back, resign, retry a failed bot move.
-// FR-1, FR-4, IR-5, #23.
+// Board UI: choose a color, play the sparring bot, take back, resign, retry a failed bot move,
+// and the tutor panel with its board arrows. FR-1, FR-4, IR-5, #23; #7: FR-8, FR-11, FR-12, NFR-9.
 import type { Color, MoveView } from "@chess-tutor/chess-core";
 import { useEffect, useMemo, useState, useSyncExternalStore, type CSSProperties } from "react";
 import { Chessboard, type ChessboardOptions } from "react-chessboard";
@@ -9,6 +9,7 @@ import { createGameController } from "./controller.ts";
 import { GameActions } from "./GameActions.tsx";
 import { boardFen, gameReducer, initialGameState, isPlayersTurn, statusText } from "./game-state.ts";
 import { createStore } from "./store.ts";
+import { chessboardArrows, TutorPanel } from "./TutorPanel.tsx";
 
 const SELECTED: CSSProperties = { background: "rgba(255, 213, 79, 0.55)" };
 const LAST_MOVE: CSSProperties = { background: "rgba(155, 199, 0, 0.35)" };
@@ -85,12 +86,16 @@ export function App() {
     return styles;
   }, [game, state.pendingFen, state.selected, myTurn, fen, playerColor]);
 
+  // Tutor arrows (FR-8, FR-11): the open question's, or its reveal's; at most 3.
+  const arrows = useMemo(() => chessboardArrows(state), [state.tutor]);
+
   const options: ChessboardOptions = {
     id: "board",
     position: fen,
     boardOrientation: playerColor === "b" ? "black" : "white",
     allowDragging: myTurn,
     allowDrawingArrows: false,
+    arrows,
     squareStyles,
     canDragPiece: ({ piece }) => myTurn && piece.pieceType.startsWith(playerColor),
     onPieceDrop: ({ sourceSquare, targetSquare }) => {
@@ -159,10 +164,7 @@ export function App() {
             <GameActions state={state} controller={controller} />
           </div>
 
-          <div className="panel tutor" data-testid="tutor-panel">
-            <h2>Tutor</h2>
-            <p className="muted">The tutor will comment on key moments of your game here. Coming soon.</p>
-          </div>
+          <TutorPanel state={state} controller={controller} />
         </aside>
       </main>
     </div>
