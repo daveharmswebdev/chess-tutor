@@ -2,7 +2,10 @@ import { copyFileSync, mkdirSync, mkdtempSync, readFileSync, writeFileSync } fro
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
+
+// Re-grading recorded live cases is slow on CI runners (see graders-q3.test.ts, #29).
+vi.setConfig({ testTimeout: 20_000 });
 import { classifyCorrection, regradeDir } from "../src/regrade.ts";
 import type { CaseResult, RunSummary } from "../src/types.ts";
 

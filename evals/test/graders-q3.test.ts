@@ -1,5 +1,9 @@
 import { readFileSync } from "node:fs";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
+
+// Grading a recorded live case replays every engine line with chess.js: about 2 s locally,
+// over 5 s on CI runners. Speeding the grader up is part of #29.
+vi.setConfig({ testTimeout: 20_000 });
 import { CASES_DIR } from "../src/config.ts";
 import { gradeGiveAway, gradeMoves, gradeReply } from "../src/graders.ts";
 import { gradeInputFor } from "../src/regrade.ts";
