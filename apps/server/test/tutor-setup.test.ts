@@ -18,6 +18,7 @@ const config: TutorConfig = {
   explorer: { ratings: [1200], speeds: ["blitz"] },
 };
 
+const fakeEngine = { analyze: async () => ({ fen: "", depth: 0, lines: [], bestMove: "", timeMs: 0 }) };
 let dir: string;
 let clientsMade = 0;
 const deps = () => ({
@@ -25,7 +26,6 @@ const deps = () => ({
     clientsMade++;
     return { messages: {} as TutorClient["messages"] };
   },
-  engine: { analyze: async () => ({ fen: "", depth: 0, lines: [], bestMove: "", timeMs: 0 }) },
   explorer: NO_TOKEN_TUTOR_EXPLORER,
   repertoire: null,
   config,
@@ -71,7 +71,7 @@ describe("setupTutor (NFR-9)", () => {
     const setup = setupTutor({ ...deps(), apiKey: "sk-test-not-real", promptPath: tempPrompt("You are a tutor.") });
     expect(setup.offReason).toBeNull();
     expect(setup.tutor).not.toBeNull();
-    const session = setup.tutor!.createSession({ id: "g1", playerColor: "w" });
+    const session = setup.tutor!.createSession({ id: "g1", playerColor: "w", engine: fakeEngine });
     expect(typeof session.ask).toBe("function");
     expect(clientsMade).toBe(1);
     expect(PLAYER_PROFILE).toMatch(/1000/);

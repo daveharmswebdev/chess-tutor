@@ -13,13 +13,12 @@ import {
   type MoveView,
   type SparringBot,
 } from "@chess-tutor/chess-core";
-import type { TutorOutcome, TutorRequest, TutorSession } from "@chess-tutor/tutor";
+import type { TutorEngine, TutorOutcome, TutorRequest, TutorSession } from "@chess-tutor/tutor";
 import {
   AUTH_REASON,
   buildReveal,
   cleanArrows,
   failureMessage,
-  FIRST_PROGRESS_LABEL,
   moveLoss,
   NOT_CONFIGURED_REASON,
   samePosition,
@@ -96,6 +95,8 @@ interface Game {
   moves: MoveView[];
   /** Parallel to moves: a unique id per played move, so a detection for a taken-back move is dropped. */
   moveIds: number[];
+  /** Parallel to moves: the FEN before each move (for the one-takeback reachability rule). */
+  fensBefore: string[];
   status: GameStatus;
   result: GameResult;
   endReason: GameEndReason | null;
@@ -114,9 +115,39 @@ interface Game {
   work: Set<Promise<void>>;
   session: TutorSession | null;
   /** The tutor request in flight; a newer one replaces it (and aborts it). */
-  ask: { token: number; kind: TutorKind; controller: AbortController } | null;
+  ask: { token: number; kind: TutorKind; attemptFen: string; controller: AbortController } | null;
   /** At most one open question per game; the reveal stays here until "Show me" or a wrong try. */
   question: HeldQuestion | null;
+  /** The engine wrapper this game's session uses for tool calls (NFR-3). */
+  tutorEngine: TutorEngine | null;
+}
+
+const LESSON_KINDS: ReadonlySet<TutorKind> = new Set(["player_blunder", "missed_win"]);
+
+function abortError(): Error {
+  const err = new Error("the tutor ask was aborted");
+  err.name = "AbortError";
+  return err;
+}
+
+/** `p`, or a rejection with AbortError as soon as `signal` aborts. */
+function unlessAborted<T>(p: Promise<T>, signal: AbortSignal | undefined): Promise<T> {
+  if (!signal) return p;
+  if (signal.aborted) return Promise.reject(abortError());
+  return new Promise<T>((resolve, reject) => {
+    const onAbort = () => reject(abortError());
+    signal.addEventListener("abort", onAbort, { once: true });
+    p.then(
+      (v) => {
+        signal.removeEventListener("abort", onAbort);
+        resolve(v);
+      },
+      (err: unknown) => {
+        signal.removeEventListener("abort", onAbort);
+        reject(err);
+      },
+    );
+  });
 }
 
 const UCI_RE = /^[a-h][1-8][a-h][1-8][qrbn]?$/;
@@ -162,12 +193,29 @@ interface MovePlayed {
  *
  * Coaching (FR-6 to FR-12, NFR-9): after every move (the player's and the bot's) the server
  * analyses the new position, keeps the previous one's analysis, and runs the key-moment
- * detector. Only a key moment or a Hint calls the tutor (FR-7). The bot search is queued on
- * the shared engine before the analysis, so the bot never waits for coaching (NFR-3).
+ * detector. Only a key moment or a Hint calls the tutor (FR-7).
  *
- * Questions: at most one per game. A new key moment or Hint replaces it, aborting an ask in
- * flight; a late reply for a replaced ask is dropped. The reply's reveal and revealMove stay
- * here until "Show me" or a wrong try (architecture §3.5).
+ * Shared engine (NFR-3): the bot, this analysis and the tutor's tool calls use one Stockfish
+ * with a FIFO queue. The server's analysis waits until the bot's search in flight has settled.
+ * Each session gets a per-game TutorEngine wrapper that submits at most one tutor search at a
+ * time, waits for the game's bot search (pending or in flight) before each submission, and
+ * rejects its waiting calls (AbortError) when the ask they belong to is aborted. So at most one
+ * tutor search (<= movetimeCapMs) can be ahead of the bot.
+ *
+ * Questions: at most one per game, open or in flight. Reachability rule: a question (or an ask
+ * in flight) may exist only while its attemptFen is the current position, or, for
+ * player_blunder and missed_win, the position before the player's last move (one takeback
+ * away). Any change of position that breaks this (a player move, a takeback past it) closes the
+ * question or aborts the ask, and the next "state" shows thinking false. A key moment whose
+ * attemptFen is already unreachable is not coached, and a reply that arrives for an
+ * unreachable attemptFen, or after the game ended, is dropped (with a "state"). The end of a
+ * game (resign, checkmate, draw, abandon) aborts the ask and closes the question.
+ *
+ * Priority: a Hint replaces anything. A key moment of the player's move replaces an older
+ * question. A key moment of the bot's move (punish_opponent, opponent_left_book) is skipped
+ * while a player_blunder or missed_win is in flight or open, so the player's own lesson is
+ * kept (FR-7 still holds: one ask). A late reply for a replaced ask is dropped. The reply's
+ * reveal and revealMove stay here until "Show me" or a wrong try (architecture §3.5).
  *
  * Attempts: the player's next move closes the open question. When it is played from the
  * question's attemptFen (directly for punish_opponent, opponent_left_book and hints; after a
@@ -177,9 +225,8 @@ interface MovePlayed {
  * back) closes the question silently. A graded move is not itself coached again as a key
  * moment (its reveal already explains it); the bot's reply still is.
  *
- * Takebacks keep the open question (that is how the player gets back to attemptFen).
- * Detection for a taken-back move is dropped, as is a key moment older than the player's
- * latest turn. Coaching turned off (no key, no prompt, an "auth" outcome) skips analysis
+ * Takebacks keep a reachable question (that is how the player gets back to attemptFen).
+ * Detection and grading for a taken-back move are dropped. Coaching turned off (no key, no prompt, an "auth" outcome) skips analysis
  * entirely; the game works the same.
  */
 export function createGameManager(opts: GameManagerOptions): GameManager {
@@ -270,6 +317,9 @@ export function createGameManager(opts: GameManagerOptions): GameManager {
     g.endReason = endReason;
     g.botThinking = false;
     g.version++;
+    // A finished game has no attempt to make: abort the ask, close the question.
+    cancelAsk(g);
+    g.question = null;
     save(g);
     log.info({ gameId: g.id, status, result, endReason }, "game over");
   }
@@ -337,12 +387,72 @@ export function createGameManager(opts: GameManagerOptions): GameManager {
   function recordMove(g: Game, fenBefore: string, uci: string): MovePlayed {
     const moveId = ++nextMoveId;
     g.moveIds.push(moveId);
+    g.fensBefore.push(fenBefore);
     return {
       fenBefore,
       fenAfter: g.chess.fen(),
       uci,
       history: g.moves.slice(0, -1).map((m) => m.uci),
       moveId,
+    };
+  }
+
+  /**
+   * The reachability rule (see the header): attemptFen is the current position, or, for the
+   * player's own lessons, the position before the player's last move (one takeback away).
+   */
+  function reachable(g: Game, kind: TutorKind, attemptFen: string): boolean {
+    if (g.status !== "playing") return false;
+    if (samePosition(g.chess.fen(), attemptFen)) return true;
+    if (!LESSON_KINDS.has(kind)) return false;
+    const last = g.moves.findLastIndex((m) => m.by === "player");
+    return last !== -1 && samePosition(g.fensBefore[last]!, attemptFen);
+  }
+
+  /**
+   * After the position changed: aborts an ask and closes a question whose attemptFen can no
+   * longer be reached. The caller's next "state" (or bot_move) then shows it.
+   */
+  function enforceReachable(g: Game): void {
+    if (g.ask && !reachable(g, g.ask.kind, g.ask.attemptFen)) {
+      log.info({ gameId: g.id, kind: g.ask.kind }, "tutor ask aborted: its position can no longer be reached");
+      cancelAsk(g);
+    }
+    if (g.question && !reachable(g, g.question.view.kind, g.question.view.attemptFen)) {
+      log.info({ gameId: g.id, questionId: g.question.view.id }, "tutor question closed: its position can no longer be reached");
+      g.question = null;
+    }
+  }
+
+  /**
+   * The TutorEngine a game's session uses for tool calls (NFR-3). At most one tutor search is
+   * submitted to the shared engine at a time; before each submission it waits for the game's
+   * bot search (pending or in flight); calls still waiting reject with AbortError when the ask
+   * they were made for is aborted. So at most one tutor search can be ahead of the bot.
+   */
+  function tutorEngineFor(g: Game): TutorEngine {
+    const base: TutorEngine = coaching!.engine ?? { analyze: (fen) => coaching!.analyzer.analyze(fen) };
+    let turn: Promise<void> = Promise.resolve();
+    return {
+      analyze(fen, opts) {
+        const signal = g.ask?.controller.signal;
+        const prev = turn;
+        let done!: () => void;
+        turn = new Promise<void>((r) => (done = r));
+        const run = (async () => {
+          await unlessAborted(prev, signal);
+          while (g.pending) await unlessAborted(afterBot(g), signal);
+          if (signal?.aborted) throw abortError();
+          return base.analyze(fen, opts);
+        })();
+        // The next call's turn starts when this one has settled and so has the one before it,
+        // so an aborted waiter never lets two searches through at once.
+        void run.then(
+          () => prev.then(done),
+          () => prev.then(done),
+        );
+        return run;
+      },
     };
   }
 
@@ -387,11 +497,17 @@ export function createGameManager(opts: GameManagerOptions): GameManager {
     log.info({ gameId: g.id, uci: m.uci, keyMoment: moment?.kind ?? null }, "key-moment detection");
     if (!moment || !ask) return; // FR-7: a quiet move never reaches the tutor
     if (g.status !== "playing" || !coachingOn()) return;
-    if (g.moves.length - m.history.length > 2) {
-      log.info({ gameId: g.id, uci: m.uci }, "key moment not coached: the player has moved on");
+    const attemptFen = LESSON_KINDS.has(moment.kind) ? m.fenBefore : m.fenAfter;
+    if (!reachable(g, moment.kind, attemptFen)) {
+      log.info({ gameId: g.id, uci: m.uci, keyMoment: moment.kind }, "key moment not coached: its position can no longer be reached");
       return;
     }
-    const attemptFen = moment.kind === "player_blunder" || moment.kind === "missed_win" ? m.fenBefore : m.fenAfter;
+    // The player's own lesson outranks the bot's key moment (review 028).
+    const current = g.ask?.kind ?? g.question?.view.kind;
+    if (!LESSON_KINDS.has(moment.kind) && current !== undefined && LESSON_KINDS.has(current)) {
+      log.info({ gameId: g.id, uci: m.uci, keyMoment: moment.kind, kept: current }, "key moment not coached: the player's lesson is kept");
+      return;
+    }
     startAsk(g, moment.kind, {
       kind: "key_moment",
       moment,
@@ -407,17 +523,18 @@ export function createGameManager(opts: GameManagerOptions): GameManager {
     g.question = null;
     const token = ++nextAskToken;
     const controller = new AbortController();
-    g.ask = { token, kind, controller };
+    g.ask = { token, kind, attemptFen, controller };
     log.info({ gameId: g.id, kind }, "tutor asked");
+    // tutor_thinking at once; the session sends the first progress label itself (NFR-1).
     emit(g, { type: "tutor_thinking", kind });
-    emit(g, { type: "tutor_progress", label: FIRST_PROGRESS_LABEL }); // NFR-1: first progress at once
 
     const onProgress = (p: { label: string }) => {
       if (g.ask?.token === token) emit(g, { type: "tutor_progress", label: String(p.label) });
     };
     let outcome: Promise<TutorOutcome>;
     try {
-      g.session ??= coaching!.tutor!.createSession({ id: g.id, playerColor: g.playerColor });
+      g.tutorEngine ??= tutorEngineFor(g);
+      g.session ??= coaching!.tutor!.createSession({ id: g.id, playerColor: g.playerColor, engine: g.tutorEngine });
       outcome = Promise.resolve(g.session.ask(request, onProgress, controller.signal));
     } catch (err) {
       outcome = Promise.reject(err);
@@ -439,6 +556,12 @@ export function createGameManager(opts: GameManagerOptions): GameManager {
       return;
     }
     g.ask = null;
+    if (!reachable(g, kind, attemptFen)) {
+      // Normally aborted already when the position changed; this is the last line of defence.
+      log.info(meta, "tutor reply dropped: its position can no longer be reached");
+      emit(g, { type: "state", game: viewOf(g) });
+      return;
+    }
     if (outcome.ok) {
       const { reply } = outcome;
       g.question = {
@@ -473,6 +596,10 @@ export function createGameManager(opts: GameManagerOptions): GameManager {
     const p = (async () => {
       await botTurn;
       const [before, after] = await Promise.all([analysisOf(g, m.fenBefore), analysisOf(g, m.fenAfter)]);
+      if (!stillPlayed(g, m)) {
+        log.info({ gameId: g.id, questionId: q.view.id, uci: m.uci }, "attempt not graded: the move was taken back");
+        return;
+      }
       const cpLoss = moveLoss(m.fenBefore, m.uci, before, after);
       if (cpLoss === null) {
         log.warn({ gameId: g.id, questionId: q.view.id, uci: m.uci }, "attempt not graded: no evaluation");
@@ -518,6 +645,7 @@ export function createGameManager(opts: GameManagerOptions): GameManager {
           { gameId: g.id, ms, source: botMove.source, uci: toUci(move), san: move.san },
           "bot move",
         );
+        enforceReachable(g);
         const over = checkOutcome(g);
         emit(g, { type: "bot_move", move: { ...g.moves.at(-1)! }, game: viewOf(g) });
         if (over) emit(g, { type: "game_over", game: viewOf(g) });
@@ -544,6 +672,8 @@ export function createGameManager(opts: GameManagerOptions): GameManager {
         chess: new Chess(),
         moves: [],
         moveIds: [],
+        fensBefore: [],
+        tutorEngine: null,
         status: "playing",
         result: "*",
         endReason: null,
@@ -585,10 +715,11 @@ export function createGameManager(opts: GameManagerOptions): GameManager {
       const attempt = g.question && samePosition(g.question.view.attemptFen, fenBefore) ? g.question : null;
       if (g.question && !attempt) log.info({ gameId: g.id, questionId: g.question.view.id }, "tutor question closed: the player moved on");
       g.question = null;
+      enforceReachable(g); // e.g. a Hint for the position just left: aborted, thinking false
       if (checkOutcome(g)) {
         emit(g, { type: "game_over", game: viewOf(g) });
       } else {
-        startBot(g); // first in the engine queue: the bot never waits for coaching (NFR-3)
+        startBot(g); // the bot's search is pending before any coaching search (NFR-3)
         emit(g, { type: "state", game: viewOf(g) });
       }
       if (attempt) gradeAttempt(g, attempt, played, { ...g.moves.at(-1)! });
@@ -606,8 +737,10 @@ export function createGameManager(opts: GameManagerOptions): GameManager {
         g.chess.undo();
         g.moves.pop();
         g.moveIds.pop();
+        g.fensBefore.pop();
       }
       g.version++;
+      enforceReachable(g); // a takeback past attemptFen closes the question
       emit(g, { type: "state", game: viewOf(g) });
       return viewOf(g);
     },

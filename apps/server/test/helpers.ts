@@ -5,6 +5,7 @@ import type {
   TutorOutcome,
   TutorReply,
   TutorRequest,
+  TutorEngine,
   TutorSession,
   TutorUsage,
 } from "@chess-tutor/tutor";
@@ -221,9 +222,16 @@ export interface FakeAsk {
   reject(err: unknown): void;
 }
 
+export interface FakeSessionGame {
+  id: string;
+  playerColor: Color;
+  /** The server's per-game engine wrapper for tutor tool calls (NFR-3). */
+  engine: TutorEngine;
+}
+
 export interface FakeTutor {
-  createSession(game: { id: string; playerColor: Color }): TutorSession;
-  sessions: { id: string; playerColor: Color }[];
+  createSession(game: FakeSessionGame): TutorSession;
+  sessions: FakeSessionGame[];
   asks: FakeAsk[];
   /** Resolves with the n-th (0-based) ask once it has been made. */
   ask(n: number, timeoutMs?: number): Promise<FakeAsk>;
@@ -232,7 +240,65 @@ export interface FakeTutor {
   autoProgress: string[];
 }
 
-/** A scripted tutor: asks wait for the test to resolve them, unless `auto` is set. */
+/**
+ * A fake shared engine that records the order in which searches are submitted to it.
+ * bestMove answers at once with the first legal move; analyze is held while hold() is on.
+ */
+export interface FakeEngine {
+  submissions: string[];
+  analyze(fen: string, opts?: { depth?: number; movetimeMs?: number; multiPv?: number }): Promise<Analysis>;
+  bestMove(fen: string): Promise<string>;
+  hold(): void;
+  release(): void;
+}
+
+export function createFakeEngine(): FakeEngine {
+  const submissions: string[] = [];
+  let held = false;
+  let waiters: (() => void)[] = [];
+  return {
+    submissions,
+    hold() {
+      held = true;
+    },
+    release() {
+      held = false;
+      const w = waiters;
+      waiters = [];
+      for (const fn of w) fn();
+    },
+    async analyze(fen) {
+      submissions.push(`analyze ${fen}`);
+      if (held) await new Promise<void>((r) => waiters.push(r));
+      return { fen, depth: 1, lines: [], bestMove: "", timeMs: 1 };
+    },
+    async bestMove(fen) {
+      submissions.push(`bestMove ${fen}`);
+      const m = new Chess(fen).moves({ verbose: true })[0]!;
+      return m.from + m.to + (m.promotion ?? "");
+    },
+  };
+}
+
+/** A sparring bot that searches on the given engine (for engine-ordering tests). */
+export function botOnEngine(engine: { bestMove(fen: string): Promise<string> }, delayMs = 0): SparringBot {
+  return {
+    async chooseMove(fen) {
+      // The real bot reaches the engine only after its explorer lookup.
+      if (delayMs > 0) await new Promise((r) => setTimeout(r, delayMs));
+      const uci = await engine.bestMove(fen);
+      return { uci, san: "?", source: "engine", fallbackReason: "unavailable" };
+    },
+  };
+}
+
+/** The real session sends this synchronously at the start of every ask (packages/tutor). */
+export const SESSION_FIRST_LABEL = "Tutor is looking at the position…";
+
+/**
+ * A scripted tutor: asks wait for the test to resolve them, unless `auto` is set. Like the
+ * real session, each ask reports SESSION_FIRST_LABEL synchronously.
+ */
 export function createFakeTutor(): FakeTutor {
   const asks: FakeAsk[] = [];
   const tutor: FakeTutor = {
@@ -244,6 +310,7 @@ export function createFakeTutor(): FakeTutor {
       tutor.sessions.push(game);
       return {
         ask(request, onProgress, signal) {
+          onProgress({ label: SESSION_FIRST_LABEL });
           return new Promise<TutorOutcome>((resolve, reject) => {
             const ask: FakeAsk = { request, signal, progress: (label) => onProgress({ label }), resolve, reject };
             asks.push(ask);

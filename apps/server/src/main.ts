@@ -15,7 +15,9 @@
  *   TUTOR_PROMPT_PATH  default <repo>/prompts/tutor-system.v1.md; a missing file turns coaching
  *                      off with a reason, never a crash.
  * Detection, attempt grading, the bot and the tutor's tools share the one Stockfish process
- * (one search at a time, queued); after a player move the bot's search is queued first.
+ * (one search at a time, queued). The server's analysis waits for the bot's search, and the
+ * tutor's tool calls go through a per-game wrapper that submits one search at a time, after
+ * the bot's (see games.ts), so at most one tutor search can be ahead of the bot (NFR-3).
  */
 import { fileURLToPath } from "node:url";
 import Anthropic from "@anthropic-ai/sdk";
@@ -75,12 +77,13 @@ async function main(): Promise<void> {
       analyze: (fen: string) =>
         sharedEngine.analyze(fen, { depth: analysis.depth, movetimeMs: analysis.movetimeCapMs, multiPv: analysis.multiPv }),
     };
-    const tutor = tutorFromEnv(env, { engine, explorer, repertoire, warn: (m) => warnings.push(m) });
+    const tutor = tutorFromEnv(env, { explorer, repertoire, warn: (m) => warnings.push(m) });
 
     const { app } = buildServer({
       bot,
       store,
-      coaching: { analyzer, ...tutor, thresholds, attemptToleranceCp, repertoire },
+      // engine: tool calls go through a per-game wrapper that yields to the bot (NFR-3).
+      coaching: { analyzer, engine, ...tutor, thresholds, attemptToleranceCp, repertoire },
       logger: { level: env["LOG_LEVEL"] || "info" },
     });
     for (const w of warnings) app.log.warn(w);
@@ -114,7 +117,6 @@ async function main(): Promise<void> {
 function tutorFromEnv(
   env: NodeJS.ProcessEnv,
   deps: {
-    engine: StockfishEngine;
     explorer: BotExplorerSetup;
     repertoire: ReturnType<typeof loadRepertoire>;
     warn: (message: string) => void;
@@ -127,7 +129,6 @@ function tutorFromEnv(
       apiKey,
       promptPath: env["TUTOR_PROMPT_PATH"] || DEFAULT_PROMPT_PATH,
       makeClient: () => new Anthropic(),
-      engine: deps.engine,
       explorer: deps.explorer.tutorExplorer,
       repertoire: deps.repertoire,
       config: loadTutorConfig(env["APP_ENV"] || "development"),

@@ -9,7 +9,7 @@ import {
   type MoveView,
   type Repertoire,
 } from "@chess-tutor/chess-core";
-import type { TutorFailureReason } from "@chess-tutor/tutor";
+import type { TutorEngine, TutorFailureReason } from "@chess-tutor/tutor";
 import type { TutorFactory } from "./tutor-setup.ts";
 
 /*
@@ -30,6 +30,11 @@ export interface Analyzer {
 
 export interface CoachingDeps {
   analyzer: Analyzer;
+  /**
+   * The shared engine for the tutor's tool calls. Each session gets a per-game wrapper around
+   * it that yields to the bot (NFR-3). Default: the analyzer, without search options.
+   */
+  engine?: TutorEngine;
   /** null when coaching is off (no key, no prompt file); offReason then says why. */
   tutor: TutorFactory | null;
   offReason?: string | null;
@@ -43,7 +48,6 @@ export interface CoachingDeps {
 /** When the server is built without coaching deps at all. */
 export const NOT_CONFIGURED_REASON = "Coaching is off: the tutor is not configured.";
 export const AUTH_REASON = "Coaching is off: the API key was rejected.";
-export const FIRST_PROGRESS_LABEL = "Tutor is looking at the position…";
 
 /**
  * Plain messages for "tutor_failed". The outcome's own message is logged, never sent:
