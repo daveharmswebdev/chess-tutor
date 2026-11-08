@@ -32,6 +32,8 @@ export interface RecordedRound {
   text: string;
   usage: Record<string, unknown> | null;
   error: string | null;
+  /** The correction turn the session sent after rejecting this round's reply (NFR-8); null if none. */
+  correction: string | null;
 }
 
 export interface CaseResult {
@@ -49,8 +51,10 @@ export interface CaseResult {
   ms: number;
   firstRoundMs: number | null;
   toolCalls: number;
-  /** end_turn rounds after the first: the session's NFR-8 correction retry. */
+  /** Correction turns the session sent (NFR-8). */
   retries: number;
+  /** One entry per reason per correction (give_away, unbacked_move, ...); see classifyCorrection. */
+  retryReasons: string[];
   usage: TutorUsage;
   costUsd: number;
   revealCpLoss: number | null;
@@ -72,8 +76,11 @@ export interface CaseRow {
   arrowsOk: boolean | null;
   revealOk: boolean | null;
   schemaOk: boolean | null;
+  /** Information only: an arrow points at the answer's square. */
+  pointsAtAnswer: boolean | null;
   toolCalls: number;
   retries: number;
+  retryReasons: string[];
   ms: number;
   firstRoundMs: number | null;
   costUsd: number;
@@ -90,11 +97,14 @@ export interface RunMetrics {
   moveLegalPct: number | null;
   evalMatchPct: number | null;
   noGiveAwayPct: number | null;
+  /** Information only (not NFR-7): replies with an arrow pointing at the answer's square. */
+  pointsAtAnswerPct: number | null;
   arrowsOkPct: number | null;
   revealOkPct: number | null;
   schemaOkPct: number | null;
   toolCallsMean: number | null;
   retriesTotal: number;
+  retryReasons: Record<string, number>;
   latencyP50Ms: number | null;
   latencyP95Ms: number | null;
   firstRoundP50Ms: number | null;

@@ -37,6 +37,8 @@ export interface FakeClientOptions {
   /** Throw for a request whose request text contains this FEN. */
   failFen?: string;
   usage?: { input_tokens: number; output_tokens: number };
+  /** The first reply names the answer in its message, so the session sends one correction turn. */
+  giveAwayFirst?: boolean;
 }
 
 /**
@@ -71,11 +73,15 @@ export function fakeClient(opts: FakeClientOptions = {}) {
               if (!toolResult) {
                 return msg([{ type: "tool_use", id: `toolu_${++id}`, name: "analyze_position", input: { fen: attempt } }], "tool_use", usage);
               }
-              const result = JSON.parse((toolResult as Anthropic.ToolResultBlockParam).content as string) as { lines: { moves: { uci: string }[] }[] };
+              const result = JSON.parse((toolResult as Anthropic.ToolResultBlockParam).content as string) as { lines: { moves: { uci: string; san: string }[] }[] };
+              const corrected = params.messages.some(
+                (m) => m.role === "user" && Array.isArray(m.content) && m.content.some((b) => b.type === "text" && b.text.startsWith("Your last reply was not accepted")),
+              );
+              const answerSan = result.lines[0]?.moves[0]?.san ?? "";
               const reply = {
                 schemaVersion: 1,
                 kind,
-                message: "What is your opponent threatening?",
+                message: opts.giveAwayFirst && !corrected ? `Is ${answerSan} the move?` : "What is your opponent threatening?",
                 reveal: "The engine's move.",
                 revealMove: result.lines[0]?.moves[0]?.uci ?? null,
                 arrows: [],

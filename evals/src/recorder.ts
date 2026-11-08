@@ -5,11 +5,13 @@ import type { RecordedRound } from "./types.ts";
 /**
  * Wraps the client the tutor session uses so every API round is recorded: stop reason, tool
  * calls, text, usage and time, and (from the next request's tool_result blocks) what each tool
- * answered. Only `messages.stream(...).finalMessage()` is used by the session (#7).
+ * answered, and the text of every correction turn (NFR-8) the session sends after a rejected
+ * reply. Only `messages.stream(...).finalMessage()` is used by the session (#7).
  */
 export function recordingClient(inner: TutorClient, rounds: RecordedRound[], now: () => number = () => performance.now()): TutorClient {
   const stream = (params: Anthropic.MessageCreateParams, options?: unknown) => {
     attachToolResults(params, rounds);
+    attachCorrection(params, rounds);
     const started = now();
     const s = (inner.messages.stream as (p: unknown, o?: unknown) => { finalMessage(): Promise<Anthropic.Message> })(params, options);
     return {
@@ -29,10 +31,11 @@ export function recordingClient(inner: TutorClient, rounds: RecordedRound[], now
               .join(""),
             usage: (m.usage as unknown as Record<string, unknown>) ?? null,
             error: null,
+            correction: null,
           });
           return m;
         } catch (err) {
-          rounds.push({ ms: Math.round(now() - started), stopReason: null, toolUses: [], toolResults: [], text: "", usage: null, error: String(err) });
+          rounds.push({ ms: Math.round(now() - started), stopReason: null, toolUses: [], toolResults: [], text: "", usage: null, error: String(err), correction: null });
           throw err;
         }
       },
@@ -52,4 +55,20 @@ function attachToolResults(params: Anthropic.MessageCreateParams, rounds: Record
     const content = typeof block.content === "string" ? block.content : JSON.stringify(block.content ?? "");
     round.toolResults.push({ id: block.tool_use_id, name: use.name, input: use.input, content, isError: block.is_error === true });
   }
+}
+
+/** The session's correction turn starts with this (packages/tutor session.ts correction()). */
+export const CORRECTION_PREFIX = "Your last reply was not accepted";
+
+/** A user text turn after the last recorded round is the correction for that round's reply. */
+function attachCorrection(params: Anthropic.MessageCreateParams, rounds: RecordedRound[]): void {
+  const last = params.messages[params.messages.length - 1];
+  const round = rounds[rounds.length - 1];
+  if (!last || last.role !== "user" || !round || round.correction) return;
+  const blocks = typeof last.content === "string" ? [{ type: "text", text: last.content }] : last.content;
+  const text = blocks
+    .filter((b): b is Anthropic.TextBlockParam => b.type === "text")
+    .map((b) => b.text)
+    .join("");
+  if (text.startsWith(CORRECTION_PREFIX)) round.correction = text;
 }

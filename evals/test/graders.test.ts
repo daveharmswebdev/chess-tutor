@@ -169,15 +169,32 @@ describe("gradeGiveAway (NFR-7)", () => {
     expect(g.problems).toEqual([]);
   });
 
-  it("flags an arrow equal to, ending on, or along the answer's line, and one starting on its empty destination", () => {
-    const along = gradeGiveAway(input(withReply(HINT, { message: "Look.", arrows: [{ from: "e2", to: "d3" }] })));
-    expect(along.problems.join(" ")).toMatch(/e2->d3/);
+  it("flags an arrow that is the answer or starts on its from-square (the user's NFR-7 rule)", () => {
     const equal = gradeGiveAway(input(withReply(HINT, { message: "Look.", arrows: [{ from: "f1", to: "d3" }] })));
     expect(equal.pass).toBe(false);
-    const fromDest = gradeGiveAway(input(withReply(HINT, { message: "Look.", arrows: [{ from: "d3", to: "h7" }] })));
-    expect(fromDest.problems.join(" ")).toMatch(/d3->h7/);
+    expect(equal.problems.join(" ")).toMatch(/is the answer/);
+    const fromSquare = gradeGiveAway(input(withReply(HINT, { message: "Look.", arrows: [{ from: "f1", to: "c4" }] })));
+    expect(fromSquare.pass).toBe(false);
     const unrelated = gradeGiveAway(input(withReply(HINT, { message: "Look.", arrows: [{ from: "e1", to: "g1" }] })));
     expect(unrelated.problems).toEqual([]);
+    expect(unrelated.nudges).toEqual([]);
+  });
+
+  it("reports arrows ending on the answer's square, along its line, or from its empty to-square as nudges, not give-aways", () => {
+    for (const arrow of [
+      { from: "e2", to: "d3" },
+      { from: "c4", to: "d3" },
+      { from: "d3", to: "h7" },
+    ]) {
+      const g = gradeGiveAway(input(withReply(HINT, { message: "Look.", arrows: [arrow] })));
+      expect(g.pass, `${arrow.from}->${arrow.to}`).toBe(true);
+      expect(g.nudges.join(" ")).toMatch(new RegExp(`${arrow.from}->${arrow.to}`));
+    }
+  });
+
+  it("ignores malformed arrows for NFR-7 (the session drops them; the arrows grade reports them)", () => {
+    const g = gradeGiveAway(input(withReply(HINT, { message: "Look.", arrows: [{ from: "f1", to: "f1" }] })));
+    expect(g.pass).toBe(true);
   });
 });
 
@@ -263,6 +280,12 @@ describe("gradeReply", () => {
     expect(g.schema.pass).toBe(true);
     expect(g.moves.pass).toBe(true);
     expect(g.giveAway.pass).toBe(false);
+  });
+
+  it("does not count a null revealMove against NFR-6 move legality (the reveal grade reports it)", () => {
+    const g = gradeReply(input(withReply(HINT, { revealMove: null, arrows: [] })));
+    expect(g.reveal.pass).toBe(false);
+    expect(g.nfr6Moves).toBe(true);
   });
 
   it("flags a reply that does not match the schema", () => {

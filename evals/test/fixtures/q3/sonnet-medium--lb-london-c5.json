@@ -1,0 +1,258 @@
+{
+  "id": "lb-london-c5",
+  "caseId": "lb-london-c5",
+  "repeat": 1,
+  "kind": "opponent_left_book",
+  "model": "claude-sonnet-5-5",
+  "effort": "medium",
+  "ok": true,
+  "reason": null,
+  "failureMessage": null,
+  "reply": {
+    "schemaVersion": 1,
+    "kind": "opponent_left_book",
+    "message": "Black played 1...c5 instead of 1...d5, so this isn't the usual London line. The c5 pawn now attacks your d4 pawn. How could you support your center and keep developing smoothly?",
+    "reveal": "A solid reply is e3. It supports the d4 pawn and opens a path for your light-squared bishop. If Black plays cxd4, recapture with exd4 and keep building with Nf3. The engine slightly prefers d5, which gains space. But e3 keeps you in a familiar setup.",
+    "revealMove": "e2e3",
+    "arrows": [
+      {
+        "from": "c5",
+        "to": "d4"
+      }
+    ]
+  },
+  "ms": 10563,
+  "firstRoundMs": 1622,
+  "toolCalls": 3,
+  "retries": 1,
+  "usage": {
+    "requests": 4,
+    "inputTokens": 4648,
+    "outputTokens": 1013,
+    "cacheReadInputTokens": 12900,
+    "cacheCreationInputTokens": 0
+  },
+  "costUsd": 0.022006,
+  "revealCpLoss": 51,
+  "progress": [
+    "Tutor is looking at the position…",
+    "Checking your repertoire…",
+    "Checking what players usually play…",
+    "Looking at the engine lines…"
+  ],
+  "rounds": [
+    {
+      "ms": 1622,
+      "stopReason": "tool_use",
+      "toolUses": [
+        {
+          "id": "toolu_01YQRzdWZ6pBuJ8vcNjptZrH",
+          "name": "get_repertoire_context",
+          "input": {
+            "fen": "rnbqkbnr/pp1ppppp/8/2p5/3P4/8/PPP1PPPP/RNBQKBNR w KQkq - 0 2"
+          }
+        },
+        {
+          "id": "toolu_012gyd2byGxuupfbt4BLGT5m",
+          "name": "opening_explorer",
+          "input": {
+            "fen": "rnbqkbnr/pp1ppppp/8/2p5/3P4/8/PPP1PPPP/RNBQKBNR w KQkq - 0 2"
+          }
+        }
+      ],
+      "toolResults": [
+        {
+          "id": "toolu_01YQRzdWZ6pBuJ8vcNjptZrH",
+          "name": "get_repertoire_context",
+          "input": {
+            "fen": "rnbqkbnr/pp1ppppp/8/2p5/3P4/8/PPP1PPPP/RNBQKBNR w KQkq - 0 2"
+          },
+          "content": "{\"color\":\"white\",\"in_repertoire\":false,\"last_book_line\":\"London vs 1...d5\",\"left_book_with\":{\"san\":\"c5\",\"uci\":\"c7c5\"},\"move_number\":1}",
+          "isError": false
+        },
+        {
+          "id": "toolu_012gyd2byGxuupfbt4BLGT5m",
+          "name": "opening_explorer",
+          "input": {
+            "fen": "rnbqkbnr/pp1ppppp/8/2p5/3P4/8/PPP1PPPP/RNBQKBNR w KQkq - 0 2"
+          },
+          "content": "{\"available\":false,\"reason\":\"network\"}",
+          "isError": false
+        }
+      ],
+      "text": "",
+      "usage": {
+        "input_tokens": 370,
+        "cache_creation_input_tokens": 0,
+        "cache_read_input_tokens": 3225,
+        "cache_creation": {
+          "ephemeral_5m_input_tokens": 0,
+          "ephemeral_1h_input_tokens": 0
+        },
+        "output_tokens": 211,
+        "service_tier": "standard",
+        "inference_geo": "global",
+        "speed": "standard",
+        "output_tokens_details": {
+          "thinking_tokens": 0
+        }
+      },
+      "error": null
+    },
+    {
+      "ms": 1818,
+      "stopReason": "tool_use",
+      "toolUses": [
+        {
+          "id": "toolu_01GPG58ZMx9rrn25agNS3tWg",
+          "name": "analyze_position",
+          "input": {
+            "fen": "rnbqkbnr/pp1ppppp/8/2p5/3P4/8/PPP1PPPP/RNBQKBNR w KQkq - 0 2",
+            "multi_pv": 3
+          }
+        }
+      ],
+      "toolResults": [
+        {
+          "id": "toolu_01GPG58ZMx9rrn25agNS3tWg",
+          "name": "analyze_position",
+          "input": {
+            "fen": "rnbqkbnr/pp1ppppp/8/2p5/3P4/8/PPP1PPPP/RNBQKBNR w KQkq - 0 2",
+            "multi_pv": 3
+          },
+          "content": "{\"fen\":\"rnbqkbnr/pp1ppppp/8/2p5/3P4/8/PPP1PPPP/RNBQKBNR w KQkq - 0 2\",\"side_to_move\":\"white\",\"depth\":18,\"lines\":[{\"rank\":1,\"eval_cp\":61,\"mate_in\":null,\"moves\":[{\"san\":\"d5\",\"uci\":\"d4d5\"},{\"san\":\"Nf6\",\"uci\":\"g8f6\"},{\"san\":\"Nc3\",\"uci\":\"b1c3\"},{\"san\":\"e6\",\"uci\":\"e7e6\"},{\"san\":\"e4\",\"uci\":\"e2e4\"},{\"san\":\"d6\",\"uci\":\"d7d6\"},{\"san\":\"dxe6\",\"uci\":\"d5e6\"},{\"san\":\"fxe6\",\"uci\":\"f7e6\"}]},{\"rank\":2,\"eval_cp\":20,\"mate_in\":null,\"moves\":[{\"san\":\"e3\",\"uci\":\"e2e3\"},{\"san\":\"cxd4\",\"uci\":\"c5d4\"},{\"san\":\"exd4\",\"uci\":\"e3d4\"},{\"san\":\"d5\",\"uci\":\"d7d5\"},{\"san\":\"Nf3\",\"uci\":\"g1f3\"},{\"san\":\"Nc6\",\"uci\":\"b8c6\"},{\"san\":\"Bb5\",\"uci\":\"f1b5\"},{\"san\":\"Bg4\",\"uci\":\"c8g4\"}]},{\"rank\":3,\"eval_cp\":4,\"mate_in\":null,\"moves\":[{\"san\":\"e4\",\"uci\":\"e2e4\"},{\"san\":\"cxd4\",\"uci\":\"c5d4\"},{\"san\":\"Nf3\",\"uci\":\"g1f3\"},{\"san\":\"e5\",\"uci\":\"e7e5\"},{\"san\":\"c3\",\"uci\":\"c2c3\"},{\"san\":\"Nc6\",\"uci\":\"b8c6\"},{\"san\":\"cxd4\",\"uci\":\"c3d4\"},{\"san\":\"exd4\",\"uci\":\"e5d4\"}]}]}",
+          "isError": false
+        }
+      ],
+      "text": "",
+      "usage": {
+        "input_tokens": 723,
+        "cache_creation_input_tokens": 0,
+        "cache_read_input_tokens": 3225,
+        "cache_creation": {
+          "ephemeral_5m_input_tokens": 0,
+          "ephemeral_1h_input_tokens": 0
+        },
+        "output_tokens": 164,
+        "service_tier": "standard",
+        "inference_geo": "global",
+        "speed": "standard",
+        "output_tokens_details": {
+          "thinking_tokens": 33
+        }
+      },
+      "error": null
+    },
+    {
+      "ms": 4033,
+      "stopReason": "end_turn",
+      "toolUses": [],
+      "toolResults": [],
+      "text": "{\"schemaVersion\":1,\"kind\":\"opponent_left_book\",\"message\":\"Black played 1...c5, the Benoni-style attack on your d4 pawn, so this isn't the usual 1...d5 line. Your d4 pawn is now attacked by the c5 pawn. How could you keep your pieces developing smoothly and support the center?\",\"reveal\":\"A solid London-style reply is e3. It supports d4 and opens the path for your light-squared bishop. If Black plays cxd4, recapture with exd4, then develop with Nf3, Bf4 and c3 or Nc3, and keep your pieces behind a sturdy pawn center. The engine slightly prefers d5, which grabs space, but e3 keeps you in familiar London structures.\",\"revealMove\":\"e2e3\",\"arrows\":[{\"from\":\"c5\",\"to\":\"d4\"},{\"from\":\"c1\",\"to\":\"f4\"}]}",
+      "usage": {
+        "input_tokens": 1529,
+        "cache_creation_input_tokens": 0,
+        "cache_read_input_tokens": 3225,
+        "cache_creation": {
+          "ephemeral_5m_input_tokens": 0,
+          "ephemeral_1h_input_tokens": 0
+        },
+        "output_tokens": 410,
+        "service_tier": "standard",
+        "inference_geo": "global",
+        "speed": "standard",
+        "output_tokens_details": {
+          "thinking_tokens": 113
+        }
+      },
+      "error": null
+    },
+    {
+      "ms": 2171,
+      "stopReason": "end_turn",
+      "toolUses": [],
+      "toolResults": [],
+      "text": "{\"schemaVersion\":1,\"kind\":\"opponent_left_book\",\"message\":\"Black played 1...c5 instead of 1...d5, so this isn't the usual London line. The c5 pawn now attacks your d4 pawn. How could you support your center and keep developing smoothly?\",\"reveal\":\"A solid reply is e3. It supports the d4 pawn and opens a path for your light-squared bishop. If Black plays cxd4, recapture with exd4 and keep building with Nf3. The engine slightly prefers d5, which gains space. But e3 keeps you in a familiar setup.\",\"revealMove\":\"e2e3\",\"arrows\":[{\"from\":\"c5\",\"to\":\"d4\"}]}",
+      "usage": {
+        "input_tokens": 2026,
+        "cache_creation_input_tokens": 0,
+        "cache_read_input_tokens": 3225,
+        "cache_creation": {
+          "ephemeral_5m_input_tokens": 0,
+          "ephemeral_1h_input_tokens": 0
+        },
+        "output_tokens": 228,
+        "service_tier": "standard",
+        "inference_geo": "global",
+        "speed": "standard",
+        "output_tokens_details": {
+          "thinking_tokens": 0
+        }
+      },
+      "error": null
+    }
+  ],
+  "grades": {
+    "schema": {
+      "pass": true,
+      "problems": []
+    },
+    "moves": {
+      "pass": false,
+      "mentions": [
+        {
+          "field": "message",
+          "raw": "c5",
+          "legal": true
+        },
+        {
+          "field": "message",
+          "raw": "d5",
+          "legal": true
+        },
+        {
+          "field": "reveal",
+          "raw": "cxd4",
+          "legal": true
+        },
+        {
+          "field": "reveal",
+          "raw": "exd4",
+          "legal": false
+        },
+        {
+          "field": "reveal",
+          "raw": "Nf3",
+          "legal": true
+        }
+      ],
+      "illegal": [
+        "exd4"
+      ]
+    },
+    "evals": {
+      "pass": true,
+      "quotes": []
+    },
+    "giveAway": {
+      "pass": true,
+      "problems": []
+    },
+    "arrows": {
+      "pass": true,
+      "problems": []
+    },
+    "reveal": {
+      "pass": false,
+      "legal": true,
+      "equalsBest": false,
+      "cpLoss": 51,
+      "problems": [
+        "revealMove e2e3 loses 51 cp against d4d5 (tolerance 50)"
+      ]
+    },
+    "nfr6Moves": false,
+    "nfr6Evals": true,
+    "nfr7": true
+  }
+}

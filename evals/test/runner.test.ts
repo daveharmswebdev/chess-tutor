@@ -102,6 +102,20 @@ describe("runEval", () => {
     expect(summary.metrics.okRate).toBe(0.5);
   });
 
+  it("records the reason of every correction retry the session sends (NFR-8)", async () => {
+    const { client } = fakeClient({ giveAwayFirst: true });
+    const opts = options({ client, cases: CASES.slice(0, 1) });
+    const summary = await runEval(opts);
+    const one = readJson<CaseResult>(join(opts.outDir, "cases", "hint-1.json"));
+    expect(one.ok).toBe(true);
+    expect(one.retries).toBe(1);
+    expect(one.retryReasons).toEqual(["give_away"]);
+    const corrected = one.rounds.find((r) => r.correction !== null)!;
+    expect(corrected.correction).toMatch(/gives the answer away/);
+    expect(summary.metrics.retryReasons).toEqual({ give_away: 1 });
+    expect(readFileSync(join(opts.outDir, "report.md"), "utf8")).toMatch(/give_away 1/);
+  });
+
   it("repeats each case --repeat times", async () => {
     const { client } = fakeClient();
     const opts = options({ client, cases: CASES.slice(0, 1), repeat: 2 });

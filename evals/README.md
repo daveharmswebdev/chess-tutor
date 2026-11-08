@@ -72,6 +72,14 @@ pnpm eval -- compare evals/results/<run-a> evals/results/<run-b> [--out <dir>]
 
 This writes `compare.md` and `compare.json`. They show the metrics side by side, then one row per case with each run's result (`ok`, `ok, give-away`, `FAIL unsupported_claim`, ...).
 
+## 3a. Re-grading a run offline
+
+```
+pnpm eval -- regrade evals/results/<run> [<run> ...]
+```
+
+When the graders change, this re-grades the recorded `cases/*.json` of a run without any API or engine call. It rewrites the grades, `summary.json` (keeping the run's settings) and `report.md`. It needs the run's cases to still exist in `evals/cases/`. Runs recorded before correction texts were captured show their retries as `unrecorded`.
+
 ## 4. What the metrics mean
 
 Percentages for grades are taken over the replies the tutor actually returned (`ok`). Failed asks count only in the OK rate and in the failure reasons.
@@ -79,13 +87,14 @@ Percentages for grades are taken over the replies the tutor actually returned (`
 | metric | in plain words |
 | --- | --- |
 | OK rate | How often the tutor gave a reply the server would show. The rest failed (reason shown), and the player would see "coaching unavailable". |
-| NFR-6 move legality | Every move the tutor names in its message or reveal is a real, legal move. It may be named in SAN (Nf3, Bxd6, O-O, e8=Q, Bb5+), UCI (g1f3), long algebraic (e3-e4, Bf1-d3) or as "bishop to d3". The move must be legal in some position of the case (the game so far, the current position, the attempt position) or in a position reached by moves named earlier in the same text, so "g6, then Bg7 and O-O" counts as a plan. Also, `revealMove` must be legal at the attempt position. A bare square ("the knight on f6") is not a move. It counts as a pawn move only in a move context ("play g6", "...e5", "d6 and c5"). |
+| NFR-6 move legality | Every move the tutor names in its message or reveal is a real, legal move. It may be named in SAN (Nf3, Bxd6, O-O, e8=Q, Bb5+), UCI (g1f3), long algebraic (e3-e4, Bf1-d3) or as "bishop to d3". The move must be legal in one of these positions: a position of the case (the game so far, the current position, the attempt position), the position after `revealMove`, any position along the lines in this ask's tool results (engine lines, evaluate_move's reply line, explorer and repertoire moves), or a position reached by moves named earlier in the same text. So "g6, then Bg7 and O-O" counts as a plan, and "after exf4 exf4" counts as the engine line. A `revealMove`, when given, must be legal at the attempt position. A bare square ("the knight on f6", "go after c7", "the rook on a8?") is not a move. It counts as a pawn move only in a move context ("play g6", "...e5", "d6 and c5", "c4?!"), or as the piece's move after "the knight can go to a6 or c7". |
 | NFR-6 eval match | Every evaluation the tutor quotes (+1.5, 1.5 pawns, 150 centipawns, mate in 3) matches a score it was given in this ask: a tool result (engine evaluations, centipawn loss) or the key-moment data (centipawn loss or gain). The match must be within 0.3 pawns, or 0.5 for a whole number of pawns. When the sentence says which side is better ("Black is up 1.5", "+1.5 for White", "you are down 2 pawns"), the sign must match too. Crediting the advantage to the wrong side is flagged as `wrong_side`. |
-| NFR-7 no give-away (target 90%) | The first message and the arrows do not give the answer away before the player tries. The grade fails when the message names `revealMove` in any notation, or names the answer's piece together with a check when the answer gives check ("a check with your other bishop"). It also fails when an arrow is the answer move, starts on its from-square, ends on its to-square, runs along its line through the to-square, or starts on its empty to-square. |
-| Arrows well formed | At most 3 arrows, each between two different real squares, no duplicates (a `h7->h7` arrow fails). |
+| NFR-7 no give-away (target 90%) | The first message and the arrows do not give the answer away before the player tries (the user's rule, 2026-11-08). The grade fails when the message names `revealMove` in any notation, or names the answer's piece together with a check when the answer gives check ("a check with your other bishop"). It also fails when an arrow is the answer move or starts on its from-square, because that shows the piece. Malformed arrows (the session drops them) are ignored here. |
+| Points at the answer square | For information only, not part of NFR-7. Counts replies with an arrow that ends on the answer's to-square, runs along its line through it, or starts on its empty to-square. These are allowed Socratic nudges ("look at e5"). |
+| Arrows well formed | At most 3 arrows, each between two different real squares, no duplicates (a `h7->h7` arrow fails). Since #10 round 2 the tutor session drops malformed arrows before it returns a reply, so new runs should be at 100%. |
 | Reveal move | `revealMove` is the engine's best move at the attempt position, or loses at most `tutor.attemptToleranceCp` (50 cp) against it. The runner measures the loss with Stockfish. |
 | Schema and kind | The reply matches the tutor's reply schema and the kind of the case. |
-| Tool calls, correction retries | How many tools the tutor called per case. Also how often the session had to send its one correction turn (NFR-8), counted as end-of-turn rounds after the first. |
+| Tool calls, correction retries | How many tools the tutor called per case. Also how often the session sent its one correction turn (NFR-8), counted by reason from the recorded correction text: `give_away`, `unbacked_move` (a move no tool or key-moment data gave), `illegal_move`, `unbacked_eval`, `reveal_move`, `invalid_reply`, `other`. |
 | Latency p50 / p95 | Time for the whole ask (all rounds and tools). The median and the 95th percentile, nearest rank. |
 | First API round | Time until the first API response arrives (the first tool call or the reply). |
 | Cost per case / per game | Average USD per ask. "Per game" assumes 10 key moments or hints per game. |
@@ -105,5 +114,6 @@ These graders are deterministic. They do not judge whether an explanation is *tr
 - `src/recorder.ts`: wraps the Anthropic client and records every round and tool result
 - `src/graders.ts` and `src/notation.ts`: the deterministic graders (chess.js only, independent of `packages/tutor` internals)
 - `src/report.ts`: metrics, `report.md`, compare
+- `src/regrade.ts`: offline re-grading of recorded runs, and correction-reason buckets
 - `src/generate-cases.ts`, `src/cases.ts`: building and loading cases
-- `test/fixtures/bakeoff-replies.json`: the 12 real replies from the model bake-off (Opus 5.5 medium and low, Sonnet 5.5 medium), used as grader fixtures. `test/fixtures/runs/` holds two run summaries built from them, used for the compare tests.
+- `test/fixtures/bakeoff-replies.json`: the 12 real replies from the model bake-off (Opus 5.5 medium and low, Sonnet 5.5 medium), used as grader fixtures. `test/fixtures/runs/` holds two run summaries built from them, used for the compare tests. `test/fixtures/q3/` holds real per-case results from the first live runs (2026-11-08), used for the round-2 grader tests.

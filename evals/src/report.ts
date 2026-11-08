@@ -29,13 +29,21 @@ export function toRow(r: CaseResult): CaseRow {
     arrowsOk: g ? g.arrows.pass : null,
     revealOk: g ? g.reveal.pass : null,
     schemaOk: g ? g.schema.pass : null,
+    pointsAtAnswer: g ? g.pointsAtAnswer : null,
     toolCalls: r.toolCalls,
     retries: r.retries,
+    retryReasons: r.retryReasons ?? [],
     ms: r.ms,
     firstRoundMs: r.firstRoundMs,
     costUsd: r.costUsd,
     problems,
   };
+}
+
+function countReasons(rows: CaseRow[]): Record<string, number> {
+  const out: Record<string, number> = {};
+  for (const r of rows) for (const reason of r.retryReasons ?? []) out[reason] = (out[reason] ?? 0) + 1;
+  return Object.fromEntries(Object.entries(out).sort(([a], [b]) => a.localeCompare(b)));
 }
 
 /** Nearest-rank percentile. */
@@ -63,11 +71,13 @@ export function computeMetrics(rows: CaseRow[]): RunMetrics {
     moveLegalPct: share(graded, (r) => r.nfr6Moves),
     evalMatchPct: share(graded, (r) => r.nfr6Evals),
     noGiveAwayPct: share(graded, (r) => r.nfr7),
+    pointsAtAnswerPct: share(graded, (r) => r.pointsAtAnswer),
     arrowsOkPct: share(graded, (r) => r.arrowsOk),
     revealOkPct: share(graded, (r) => r.revealOk),
     schemaOkPct: share(graded, (r) => r.schemaOk),
     toolCallsMean: rows.length ? rows.reduce((s, r) => s + r.toolCalls, 0) / rows.length : null,
     retriesTotal: rows.reduce((s, r) => s + r.retries, 0),
+    retryReasons: countReasons(rows),
     latencyP50Ms: percentile(rows.map((r) => r.ms), 0.5),
     latencyP95Ms: percentile(rows.map((r) => r.ms), 0.95),
     firstRoundP50Ms: percentile(firsts, 0.5),
@@ -92,17 +102,22 @@ const METRIC_ROWS: [string, (m: RunMetrics) => string][] = [
   ["NFR-6 move legality (replies)", (m) => pct(m.moveLegalPct)],
   ["NFR-6 eval match (replies)", (m) => pct(m.evalMatchPct)],
   [`NFR-7 no give-away (target >= ${NFR7_TARGET * 100}%)`, (m) => pct(m.noGiveAwayPct)],
+  ["Points at the answer square (information, not NFR-7)", (m) => pct(m.pointsAtAnswerPct ?? null)],
   ["Arrows well formed", (m) => pct(m.arrowsOkPct)],
   ["Reveal move best or within tolerance", (m) => pct(m.revealOkPct)],
   ["Schema and kind", (m) => pct(m.schemaOkPct)],
   ["Tool calls per case (mean)", (m) => (m.toolCallsMean === null ? "n/a" : m.toolCallsMean.toFixed(1))],
   ["Correction retries (total)", (m) => String(m.retriesTotal)],
+  ["Correction retries by reason", (m) => byReason(m.retryReasons)],
   ["Latency p50 / p95", (m) => `${sec(m.latencyP50Ms)} / ${sec(m.latencyP95Ms)}`],
   ["First API round p50 / p95", (m) => `${sec(m.firstRoundP50Ms)} / ${sec(m.firstRoundP95Ms)}`],
   ["Cost per case", (m) => usd(m.costPerCaseUsd)],
   [`Cost per game (${KEY_MOMENTS_PER_GAME} asks)`, (m) => usd(m.costPerGameUsd, 3)],
   ["Total cost", (m) => usd(m.totalCostUsd, 3)],
 ];
+
+const byReason = (r: Record<string, number> | undefined) =>
+  !r || Object.keys(r).length === 0 ? "none" : Object.entries(r).map(([k, v]) => `${k} ${v}`).join(", ");
 
 const mark = (b: boolean | null) => (b === null ? "-" : b ? "pass" : "FAIL");
 
@@ -130,11 +145,11 @@ export function renderRunReport(s: RunSummary): string {
     m.noGiveAwayPct !== null && m.noGiveAwayPct < NFR7_TARGET ? `NFR-7 is below its ${NFR7_TARGET * 100}% target.\n` : "",
     "## Cases",
     "",
-    "| Case | Kind | Result | Moves | Evals | NFR-7 | Arrows | Reveal | Tools | Time | Cost | Problems |",
-    "| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |",
+    "| Case | Kind | Result | Moves | Evals | NFR-7 | Points at answer | Arrows | Reveal | Tools | Retries | Time | Cost | Problems |",
+    "| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |",
     ...s.rows.map(
       (r) =>
-        `| ${r.id} | ${r.kind} | ${r.ok ? "ok" : `FAIL ${r.reason}`} | ${mark(r.nfr6Moves)} | ${mark(r.nfr6Evals)} | ${mark(r.nfr7)} | ${mark(r.arrowsOk)} | ${mark(r.revealOk)} | ${r.toolCalls} | ${sec(r.ms)} | ${usd(r.costUsd)} | ${escape(r.problems.join("; "))} |`,
+        `| ${r.id} | ${r.kind} | ${r.ok ? "ok" : `FAIL ${r.reason}`} | ${mark(r.nfr6Moves)} | ${mark(r.nfr6Evals)} | ${mark(r.nfr7)} | ${r.pointsAtAnswer === null ? "-" : r.pointsAtAnswer ? "yes" : "no"} | ${mark(r.arrowsOk)} | ${mark(r.revealOk)} | ${r.toolCalls} | ${r.retries ? `${r.retries} (${(r.retryReasons ?? []).join(", ")})` : "0"} | ${sec(r.ms)} | ${usd(r.costUsd)} | ${escape(r.problems.join("; "))} |`,
     ),
     "",
     needsJudge(),

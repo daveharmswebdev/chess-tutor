@@ -1,0 +1,204 @@
+{
+  "id": "lb-london-qb6",
+  "caseId": "lb-london-qb6",
+  "repeat": 1,
+  "kind": "opponent_left_book",
+  "model": "claude-opus-5-5",
+  "effort": "low",
+  "ok": true,
+  "reason": null,
+  "failureMessage": null,
+  "reply": {
+    "schemaVersion": 1,
+    "kind": "opponent_left_book",
+    "message": "Your opponent skipped the usual Nc6 and played Qb6. The queen came out early to hit your b2 pawn. Which of your pieces could develop with a threat of its own, instead of just guarding b2?",
+    "reveal": "Nc3 is the strongest reply. It develops a piece, and the knight can follow up with Nb5 to bother Black's queenside. Next play Nf3, push a4 to gain space, and keep your usual London setup: pawns on d4 and e3, bishop on f4, castle short. Hitting an early queen with your developing moves wins you time.",
+    "revealMove": "b1c3",
+    "arrows": [
+      {
+        "from": "b6",
+        "to": "b2"
+      }
+    ]
+  },
+  "ms": 10461,
+  "firstRoundMs": 2507,
+  "toolCalls": 1,
+  "retries": 1,
+  "usage": {
+    "requests": 3,
+    "inputTokens": 3405,
+    "outputTokens": 747,
+    "cacheReadInputTokens": 9675,
+    "cacheCreationInputTokens": 0
+  },
+  "costUsd": 0.030495,
+  "revealCpLoss": null,
+  "progress": [
+    "Tutor is looking at the position…",
+    "Looking at the engine lines…"
+  ],
+  "rounds": [
+    {
+      "ms": 2507,
+      "stopReason": "tool_use",
+      "toolUses": [
+        {
+          "id": "toolu_01HWqj9894SUjUkbHQmntNvf",
+          "name": "analyze_position",
+          "input": {
+            "fen": "rnb1kbnr/pp2pppp/1q6/2pp4/3P1B2/4P3/PPP2PPP/RN1QKBNR w KQkq - 1 4"
+          }
+        }
+      ],
+      "toolResults": [
+        {
+          "id": "toolu_01HWqj9894SUjUkbHQmntNvf",
+          "name": "analyze_position",
+          "input": {
+            "fen": "rnb1kbnr/pp2pppp/1q6/2pp4/3P1B2/4P3/PPP2PPP/RN1QKBNR w KQkq - 1 4"
+          },
+          "content": "{\"fen\":\"rnb1kbnr/pp2pppp/1q6/2pp4/3P1B2/4P3/PPP2PPP/RN1QKBNR w KQkq - 1 4\",\"side_to_move\":\"white\",\"depth\":18,\"lines\":[{\"rank\":1,\"eval_cp\":75,\"mate_in\":null,\"moves\":[{\"san\":\"Nc3\",\"uci\":\"b1c3\"},{\"san\":\"e6\",\"uci\":\"e7e6\"},{\"san\":\"Nb5\",\"uci\":\"c3b5\"},{\"san\":\"Na6\",\"uci\":\"b8a6\"},{\"san\":\"Nf3\",\"uci\":\"g1f3\"},{\"san\":\"Nf6\",\"uci\":\"g8f6\"},{\"san\":\"a4\",\"uci\":\"a2a4\"},{\"san\":\"Be7\",\"uci\":\"f8e7\"}]},{\"rank\":2,\"eval_cp\":29,\"mate_in\":null,\"moves\":[{\"san\":\"Nf3\",\"uci\":\"g1f3\"},{\"san\":\"Nf6\",\"uci\":\"g8f6\"},{\"san\":\"c4\",\"uci\":\"c2c4\"},{\"san\":\"e6\",\"uci\":\"e7e6\"},{\"san\":\"Nc3\",\"uci\":\"b1c3\"},{\"san\":\"cxd4\",\"uci\":\"c5d4\"},{\"san\":\"Qxd4\",\"uci\":\"d1d4\"},{\"san\":\"Bb4\",\"uci\":\"f8b4\"}]},{\"rank\":3,\"eval_cp\":26,\"mate_in\":null,\"moves\":[{\"san\":\"c4\",\"uci\":\"c2c4\"},{\"san\":\"cxd4\",\"uci\":\"c5d4\"},{\"san\":\"Qxd4\",\"uci\":\"d1d4\"},{\"san\":\"Qxd4\",\"uci\":\"b6d4\"},{\"san\":\"exd4\",\"uci\":\"e3d4\"},{\"san\":\"dxc4\",\"uci\":\"d5c4\"},{\"san\":\"Nc3\",\"uci\":\"b1c3\"},{\"san\":\"Nf6\",\"uci\":\"g8f6\"}]}]}",
+          "isError": false
+        }
+      ],
+      "text": "",
+      "usage": {
+        "input_tokens": 439,
+        "cache_creation_input_tokens": 0,
+        "cache_read_input_tokens": 3225,
+        "cache_creation": {
+          "ephemeral_5m_input_tokens": 0,
+          "ephemeral_1h_input_tokens": 0
+        },
+        "output_tokens": 193,
+        "service_tier": "standard",
+        "inference_geo": "global",
+        "speed": "standard",
+        "output_tokens_details": {
+          "thinking_tokens": 82
+        }
+      },
+      "error": null
+    },
+    {
+      "ms": 4120,
+      "stopReason": "end_turn",
+      "toolUses": [],
+      "toolResults": [],
+      "text": "{\"schemaVersion\":1,\"kind\":\"opponent_left_book\",\"message\":\"Your opponent skipped the usual Nc6 and played Qb6. The queen came out early to hit your b2 pawn. Can you develop a piece that guards b2 indirectly and also eyes the weak squares near Black's queenside, like b5?\",\"reveal\":\"Nc3 is the strongest reply. It develops a piece, and if Black grabs the pawn your knight can jump to b5, aiming at c7 and the black king. After e6, Nb5 bothers the queen side straight away. Then play Nf3, push a4 to gain space, and keep your usual London setup: pawns on d4 and e3, bishop on f4, castle short. Hitting an early queen with your developing moves wins you time.\",\"revealMove\":\"b1c3\",\"arrows\":[{\"from\":\"b6\",\"to\":\"b2\"},{\"from\":\"c5\",\"to\":\"b5\"}]}",
+      "usage": {
+        "input_tokens": 1289,
+        "cache_creation_input_tokens": 0,
+        "cache_read_input_tokens": 3225,
+        "cache_creation": {
+          "ephemeral_5m_input_tokens": 0,
+          "ephemeral_1h_input_tokens": 0
+        },
+        "output_tokens": 305,
+        "service_tier": "standard",
+        "inference_geo": "global",
+        "speed": "standard",
+        "output_tokens_details": {
+          "thinking_tokens": 0
+        }
+      },
+      "error": null
+    },
+    {
+      "ms": 2925,
+      "stopReason": "end_turn",
+      "toolUses": [],
+      "toolResults": [],
+      "text": "{\"schemaVersion\":1,\"kind\":\"opponent_left_book\",\"message\":\"Your opponent skipped the usual Nc6 and played Qb6. The queen came out early to hit your b2 pawn. Which of your pieces could develop with a threat of its own, instead of just guarding b2?\",\"reveal\":\"Nc3 is the strongest reply. It develops a piece, and the knight can follow up with Nb5 to bother Black's queenside. Next play Nf3, push a4 to gain space, and keep your usual London setup: pawns on d4 and e3, bishop on f4, castle short. Hitting an early queen with your developing moves wins you time.\",\"revealMove\":\"b1c3\",\"arrows\":[{\"from\":\"b6\",\"to\":\"b2\"}]}",
+      "usage": {
+        "input_tokens": 1677,
+        "cache_creation_input_tokens": 0,
+        "cache_read_input_tokens": 3225,
+        "cache_creation": {
+          "ephemeral_5m_input_tokens": 0,
+          "ephemeral_1h_input_tokens": 0
+        },
+        "output_tokens": 249,
+        "service_tier": "standard",
+        "inference_geo": "global",
+        "speed": "standard",
+        "output_tokens_details": {
+          "thinking_tokens": 0
+        }
+      },
+      "error": null
+    }
+  ],
+  "grades": {
+    "schema": {
+      "pass": true,
+      "problems": []
+    },
+    "moves": {
+      "pass": false,
+      "mentions": [
+        {
+          "field": "message",
+          "raw": "Nc6",
+          "legal": true
+        },
+        {
+          "field": "message",
+          "raw": "Qb6",
+          "legal": true
+        },
+        {
+          "field": "message",
+          "raw": "b2?",
+          "legal": false
+        },
+        {
+          "field": "reveal",
+          "raw": "Nc3",
+          "legal": true
+        },
+        {
+          "field": "reveal",
+          "raw": "Nb5",
+          "legal": true
+        },
+        {
+          "field": "reveal",
+          "raw": "Nf3",
+          "legal": true
+        },
+        {
+          "field": "reveal",
+          "raw": "a4",
+          "legal": true
+        }
+      ],
+      "illegal": [
+        "b2?"
+      ]
+    },
+    "evals": {
+      "pass": true,
+      "quotes": []
+    },
+    "giveAway": {
+      "pass": true,
+      "problems": []
+    },
+    "arrows": {
+      "pass": true,
+      "problems": []
+    },
+    "reveal": {
+      "pass": true,
+      "legal": true,
+      "equalsBest": true,
+      "cpLoss": 0,
+      "problems": []
+    },
+    "nfr6Moves": false,
+    "nfr6Evals": true,
+    "nfr7": true
+  }
+}

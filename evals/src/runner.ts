@@ -12,6 +12,7 @@ import {
 } from "@chess-tutor/tutor";
 import { costUsd, PLAYER_PROFILE, sha256, type Price } from "./config.ts";
 import { gradeReply } from "./graders.ts";
+import { gradeInputFor, retriesOf } from "./regrade.ts";
 import { board, playUci } from "./notation.ts";
 import { recordingClient } from "./recorder.ts";
 import { computeMetrics, renderRunReport, toRow } from "./report.ts";
@@ -142,23 +143,8 @@ async function runCase(c: EvalCase, id: string, repeat: number, opts: RunOptions
   let revealCpLoss: number | null = null;
   if (reply?.revealMove && reply.revealMove !== c.engineBest) revealCpLoss = await cpLoss(c, reply.revealMove, opts);
 
-  const toolResults = rounds.flatMap((r) => r.toolResults);
-  const grades = reply
-    ? gradeReply({
-        kind: c.kind,
-        playerColor: c.playerColor,
-        history: c.history,
-        fen: c.fen,
-        attemptFen: c.attemptFen,
-        moment: c.moment,
-        engineBest: c.engineBest,
-        reply,
-        toolResults,
-        revealCpLoss,
-        toleranceCp: opts.toleranceCp,
-      })
-    : null;
-  const endTurns = rounds.filter((r) => r.stopReason === "end_turn").length;
+  const input = gradeInputFor({ reply, rounds, revealCpLoss }, c, opts.toleranceCp);
+  const grades = input ? gradeReply(input) : null;
   return {
     id,
     caseId: c.id,
@@ -173,7 +159,7 @@ async function runCase(c: EvalCase, id: string, repeat: number, opts: RunOptions
     ms: outcome.ms,
     firstRoundMs: rounds[0]?.ms ?? null,
     toolCalls: rounds.reduce((n, r) => n + r.toolUses.length, 0),
-    retries: Math.max(0, endTurns - 1),
+    ...retriesOf(rounds),
     usage: outcome.usage,
     costUsd: costUsd(outcome.usage, opts.price),
     revealCpLoss,

@@ -52,9 +52,56 @@ export interface MovesGrade {
   illegal: string[];
 }
 
-/** Positions a mention may refer to: the game's positions, fen and attemptFen. */
-function basePositions(input: GradeInput): string[] {
-  return unique([...historyFens(input.history), input.fen, input.attemptFen]);
+/**
+ * Positions a mention may refer to: the game's positions, fen, attemptFen, the position after
+ * revealMove (a reveal explains the line that follows the answer), and every position along the
+ * lines in this ask's tool results (engine lines, evaluate_move's reply line, explorer and
+ * repertoire moves), each line played from the position its tool was asked about.
+ */
+export function basePositions(input: Pick<GradeInput, "history" | "fen" | "attemptFen" | "kind" | "reply" | "toolResults">): string[] {
+  const list = [...historyFens(input.history), input.fen, input.attemptFen];
+  const attempt = input.kind === "hint" ? input.fen : input.attemptFen;
+  const answer = input.reply.revealMove ? playUci(attempt, input.reply.revealMove) : null;
+  if (answer) list.push(answer.fen);
+  for (const t of input.toolResults) list.push(...toolLinePositions(t));
+  return unique(list);
+}
+
+const ucis = (moves: unknown): string[] =>
+  Array.isArray(moves) ? moves.map((m) => (m && typeof m === "object" ? (m as { uci?: unknown }).uci : m)).filter((u): u is string => typeof u === "string") : [];
+
+/** Positions reached along the move lines of one tool result. */
+export function toolLinePositions(t: ToolResultRecord): string[] {
+  if (t.isError) return [];
+  const fen = (t.input as { fen?: unknown } | null)?.fen;
+  if (typeof fen !== "string" || !board(fen)) return [];
+  let data: Record<string, unknown>;
+  try {
+    data = JSON.parse(t.content) as Record<string, unknown>;
+  } catch {
+    return [];
+  }
+  const out: string[] = [];
+  const line = (from: string, moves: string[]) => {
+    let at = from;
+    for (const uci of moves) {
+      const next = playUci(at, uci);
+      if (!next) break;
+      out.push(next.fen);
+      at = next.fen;
+    }
+  };
+  if (Array.isArray(data["lines"])) for (const l of data["lines"] as { moves?: unknown }[]) line(fen, ucis(l?.moves));
+  const played = ucis([data["move"]])[0];
+  if (played) {
+    const after = playUci(fen, played);
+    if (after) {
+      out.push(after.fen);
+      line(after.fen, ucis(data["reply_line"]));
+    }
+  }
+  for (const single of [...ucis([data["best"]]), ...ucis(data["moves"]), ...ucis(data["next_moves"])]) line(fen, [single]);
+  return out;
 }
 
 function unique(list: string[]): string[] {
@@ -118,6 +165,8 @@ export function gradeArrows(reply: Pick<TutorReply, "arrows">): ArrowsGrade {
 export interface GiveAwayGrade {
   pass: boolean;
   problems: string[];
+  /** Arrows that point at the answer's square without giving the move (allowed Socratic nudges). */
+  nudges: string[];
 }
 
 const PIECE_NAME: Record<string, string> = { p: "pawn", n: "knight", b: "bishop", r: "rook", q: "queen", k: "king" };
@@ -141,18 +190,22 @@ function alongLine(from: string, to: string, a: { from: string; to: string }): b
 }
 
 /**
- * NFR-7: the first message and the pre-reveal arrows must not give away revealMove.
- * - The message names revealMove in any notation (SAN, UCI, long algebraic, "bishop to d3",
- *   or a pawn move's square in a move context).
- * - The message names the answer's piece and a check, when the answer gives check
- *   ("can a check with your other bishop ...").
- * - An arrow equals the move, starts on its from-square, ends on its to-square, runs along its
- *   line through the to-square, or starts on its (empty) to-square.
+ * NFR-7, the user's rule (2026-11-08): the first message and the pre-reveal arrows give the
+ * answer away when
+ * - the message names revealMove in any notation (SAN, UCI, long algebraic, "bishop to d3",
+ *   or a pawn move's square in a move context);
+ * - the message names the answer's piece and a check, when the answer gives check
+ *   ("can a check with your other bishop ...");
+ * - an arrow is the answer move or starts on its from-square (shows the piece).
+ * An arrow that only ends on the answer's to-square, runs along its line through it, or starts
+ * on its empty to-square is a Socratic nudge: reported in `nudges` ("points at the answer
+ * square"), not a give-away. Malformed arrows (the session drops them) are ignored here.
  */
 export function gradeGiveAway(input: GradeInput): GiveAwayGrade {
   const problems: string[] = [];
+  const nudges: string[] = [];
   const answer = input.reply.revealMove;
-  if (!answer) return { pass: true, problems };
+  if (!answer) return { pass: true, problems, nudges };
   const attempt = input.kind === "hint" ? input.fen : input.attemptFen;
   const played = playUci(attempt, answer);
   const from = answer.slice(0, 2);
@@ -170,15 +223,15 @@ export function gradeGiveAway(input: GradeInput): GiveAwayGrade {
 
   const empty = board(attempt)?.get(to as never) === undefined;
   for (const a of input.reply.arrows) {
-    if (!isSquare(a.from) || !isSquare(a.to) || !isSquare(from) || !isSquare(to)) continue;
+    if (!isSquare(a.from) || !isSquare(a.to) || a.from === a.to || !isSquare(from) || !isSquare(to)) continue;
     const label = `arrow ${a.from}->${a.to}`;
     if (a.from === from && a.to === to) problems.push(`${label} is the answer ${answer}`);
     else if (a.from === from) problems.push(`${label} starts on the answer's from-square ${from}`);
-    else if (a.to === to) problems.push(`${label} ends on the answer's to-square ${to}`);
-    else if (alongLine(from, to, a)) problems.push(`${label} runs along the answer's line through ${to}`);
-    else if (a.from === to && empty) problems.push(`${label} starts on the answer's empty to-square ${to}`);
+    else if (a.to === to) nudges.push(`${label} ends on the answer's to-square ${to}`);
+    else if (alongLine(from, to, a)) nudges.push(`${label} runs along the answer's line through ${to}`);
+    else if (a.from === to && empty) nudges.push(`${label} starts on the answer's empty to-square ${to}`);
   }
-  return { pass: problems.length === 0, problems };
+  return { pass: problems.length === 0, problems, nudges };
 }
 
 function namesMove(fen: string, m: Mention, uci: string): boolean {
@@ -354,12 +407,14 @@ export interface ReplyGrades {
   giveAway: GiveAwayGrade;
   arrows: ArrowsGrade;
   reveal: RevealGrade;
-  /** NFR-6: every move named is legal and revealMove is legal at the attempt position. */
+  /** NFR-6: every move named is legal and revealMove (when given) is legal at the attempt position. */
   nfr6Moves: boolean;
   /** NFR-6: every quoted evaluation is backed. */
   nfr6Evals: boolean;
   /** NFR-7: nothing gives the answer away before the reveal. */
   nfr7: boolean;
+  /** Information only: an arrow points at the answer's square (giveAway.nudges). */
+  pointsAtAnswer: boolean;
 }
 
 export function gradeReply(input: GradeInput): ReplyGrades {
@@ -378,8 +433,9 @@ export function gradeReply(input: GradeInput): ReplyGrades {
     giveAway,
     arrows,
     reveal,
-    nfr6Moves: moves.pass && reveal.legal,
+    nfr6Moves: moves.pass && (input.reply.revealMove === null || reveal.legal),
     nfr6Evals: evals.pass,
     nfr7: giveAway.pass,
+    pointsAtAnswer: giveAway.nudges.length > 0,
   };
 }

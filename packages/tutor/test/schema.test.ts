@@ -56,8 +56,9 @@ describe("parseReply (NFR-8)", () => {
     expect(parseReply(JSON.stringify({ ...good, schemaVersion: 2 }), "hint")).toMatchObject({ ok: false });
     const arrows = Array.from({ length: 4 }, () => ({ from: "e2", to: "e4" }));
     expect(parseReply(JSON.stringify({ ...good, arrows }), "hint")).toMatchObject({ ok: false, problem: expect.stringMatching(/arrows/) });
+    // An off-board arrow is no longer a schema failure: the session drops it (FR-11, #10 round 2).
     const offBoard = { ...good, arrows: [{ from: "e2", to: "e9" }] };
-    expect(parseReply(JSON.stringify(offBoard), "hint")).toMatchObject({ ok: false, problem: expect.stringMatching(/arrow/) });
+    expect(parseReply(JSON.stringify(offBoard), "hint")).toMatchObject({ ok: true });
     expect(parseReply(JSON.stringify(good), "player_blunder")).toMatchObject({ ok: false, problem: expect.stringMatching(/kind/) });
   });
 });

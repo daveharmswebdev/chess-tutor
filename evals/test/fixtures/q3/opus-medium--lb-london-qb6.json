@@ -1,0 +1,221 @@
+{
+  "id": "lb-london-qb6",
+  "caseId": "lb-london-qb6",
+  "repeat": 1,
+  "kind": "opponent_left_book",
+  "model": "claude-opus-5-5",
+  "effort": "medium",
+  "ok": true,
+  "reason": null,
+  "failureMessage": null,
+  "reply": {
+    "schemaVersion": 1,
+    "kind": "opponent_left_book",
+    "message": "Your opponent played 3...Qb6 instead of the usual Nc6. Their queen now attacks your b2 pawn. Their queen has left the d8 square, so look at c7. Your bishop on f4 already aims at it. Which piece could you develop so that it joins the attack on c7?",
+    "reveal": "Nc3 is the engine's top choice (about +0.7 for White). It develops a piece. After e6 it can jump to b5, where it teams up with your Bf4 against c7. In the engine's line Black has to play Na6 to guard c7, and then you continue with Nf3 and c3. That gives you the normal London setup: pawns on c3, d4 and e3 holding the center, and your pieces on good squares.",
+    "revealMove": "b1c3",
+    "arrows": [
+      {
+        "from": "b6",
+        "to": "b2"
+      },
+      {
+        "from": "f4",
+        "to": "c7"
+      }
+    ]
+  },
+  "ms": 9293,
+  "firstRoundMs": 2951,
+  "toolCalls": 2,
+  "retries": 0,
+  "usage": {
+    "requests": 2,
+    "inputTokens": 1930,
+    "outputTokens": 699,
+    "cacheReadInputTokens": 6450,
+    "cacheCreationInputTokens": 0
+  },
+  "costUsd": 0.02299,
+  "revealCpLoss": null,
+  "progress": [
+    "Tutor is looking at the position…",
+    "Checking your repertoire…",
+    "Looking at the engine lines…"
+  ],
+  "rounds": [
+    {
+      "ms": 2951,
+      "stopReason": "tool_use",
+      "toolUses": [
+        {
+          "id": "toolu_01A23ziU2tjLyiFPGGDzS8FE",
+          "name": "get_repertoire_context",
+          "input": {
+            "fen": "rnb1kbnr/pp2pppp/1q6/2pp4/3P1B2/4P3/PPP2PPP/RN1QKBNR w KQkq - 1 4"
+          }
+        },
+        {
+          "id": "toolu_012pRiaN8JrWYqrW6xdcXLTU",
+          "name": "analyze_position",
+          "input": {
+            "fen": "rnb1kbnr/pp2pppp/1q6/2pp4/3P1B2/4P3/PPP2PPP/RN1QKBNR w KQkq - 1 4",
+            "multi_pv": 3
+          }
+        }
+      ],
+      "toolResults": [
+        {
+          "id": "toolu_01A23ziU2tjLyiFPGGDzS8FE",
+          "name": "get_repertoire_context",
+          "input": {
+            "fen": "rnb1kbnr/pp2pppp/1q6/2pp4/3P1B2/4P3/PPP2PPP/RN1QKBNR w KQkq - 1 4"
+          },
+          "content": "{\"color\":\"white\",\"in_repertoire\":false,\"last_book_line\":\"London vs ...c5\",\"left_book_with\":{\"san\":\"Qb6\",\"uci\":\"d8b6\"},\"move_number\":3}",
+          "isError": false
+        },
+        {
+          "id": "toolu_012pRiaN8JrWYqrW6xdcXLTU",
+          "name": "analyze_position",
+          "input": {
+            "fen": "rnb1kbnr/pp2pppp/1q6/2pp4/3P1B2/4P3/PPP2PPP/RN1QKBNR w KQkq - 1 4",
+            "multi_pv": 3
+          },
+          "content": "{\"fen\":\"rnb1kbnr/pp2pppp/1q6/2pp4/3P1B2/4P3/PPP2PPP/RN1QKBNR w KQkq - 1 4\",\"side_to_move\":\"white\",\"depth\":18,\"lines\":[{\"rank\":1,\"eval_cp\":68,\"mate_in\":null,\"moves\":[{\"san\":\"Nc3\",\"uci\":\"b1c3\"},{\"san\":\"e6\",\"uci\":\"e7e6\"},{\"san\":\"Nb5\",\"uci\":\"c3b5\"},{\"san\":\"Na6\",\"uci\":\"b8a6\"},{\"san\":\"Nf3\",\"uci\":\"g1f3\"},{\"san\":\"Nf6\",\"uci\":\"g8f6\"},{\"san\":\"c3\",\"uci\":\"c2c3\"},{\"san\":\"Be7\",\"uci\":\"f8e7\"}]},{\"rank\":2,\"eval_cp\":32,\"mate_in\":null,\"moves\":[{\"san\":\"c4\",\"uci\":\"c2c4\"},{\"san\":\"Nf6\",\"uci\":\"g8f6\"},{\"san\":\"Nf3\",\"uci\":\"g1f3\"},{\"san\":\"cxd4\",\"uci\":\"c5d4\"},{\"san\":\"Qxd4\",\"uci\":\"d1d4\"},{\"san\":\"e6\",\"uci\":\"e7e6\"},{\"san\":\"Nc3\",\"uci\":\"b1c3\"},{\"san\":\"Bb4\",\"uci\":\"f8b4\"}]},{\"rank\":3,\"eval_cp\":24,\"mate_in\":null,\"moves\":[{\"san\":\"Nf3\",\"uci\":\"g1f3\"},{\"san\":\"Nf6\",\"uci\":\"g8f6\"},{\"san\":\"c4\",\"uci\":\"c2c4\"},{\"san\":\"cxd4\",\"uci\":\"c5d4\"},{\"san\":\"Qxd4\",\"uci\":\"d1d4\"},{\"san\":\"e6\",\"uci\":\"e7e6\"},{\"san\":\"Qxb6\",\"uci\":\"d4b6\"},{\"san\":\"axb6\",\"uci\":\"a7b6\"}]}]}",
+          "isError": false
+        }
+      ],
+      "text": "",
+      "usage": {
+        "input_tokens": 439,
+        "cache_creation_input_tokens": 0,
+        "cache_read_input_tokens": 3225,
+        "cache_creation": {
+          "ephemeral_5m_input_tokens": 0,
+          "ephemeral_1h_input_tokens": 0
+        },
+        "output_tokens": 274,
+        "service_tier": "standard",
+        "inference_geo": "global",
+        "speed": "standard",
+        "output_tokens_details": {
+          "thinking_tokens": 28
+        }
+      },
+      "error": null
+    },
+    {
+      "ms": 5525,
+      "stopReason": "end_turn",
+      "toolUses": [],
+      "toolResults": [],
+      "text": "{\"schemaVersion\":1,\"kind\":\"opponent_left_book\",\"message\":\"Your opponent played 3...Qb6 instead of the usual Nc6. Their queen now attacks your b2 pawn. Their queen has left the d8 square, so look at c7. Your bishop on f4 already aims at it. Which piece could you develop so that it joins the attack on c7?\",\"reveal\":\"Nc3 is the engine's top choice (about +0.7 for White). It develops a piece. After e6 it can jump to b5, where it teams up with your Bf4 against c7. In the engine's line Black has to play Na6 to guard c7, and then you continue with Nf3 and c3. That gives you the normal London setup: pawns on c3, d4 and e3 holding the center, and your pieces on good squares.\",\"revealMove\":\"b1c3\",\"arrows\":[{\"from\":\"b6\",\"to\":\"b2\"},{\"from\":\"f4\",\"to\":\"c7\"}]}",
+      "usage": {
+        "input_tokens": 1491,
+        "cache_creation_input_tokens": 0,
+        "cache_read_input_tokens": 3225,
+        "cache_creation": {
+          "ephemeral_5m_input_tokens": 0,
+          "ephemeral_1h_input_tokens": 0
+        },
+        "output_tokens": 425,
+        "service_tier": "standard",
+        "inference_geo": "global",
+        "speed": "standard",
+        "output_tokens_details": {
+          "thinking_tokens": 113
+        }
+      },
+      "error": null
+    }
+  ],
+  "grades": {
+    "schema": {
+      "pass": true,
+      "problems": []
+    },
+    "moves": {
+      "pass": false,
+      "mentions": [
+        {
+          "field": "message",
+          "raw": "Qb6",
+          "legal": true
+        },
+        {
+          "field": "message",
+          "raw": "Nc6",
+          "legal": true
+        },
+        {
+          "field": "message",
+          "raw": "c7?",
+          "legal": false
+        },
+        {
+          "field": "reveal",
+          "raw": "Nc3",
+          "legal": true
+        },
+        {
+          "field": "reveal",
+          "raw": "e6",
+          "legal": true
+        },
+        {
+          "field": "reveal",
+          "raw": "Bf4",
+          "legal": true
+        },
+        {
+          "field": "reveal",
+          "raw": "Na6",
+          "legal": true
+        },
+        {
+          "field": "reveal",
+          "raw": "Nf3",
+          "legal": true
+        },
+        {
+          "field": "reveal",
+          "raw": "c3",
+          "legal": true
+        }
+      ],
+      "illegal": [
+        "c7?"
+      ]
+    },
+    "evals": {
+      "pass": true,
+      "quotes": [
+        {
+          "raw": "+0.7",
+          "cp": 70,
+          "mate": null,
+          "side": "w",
+          "problem": null
+        }
+      ]
+    },
+    "giveAway": {
+      "pass": true,
+      "problems": []
+    },
+    "arrows": {
+      "pass": true,
+      "problems": []
+    },
+    "reveal": {
+      "pass": true,
+      "legal": true,
+      "equalsBest": true,
+      "cpLoss": 0,
+      "problems": []
+    },
+    "nfr6Moves": false,
+    "nfr6Evals": true,
+    "nfr7": true
+  }
+}
