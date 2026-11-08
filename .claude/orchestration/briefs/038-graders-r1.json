@@ -1,0 +1,27 @@
+{
+  "brief_id": "038-graders-r1",
+  "agent": "reviewer",
+  "issue": 29,
+  "base_sha": "f3bc58d",
+  "scratch_dir": "/private/tmp/claude-501/-Users-daveharms-personal-workspace-chess-tutor/6f327728-079b-44d8-a290-4d4f254fe37a/scratchpad/038-graders-r1",
+  "objective": "Review the #29 grader fixes (evals/) at the range git diff 743f9bf..f3bc58d (743f9bf = main). Read with git diff / git show. Find a grader that passes a bad reply or fails a good one (the worst kind: these numbers decide whether the CI eval may block merges), budget-cap holes (a run that can spend past --max-usd), and regressions. Report blocking / major / minor and say whether each #29 grader 'Done when' item is met (the CI-gate item is out of scope this round).",
+  "requirements": [
+    "NFR-4",
+    "NFR-6",
+    "NFR-7"
+  ],
+  "contract": "#29 Done when (grader items): unsigned evaluations checked ('better by 2.3', 'down 0.4', 'a 1.5-pawn edge'), material counts ('2 pawns on the queenside') not treated as evaluations (NFR-6); a move described as played now is checked against the current position and tool lines, not any earlier game position; 'Play Nc3 now' and 'Black plays Nb8-c6' fail on case hint-london-ne5 (NFR-6); the give-away grader catches 'a bishop check', 'checks with your bishop', 'castle' in words, 'the e4 break', 'putting your knight on e5', and a null revealMove falls back to engineBest (NFR-7); the cost cap counts failed asks' usage, with a runner test at concurrency > 1 (NFR-4). Out of scope: making .github/workflows/evals.yml blocking.\n\nOne commit f3bc58d by tutor-agent (brief 036). Summary: findEvalQuotes catches unsigned quotes; a whole number of pawns with no sign and no eval word is material. gradeMoves keeps two pools: present/future/plan/no-cue mentions use currentPositions (fen, attemptFen, after revealMove, tool lines, plus positions reached from those); only past-tense cue (PAST_CUE word list), numbered game record ('2.Bf4 Nf6'), or a continuation in the same sentence may use history positions; the last cue before the mention in its sentence decides; 'your/the <SAN>' may name a piece where it stands. CHECK_NOUN extended; 'castle' in any form when the answer castles = give-away; notation.ts adds PLACE_PIECE ('putting your knight on e5') and plan-noun squares ('the e4 break', plan:true, skipped for legality). Null revealMove graded against engineBest. Runner: failed ask cost = max(outcome usage, recordedUsage of rounds); test seam RunOptions.createSession. Legal moves cached per FEN. Spoke says offline regrade of 22 recorded replies (12 bakeoff + 10 q3 fixtures) unchanged; grading 5.3 s -> 1.4 s. Spoke's own finding: tense cues are heuristic; 'Black's ...c5 hit your center' style past references without a cue may now fail falsely.\n\nCoordinator gate at f3bc58d: pnpm test 668 passed (41 files); pnpm typecheck exit 0.",
+  "scope": [],
+  "negative": [
+    "Read-only: do not edit, commit, or run anything that writes to the repo.",
+    "Do not call the Anthropic API or run the live runner. pnpm test, vitest and the offline regrade on fixtures are fine.",
+    "Do not review outside the range."
+  ],
+  "rubric": [
+    "Every finding cites file:line and a concrete failure scenario.",
+    "Probe in-process (scripts in your scratch dir): get an illegal present-tense move, an unbacked unsigned evaluation, or a give-away wording past the graders; get a correct past-tense reference, a material count or a plan sentence failed; check the cap with concurrency 2 when two failing asks are in flight.",
+    "Explicit per-item 'Done when' status and a ship / no-ship verdict."
+  ],
+  "concurrency": "A reviewer is working on #26 (packages/tutor, brief 037) in another worktree; ignore packages/.",
+  "round": 1
+}

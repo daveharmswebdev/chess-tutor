@@ -1,0 +1,26 @@
+{
+  "brief_id": "037-factcheck-r1",
+  "agent": "reviewer",
+  "issue": 26,
+  "base_sha": "723457a",
+  "scratch_dir": "/private/tmp/claude-501/-Users-daveharms-personal-workspace-chess-tutor/6f327728-079b-44d8-a290-4d4f254fe37a/scratchpad/037-factcheck-r1",
+  "objective": "Review #26 (tutor FR-10 fact check: signed evaluations vs deltas, false alarms) at the range git diff 743f9bf..723457a (743f9bf = main). Read with git diff / git show. Find correctness bugs: a quoted evaluation for the wrong side or an invented number that now passes (the worst kind: FR-10), a correct coaching reply that is now rejected (costs the retry, user sees 'couldn't analyze'), and regressions in the move check. Report blocking / major / minor and say whether each #26 'Done when' criterion is met.",
+  "requirements": [
+    "FR-10",
+    "NFR-6"
+  ],
+  "contract": "#26 Done when: a quoted evaluation passes only if the engine gave that value for that side; signed scores kept separate from move-loss figures (FR-10, NFR-6). The false-alarm sentences pass ('Your 3.Bf4 was the right London setup' after Bg3; 'White castled with O-O earlier' on Black's turn; '+1 in development'; 'nobody is 2 pawns up'), and existing rejections hold (Black O-O, '+4.2' with no tool call, 'Push h5!'). The failure message says 'a move or evaluation'.\n\nOne commit 723457a by tutor-agent (brief 035). Its summary: Evidence keeps `scores` (signed White-relative), `shown` (as a tool displayed them, evaluate_move from the mover's POV) and `deltas` (cp_loss, cpLoss/gainCp via new addDelta). backsEval takes a frame: 'white' when the quote names a side (only a signed score backs it, never a delta); 'shown' for a signed number with no side (a score with that sign as White or the mover saw it, or a delta of that size); 'magnitude' default (any |score| or delta). extractEvals(text, playerColor?) finds side from subject or trailing phrase; 'you'/'your opponent' resolved via playerColor which session.ts now passes to checkClaims. Move-number prefixes resolved against that history ply (Evidence.historyPly from FEN counters); a side named as mover right before a move limits positions to that side to move. Signed counts ('+1 in development', '+2 in space', '+1 tempo') and negated numbers in the clause's last words are not evaluations. Spoke's own findings: heuristics; bare past move that is legal now (no move number) still rejected as before.\n\nCoordinator gate at 723457a: pnpm test 659 passed (40 files); pnpm typecheck exit 0. Downstream: evals/src/regrade.ts buckets correction texts by /gives the answer away/, /not legal in any position/, /does not appear in this turn's tool results|is not backed by this turn's tool results/, /quotes the evaluation/, /revealMove \"/; correction prefix 'Your last reply was not accepted'. These must still hold.",
+  "scope": [],
+  "negative": [
+    "Read-only: do not edit, commit, or run anything that writes to the repo.",
+    "Never call the Anthropic API.",
+    "Do not review outside the range."
+  ],
+  "rubric": [
+    "Every finding cites file:line and a concrete failure scenario.",
+    "Try, with in-process probes (vitest or node scripts in your scratch dir), to get a wrong-side or invented evaluation past checkClaims, and to get a correct sentence rejected (e.g. 'Black is better by 0.8' when eval_cp is -80, 'you are up 1.5' as Black with eval -150, a mate quote, a tool shown from Black's POV).",
+    "Explicit per-criterion 'Done when' status and a ship / no-ship verdict."
+  ],
+  "concurrency": "tutor-agent is working on brief 036 (#29, evals/ only) in another worktree; ignore evals/ changes.",
+  "round": 1
+}

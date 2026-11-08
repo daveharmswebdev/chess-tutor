@@ -1,0 +1,31 @@
+{
+  "brief_id": "040-graders-r2",
+  "agent": "tutor-agent",
+  "issue": 29,
+  "base_sha": "f3bc58d",
+  "scratch_dir": "/private/tmp/claude-501/-Users-daveharms-personal-workspace-chess-tutor/6f327728-079b-44d8-a290-4d4f254fe37a/scratchpad/040-graders-r2",
+  "objective": "Round 2 of the #29 grader fixes on your branch (base f3bc58d): fix review 038's four major findings and the cheap minors, so the graders neither pass a bad reply nor fail a good one in these cases. (1) A numbered mention of the current move or later ('Play 9.Nc3 now', '9.Nc3! is best') uses the current pool; only an earlier move number is a game record. (2) Tense is decided per clause, not per sentence: a comma, 'so', 'since ... ,', 'now that ... ,' reset the cue, and an earlier past-tense mention doesn't carry over to a present-tense one. (3) The opponent's last move (the move from the position before the current one) is a valid reference without a past-tense cue ('Black's ...b6 weakened c6', 'After ...b6 the long diagonal opens'). (4) Unsigned evaluations are extracted when a conjunction or preposition follows ('better by 2.3 and', 'down 0.4 or so', 'up 1.5 to 2'), and unsigned scores attributed to the engine or an evaluation noun ('The engine gives 1.8 for White', \"The evaluation is 2.3 in White's favour\", 'White is 1.5 better').",
+  "requirements": [
+    "NFR-6",
+    "NFR-7",
+    "NFR-4"
+  ],
+  "contract": "Review 038 (reviewer, at f3bc58d): ship-able but these must close before the CI eval can block. Probes on case hint-london-ne5 (Nc3 illegal now: the knight went to d2 on move 6; Black's last move b7b6). Rerun them as tests:\n- MAJOR graders.ts:99 `if (NUMBERED.test(before)) return true;` returns past before PRESENT_CUE. gradeMoves('Play 9.Nc3 now.').illegal -> [] and ('9.Nc3! is best.') -> []; both must be ['Nc3'] (or equivalent raw).\n- MAJOR graders.ts:81 last cue anywhere earlier in the sentence; sentence split only on '. ', '! ', '? ', '; ', newline. (\"Black's last move was ...b6, so Nc3 is strong.\"), ('Since Black was slow, Nc3 is best.'), ('Now that you have developed, Nc3 is the move.') -> [] ; must flag Nc3.\n- MAJOR graders.ts:63 currentPositions omits the position before the last move. (\"Black's ...b6 weakened c6.\"), ('After ...b6 the long diagonal opens.'), (\"Black's last move ...b6 weakens c6.\") -> ['b6']; must pass. Reviewer's suggestion: add the position before the last move (historyFens(history).at(-2)) to currentPositions (careful: that position has the opponent to move, so only the opponent's moves there; don't let it re-open item 1/2 holes for the player's moves).\n- MAJOR graders.ts:364 BARE_QUOTE negative lookahead rejects a number followed by of|to|or|and. With no tool results all should be 'unmatched': 'You are better by 2.3 and should attack.', 'White is down 0.4 or so.', 'You are up 1.5 to 2 here.', 'The engine gives 1.8 for White.', \"The evaluation is 2.3 in White's favour.\", 'White is 1.5 better.' -> today quotes [].\n- minor graders.ts:370 PAWN_LEAD treats 'by'/'up' as eval words: 'e4 is defended by 2 pawns.', \"Black's c5 pawn is backed up by 2 pawns.\" -> '2 pawns:unmatched'; must not be quotes. ('After the trade you are up 2 pawns in material.' is a real material claim: your call, document it.)\n- minor graders.ts:268 any castle word fails when the answer castles, even about the opponent: 'Black has already castled. Where is your king safest?' and 'Black castled; is your king safe?' with revealMove e1g1 -> flagged; must pass. Keep 'castle', 'you castle', 'castling now' flagged.\n- minor notation.ts:65 'the e4 pawn break', 'the e4-break' (revealMove e3e4), \"putting your king's knight on e5\", 'Your knight belongs on e5' (f3e5) not flagged; flag them if it doesn't create false fails on the 22 recorded replies.\n- Leave as-is (note in your return): recorder.ts:38 a round failing mid-stream records usage null; the cap overshoot with concurrency N is documented.\nKeep round-1 behaviour: the offline before/after grade of the 22 recorded replies (12 bakeoff + 10 q3 fixtures) should stay identical, or explain each change. Prefer structural rules (clause boundaries, the case's move number from the FEN) over growing word lists.\n\nCoordinator gate at f3bc58d: pnpm test 668 passed (41 files); typecheck exit 0.",
+  "scope": [
+    "evals/**"
+  ],
+  "negative": [
+    "Do not edit packages/, prompts/, docs, config, .github, root files or the lockfile.",
+    "No new dependencies.",
+    "Never call the real Anthropic API or Lichess.",
+    "Do not depend on the exact unsupported_claim wording in packages/tutor session.ts."
+  ],
+  "rubric": [
+    "Tests first (red then green): every reviewer probe above as a test, with its expected verdict.",
+    "Round-1 tests pass; offline regrade of the 22 recorded replies unchanged or each change explained.",
+    "pnpm test and pnpm typecheck clean from the repo root.",
+    "files_changed lists every file changed in f3bc58d..your head. Commit message references NFR-6, NFR-7 and #29 (Part of #29)."
+  ],
+  "concurrency": "Brief 039 (#26 round 2, packages/tutor only) is running in parallel; don't touch packages/.",
+  "round": 2
+}

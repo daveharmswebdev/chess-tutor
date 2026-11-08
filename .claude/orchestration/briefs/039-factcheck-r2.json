@@ -1,0 +1,30 @@
+{
+  "brief_id": "039-factcheck-r2",
+  "agent": "tutor-agent",
+  "issue": 26,
+  "base_sha": "723457a",
+  "scratch_dir": "/private/tmp/claude-501/-Users-daveharms-personal-workspace-chess-tutor/6f327728-079b-44d8-a290-4d4f254fe37a/scratchpad/039-factcheck-r2",
+  "objective": "Round 2 of #26 on your branch (base 723457a): fix review 037's blocking and major findings in the FR-10 evaluation check, without losing what round 1 fixed. (1) BLOCKING: the negation skip must not drop evaluations after ordinary idioms; skip only when the negation governs the number's own subject or predicate ('nobody is 2 pawns up', 'no one is', 'neither side is 1.5 pawns better', 'not +0.5'). (2) Side detection covers 'up/ahead/behind/down N', 'better/worse by N', 'leads by N', and unsigned numbers with an evaluation word ('Black is better by 0.8', 'You are up 1.5') which today are never extracted. (3) Mate quotes carry a side: 'White has mate in 3' fails when the engine gave Black mate in 3. (4) A number whose sign already points to the named side in White-relative notation ('-1.5 in Black's favour', 'the eval is -1.5 for Black', 'the engine has Black at -1.5' with eval_cp -150) passes. (5) Material is not exempt: 'White is +3 in material' is checked.",
+  "requirements": [
+    "FR-10",
+    "NFR-6"
+  ],
+  "contract": "Review 037 (reviewer, at 723457a) verdict no-ship. Findings with its probes (rerun them as tests):\n- BLOCKING claims.ts:209 negation skip looks at the last 4 words of the clause; colons don't end a clause. With no scores these all PASS (extractEvals returns []): 'No doubt White is +4.2.'; 'No wonder you are +3.5 now.' (score 0, playerColor w); 'Do not worry: White is +3.0 here.'; 'No question: White is +3.0 here.'; 'Not only is White +4.2, it is easy.'; 'Never doubt it: +3.0 for White.'. All must be rejected. 'nobody is 2 pawns up' and 'neither side is 1.5 pawns better' must still produce no claim.\n- MAJOR claims.ts:162 side found only after '<side> <COPULA words>' or before 'for'/'in favour'. As Black with score +150 (Black is down): 'You are up 1.5 pawns.' PASS, 'You are ahead by 1.5 pawns.' PASS, 'You are up +1.5.' PASS. 'Black is better by +0.8.' with +80 PASS; 'Black is better by 0.8 pawns.' with +80 PASS; 'White leads by 1.5 pawns.' with -150 PASS. All must be rejected (wrong side); the right-side versions must pass. 'You are 1.5 pawns up.' with +150 already correctly rejected.\n- MAJOR evidence.ts:130 mates stored as |N|: addScore({kind:'mate', value:-3}) then 'White has mate in 3.' PASS, 'White has M3.' PASS. Must reject; 'Black has mate in 3.' passes; unsided 'mate in 3' still passes on N.\n- MAJOR claims.ts:163 false rejection with score -150: 'The engine says -1.5 in Black's favour.', 'The eval is -1.5 for Black.', 'The engine has Black at -1.5.' are rejected; must pass. Reviewer's suggested rule: when the sign already points to the named side (negative with Black, positive with White), also accept the White-relative reading, as for 'Black is +1.5'.\n- minor claims.ts:156 NOT_EVAL_AFTER exempts 'in material'/'of material'/'pieces'/'moves': 'White is +3 in material.' with no scores PASSES; must be checked. Keep '+1 in development', '+2 in space', '+1 tempo' exempt.\n- minor claims.ts:150 unsigned number with no unit never an evaluation ('Black is better by 0.8') — covered by item (2).\n- minor evidence.ts:136 in the 'shown' frame a delta backs an unsided signed number of either sign (addDelta(250), addCp(0): 'The position is -2.5.' PASS). Optional: fix if cheap (a delta backs only unsigned magnitudes), else leave and say so.\nReviewer confirmed held: move check (4.O-O from history passes; 6...O-O, Black's O-O, 'Push h5!', 'Black pushes h5!' rejected), reveal/give-away checks, regrade phrases, session.ts:27 text. Keep all of those and all round-1 tests green.\n\nCoordinator gate at 723457a: pnpm test 659 passed (40 files); typecheck exit 0. Concern: don't overfit word lists to probes; prefer a structural rule (find the clause's subject side and the direction word, then compare) and document the heuristic's limits in claims.ts.",
+  "scope": [
+    "packages/tutor/**"
+  ],
+  "negative": [
+    "Do not edit evals/, prompts/, other packages, docs, config, .github, root files or the lockfile.",
+    "No new dependencies.",
+    "Do not change the correction-turn prefix or the regrade bucket phrases ('quotes the evaluation' etc.).",
+    "Never call the real Anthropic API."
+  ],
+  "rubric": [
+    "Tests first (red then green): every reviewer probe above as a test case, each with its expected verdict.",
+    "Round-1 tests and existing rejections still pass.",
+    "pnpm test and pnpm typecheck clean from the repo root.",
+    "files_changed lists every file changed in 723457a..your head. Commit message references FR-10, NFR-6 and #26."
+  ],
+  "concurrency": "Brief 036's branch (#29, evals/ only) is under review in parallel; don't touch evals/.",
+  "round": 2
+}

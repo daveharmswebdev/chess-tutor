@@ -127,3 +127,36 @@
 {"ts":"2026-11-08T15:01:17.720Z","event":"coordinator_verdict","brief_id":"034-review-evals-r1","agent":"reviewer","verdict":"review","reason":"SHIP. 3 major grader false-pass holes -> follow-up issue; record numbers + paths filter fixed inline"}
 {"ts":"2026-11-08T15:01:24.579Z","event":"coordinator_verdict","brief_id":"034-review-evals-r1","agent":"reviewer","verdict":"review","reason":"cost entry","tokens":91955,"duration_ms":298552}
 {"ts":"2026-11-08T15:10:18.936Z","event":"shipped","issue":10,"pr":31}
+{"ts":"2026-11-08T18:10:55.289Z","event":"dispatch","subagent_type":"tutor-agent","brief_id":"035-factcheck-r1","base_sha":"743f9bf","spoke":true}
+{"ts":"2026-11-08T18:12:31.738Z","event":"dispatch","subagent_type":"tutor-agent","brief_id":"036-graders-r1","base_sha":"743f9bf","spoke":true}
+{"ts":"2026-11-08T18:12:31.903Z","event":"agent_complete","subagent_type":"tutor-agent","brief_id":"035-factcheck-r1","agent_id":"a66e1947ae919a01a","status":"async_launched","contract":"pending"}
+{"ts":"2026-11-08T18:12:32.009Z","event":"agent_complete","subagent_type":"tutor-agent","brief_id":"036-graders-r1","agent_id":"a5d752008f2674a89","status":"async_launched","contract":"pending"}
+{"ts":"2026-11-08T18:20:34.912Z","event":"return_valid","agent_id":"a66e1947ae919a01a","agent_type":"tutor-agent","via":"handback"}
+{"ts":"2026-11-08T18:21:57.938Z","event":"dispatch","subagent_type":"reviewer","brief_id":"037-factcheck-r1","base_sha":"723457a","spoke":true}
+{"ts":"2026-11-08T18:21:58.270Z","event":"agent_complete","subagent_type":"reviewer","brief_id":"037-factcheck-r1","agent_id":"a3e2be25159669d13","status":"async_launched","contract":"pending"}
+{"ts":"2026-11-08T18:22:04.349Z","event":"coordinator_verdict","brief_id":"035-factcheck-r1","agent":"tutor-agent","verdict":"accepted","reason":"files match scope, gate 659 passed + typecheck 0; to reviewer 037","tokens":90974,"duration_ms":483327}
+{"ts":"2026-11-08T18:23:16.916Z","event":"return_invalid","agent_id":"a5d752008f2674a89","agent_type":"tutor-agent","attempt":1,"errors":["/tests_run: a 'gate' check failed, so this is not a success"]}
+{"ts":"2026-11-08T18:23:39.047Z","event":"return_valid","agent_id":"a5d752008f2674a89","agent_type":"tutor-agent","via":"handback"}
+{"ts":"2026-11-08T18:24:50.391Z","event":"dispatch","subagent_type":"reviewer","brief_id":"038-graders-r1","base_sha":"f3bc58d","spoke":true}
+{"ts":"2026-11-08T18:24:50.609Z","event":"agent_complete","subagent_type":"reviewer","brief_id":"038-graders-r1","agent_id":"a0af62bfe2e6a4e27","status":"async_launched","contract":"pending"}
+{"ts":"2026-11-08T18:24:57.423Z","event":"coordinator_verdict","brief_id":"036-graders-r1","agent":"tutor-agent","verdict":"accepted","reason":"files match scope, gate 668 passed + typecheck 0; to reviewer 038","tokens":119130,"duration_ms":667397}
+{"ts":"2026-11-08T18:25:21.393Z","event":"return_valid","agent_id":"a3e2be25159669d13","agent_type":"reviewer","via":"handback"}
+{"ts":"2026-11-08T18:25:46.755Z","event":"coordinator_verdict","brief_id":"037-factcheck-r1","agent":"reviewer","verdict":"review","reason":"no-ship: 1 blocking (negation skip), 3 major; round 2 brief 039","tokens":55644,"duration_ms":203651}
+{"ts":"2026-11-08T18:32:08.323Z","event":"return_valid","agent_id":"a0af62bfe2e6a4e27","agent_type":"reviewer","via":"handback"}
+{"ts":"2026-11-08T18:32:40.173Z","event":"coordinator_verdict","brief_id":"038-graders-r1","agent":"reviewer","verdict":"review","reason":"ship-able, but 4 major grader false pass/fail; round 2 brief 040","tokens":58656,"duration_ms":438014}
+{"ts":"2026-11-08T18:35:00.499Z","event":"return_invalid","agent_id":"a66e1947ae919a01a","agent_type":"tutor-agent","attempt":1,"errors":["/tests_run: a 'gate' check failed, so this is not a success"]}
+{"ts":"2026-11-08T18:36:00.769Z","event":"return_valid","agent_id":"a66e1947ae919a01a","agent_type":"tutor-agent","via":"handback"}
+{"ts":"2026-11-08T18:36:52.203Z","event":"coordinator_verdict","brief_id":"039-factcheck-r2","agent":"tutor-agent","verdict":"accepted","reason":"3 files in scope, gate 665 passed + typecheck 0; re-review 041","tokens":128304,"duration_ms":592374}
+{"ts":"2026-11-08T18:39:17.110Z","event":"return_valid","agent_id":"a5d752008f2674a89","agent_type":"tutor-agent","via":"handback"}
+{"ts":"2026-11-08T18:40:05.983Z","event":"return_invalid","agent_id":"a3e2be25159669d13","agent_type":"reviewer","attempt":1,"errors":["/brief_defects/0: must be string"]}
+{"ts":"2026-11-08T18:40:07.540Z","event":"coordinator_verdict","brief_id":"040-graders-r2","agent":"tutor-agent","verdict":"accepted","reason":"4 files in scope, gate 701 passed + typecheck 0; re-review 042","tokens":163646,"duration_ms":378296}
+{"ts":"2026-11-08T18:40:36.407Z","event":"return_valid","agent_id":"a3e2be25159669d13","agent_type":"reviewer","via":"handback"}
+{"ts":"2026-11-08T18:41:01.109Z","event":"coordinator_verdict","brief_id":"041-factcheck-r2","agent":"reviewer","verdict":"review","reason":"no blocking; 3 major (r2 material false-reject regression, possessive subjects, mated in N); round 3 brief 043","tokens":93032,"duration_ms":210692}
+{"ts":"2026-11-08T18:42:41.650Z","event":"return_valid","agent_id":"a0af62bfe2e6a4e27","agent_type":"reviewer","via":"handback"}
+{"ts":"2026-11-08T18:42:58.921Z","event":"coordinator_verdict","brief_id":"042-graders-r2","agent":"reviewer","verdict":"review","reason":"ship; 4 new majors moved to #29 checklist","tokens":88439,"duration_ms":141198}
+{"ts":"2026-11-08T18:44:39.997Z","event":"shipped","issue":29,"pr":32,"partial":true}
+{"ts":"2026-11-08T18:45:16.074Z","event":"return_valid","agent_id":"a66e1947ae919a01a","agent_type":"tutor-agent","via":"handback"}
+{"ts":"2026-11-08T18:46:04.470Z","event":"coordinator_verdict","brief_id":"043-factcheck-r3","agent":"tutor-agent","verdict":"accepted","reason":"2 files in scope; rebased onto 29359cb -> da24979, gate 723 passed + typecheck 0; final re-review 044","tokens":156423,"duration_ms":237403}
+{"ts":"2026-11-08T18:48:48.547Z","event":"return_valid","agent_id":"a3e2be25159669d13","agent_type":"reviewer","via":"handback"}
+{"ts":"2026-11-08T18:49:25.887Z","event":"coordinator_verdict","brief_id":"044-factcheck-r3","agent":"reviewer","verdict":"review","reason":"no-ship: 2 blocking from r3 rules; #26 parked after 3 rounds (Needs you)","tokens":119340,"duration_ms":150766}
+{"ts":"2026-11-08T18:49:25.888Z","event":"parked","issue":26,"branch":"issue-26-factcheck-wip","reason":"3 rounds, r3 review blocking"}

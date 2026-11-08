@@ -1,0 +1,36 @@
+{
+  "brief_id": "035-factcheck-r1",
+  "agent": "tutor-agent",
+  "issue": 26,
+  "base_sha": "743f9bf",
+  "scratch_dir": "/private/tmp/claude-501/-Users-daveharms-personal-workspace-chess-tutor/6f327728-079b-44d8-a290-4d4f254fe37a/scratchpad/035-factcheck-r1",
+  "objective": "Fix the tutor's FR-10 fact check in packages/tutor (#26): (1) a quoted evaluation is backed only if the engine gave that value for that side — keep signed White-relative scores separate from move-loss/gain deltas, so 'White is +4.2' fails when the backed score is -420 and a 250 cp loss cannot back 'White is +2.5'; (2) remove three false alarms: a past move referenced with its move number ('Your 3.Bf4 ...') resolved against that ply of the history before the focus-position check, the opponent's castling mentioned on the player's turn ('White castled with O-O earlier' when it is in the history), and non-evaluation numbers ('+1 in development', negated 'nobody is 2 pawns up'); (3) the unsupported_claim failure text says 'a move or evaluation'.",
+  "requirements": [
+    "FR-10",
+    "NFR-6"
+  ],
+  "contract": "Coordinator gate at base 743f9bf (main): pnpm test 648 passed, 40 files; pnpm --filter @chess-tutor/tutor typecheck and pnpm --filter ./evals typecheck both exit 0.\n\nFindings from review 031 (issue #26 technical notes):\n- major packages/tutor/src/evidence.ts:89 backsEval compares absolute values (see excerpt below). addCp also records deltas: cpLoss from evaluate_move (tools.ts:212) and the key moment's cpLoss/gainCp (request.ts:77). Probe: Evidence with addScore({kind:'cp', value:-420}), then checkClaims('White is +4.2 and completely winning.') returned []. Suggested fix: store signed White-relative scores separately from deltas; a quote that names a side (White/Black, 'you'/'your opponent' resolved through playerColor if available, or a leading sign read from White's view) matches the signed value; an unsided magnitude ('a 2.5-pawn edge', '2.5 pawns') may match either a signed score's magnitude or a delta, your call, documented in a comment.\n- minor claims.ts:201 history tier rejects a past move whose SAN is also legal in the focus position. Resolve a move-number prefix (3.Bf4, 3...Bg7) against that ply of the history first.\n- minor claims.ts:139 eval extractor matches '+1 in development' and negated '2 pawns up'.\n- minor session.ts:27 unsupported_claim text: 'The tutor mentioned a move that the engine or the game data did not give it.' -> must mention 'a move or evaluation'.\n\nCurrent evidence.ts:84-91:\n  /** A quoted evaluation is backed when it is within EVAL_TOLERANCE_CP of a backed score in absolute value (either side's point of view), or, for mate in N, when N matches exactly. */\n  backsEval(quote) { if ('mate' in quote) return this.mates.has(Math.abs(quote.mate)); const q = Math.abs(quote.cp); return this.cps.some((s) => Math.abs(s - q) <= EVAL_TOLERANCE_CP + 1e-9); }\n\nExisting rejections that must still hold (existing tests): the Black O-O case, '+4.2' with no tool call, 'Push h5!'.\n\nA downstream classifier in evals/src/regrade.ts buckets correction texts by these regexes; keep the phrases so it still classifies: /gives the answer away/, /not legal in any position/, /does not appear in this turn's tool results|is not backed by this turn's tool results/, /quotes the evaluation/, /revealMove \"/. The correction turn must still start with 'Your last reply was not accepted' (evals/src/recorder.ts CORRECTION_PREFIX).",
+  "scope": [
+    "packages/tutor/**"
+  ],
+  "negative": [
+    "Do not edit evals/, prompts/, other packages, docs, config, .github, root files or the lockfile.",
+    "No new dependencies.",
+    "Do not change the correction-turn prefix or the regrade bucket phrases listed in the contract.",
+    "Never call the real Anthropic API."
+  ],
+  "rubric": [
+    "Tests first (red then green): the -420 vs 'White is +4.2' probe rejected; a 250 cp delta does not back 'White is +2.5' in a level position; a signed backed score matching the named side passes; mate in N still exact.",
+    "Tests: '3.Bf4 was the right London setup' after Bg3 passes; 'White castled with O-O earlier' on Black's turn passes when O-O is in history; '+1 in development' and 'nobody is 2 pawns up' produce no eval claim.",
+    "Existing rejections still hold (Black O-O, '+4.2' with no tool call, 'Push h5!').",
+    "unsupported_claim text says 'a move or evaluation'.",
+    "pnpm test and pnpm typecheck clean from the repo root.",
+    "files_changed lists every file changed in 743f9bf..your head. Commit message references FR-10, NFR-6 and #26."
+  ],
+  "concurrency": "In parallel: brief 036 (tutor-agent, #29) edits evals/src/** and evals/test/** only (graders.ts, notation.ts, runner.ts). You must not touch evals/. It does not depend on your wording beyond the regrade phrases in the contract.",
+  "round": 1,
+  "contract_files": [
+    "packages/tutor/src/evidence.ts",
+    "packages/tutor/src/claims.ts"
+  ]
+}

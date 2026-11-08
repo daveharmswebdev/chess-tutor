@@ -1,0 +1,26 @@
+{
+  "brief_id": "041-factcheck-r2",
+  "agent": "reviewer",
+  "issue": 26,
+  "base_sha": "eac16da",
+  "scratch_dir": "/private/tmp/claude-501/-Users-daveharms-personal-workspace-chess-tutor/6f327728-079b-44d8-a290-4d4f254fe37a/scratchpad/041-factcheck-r2",
+  "objective": "Re-review #26 round 2: git diff 723457a..eac16da (your round-1 review 037 was of 743f9bf..723457a). Read with git show eac16da / git diff (the commit is on branch worktree-agent-a66e1947ae919a01a). Check every 037 finding is fixed, and hunt for new holes the structural rule opens: a wrong-side or invented evaluation that passes, or a correct coaching sentence now rejected. Report blocking / major / minor, per-criterion Done-when status, and ship / no-ship.",
+  "requirements": [
+    "FR-10",
+    "NFR-6"
+  ],
+  "contract": "Round 2 (brief 039, tutor-agent) summary: word lists replaced by a structural rule for the clause ending at the number (clause also ends at ': '). Only link words (being/having verbs, hedges, articles, 'at', direction words) between subject and number. Direction words ('is up/down/ahead/behind N', 'better/worse/leads/trails by N', 'N pawns up/down') make unsigned unitless N an evaluation and set its sign; 'pick up 2 pawns' isn't. Negation skips only when the subject is negative (nobody/no one/neither side/none + links) or not/never/no/n't + links governs the number. Side = subject or trailing 'for Black'/\"in Black's favour\"; a signed number that already points to the named side with no direction word also accepts the White-relative reading (EvalQuote.orCp). Mates stored signed White-relative; a sided mate quote must match the mating side. Material and pieces now checked; development/space/tempo/moves/squares exempt. In 'shown' frame a delta backs only a positive number. Spoke's stated limits: long subjects/passives/comparisons lose the side and fall back to looser unsided frames; 'Black is -1.5' accepts both readings; '+2 moves' exempt.\n\n#26 Done when: a quoted evaluation passes only if the engine gave that value for that side; signed scores separate from move-loss figures (FR-10, NFR-6); false-alarm sentences pass ('Your 3.Bf4 was the right London setup' after Bg3; 'White castled with O-O earlier' on Black's turn; '+1 in development'; 'nobody is 2 pawns up'); existing rejections hold (Black O-O, '+4.2' with no tool call, 'Push h5!'); failure message says 'a move or evaluation'.\n\nCoordinator gate at eac16da: pnpm test 665 passed (40 files); typecheck exit 0. (apps/server wasm-bot latency test failed once under load in the spoke's run, unrelated; passed in mine.)",
+  "scope": [],
+  "negative": [
+    "Read-only: do not edit, commit, or run anything that writes to the repo.",
+    "Never call the Anthropic API.",
+    "Do not review outside 723457a..eac16da except to confirm round-1 behaviour still holds."
+  ],
+  "rubric": [
+    "Re-run your 037 probes against eac16da and report each verdict.",
+    "New probes aimed at the structural rule: long subjects ('White's position is +1.5' with -150), passives, comparisons, 'Black is -1.5' with +150, sided mate variants, and common correct coaching phrasings that might now be rejected.",
+    "Every finding cites file:line and a concrete failure scenario; per-criterion Done-when; ship / no-ship."
+  ],
+  "concurrency": "#29 round 2 (evals/ only) is in progress in another worktree; ignore evals/.",
+  "round": 2
+}

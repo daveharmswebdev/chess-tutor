@@ -1,0 +1,26 @@
+{
+  "brief_id": "044-factcheck-r3",
+  "agent": "reviewer",
+  "issue": 26,
+  "base_sha": "da24979",
+  "scratch_dir": "/private/tmp/claude-501/-Users-daveharms-personal-workspace-chess-tutor/6f327728-079b-44d8-a290-4d4f254fe37a/scratchpad/044-factcheck-r3",
+  "objective": "Final re-review of #26 round 3: git show da24979 (rebased round-3 commit, was ea09d87; parent ecb2c6f = round 2 rebased onto main 29359cb). Re-run your 041 probes and confirm the three majors and two minors are fixed and nothing in 037/041's 'correct' list regressed. Look only for blocking defects or new majors this round introduced (material rule, SIDE_POSSESSIVE, MATED_IN, hypothetical rule). Ship / no-ship.",
+  "requirements": [
+    "FR-10",
+    "NFR-6"
+  ],
+  "contract": "Round 3 (brief 043) summary: 'is up/down/ahead/behind N' is an evaluation only with a side subject; a whole number of pawns or 'N in material' after up/down/ahead/behind is a material count, unchecked, when the same sentence also quotes an engine-style number (signed, decimal, cp, mate), which is still checked. SIDE_POSSESSIVE: \"<side>'s <noun>\", 'your <noun>', \"your opponent's <noun>\", 'the White/Black <noun>'. MATED_IN ('gets' a link word): mate quote for the subject's opponent. orCp only for White/Black subjects. Comparison after the number ('than ...') or a hypothetical in the clause (would/could/might/if) -> unsided frames. Known limits (follow-up): '-M3' sign, 'You can mate in 3', 'up 2 minutes on the clock'; hypothetical rule makes 'If you play Nf3, White is +0.5' unsided.\n\nThe branch is worktree-agent-a66e1947ae919a01a, checked out in .claude/worktrees/agent-a66e1947ae919a01a at da24979 (clean); you may run probes read-only there as before. Coordinator gate at da24979: pnpm test 723 passed; typecheck exit 0. This is the last allowed implementation round: anything non-blocking goes to a follow-up issue.",
+  "scope": [],
+  "negative": [
+    "Read-only: do not edit, commit, or run anything that writes to the repo.",
+    "Never call the Anthropic API.",
+    "Keep it short: only blocking/major findings from this round's changes; list minors in one line each."
+  ],
+  "rubric": [
+    "Re-run 041 probes and report each verdict.",
+    "Probe the four new rules for wrong-side passes and correct-sentence rejections.",
+    "Ship / no-ship."
+  ],
+  "concurrency": "Nothing else is running.",
+  "round": 3
+}

@@ -1,0 +1,31 @@
+{
+  "brief_id": "043-factcheck-r3",
+  "agent": "tutor-agent",
+  "issue": 26,
+  "base_sha": "eac16da",
+  "scratch_dir": "/private/tmp/claude-501/-Users-daveharms-personal-workspace-chess-tutor/6f327728-079b-44d8-a290-4d4f254fe37a/scratchpad/043-factcheck-r3",
+  "objective": "Round 3 (final) of #26 on your branch (base eac16da): fix review 041's three majors and two cheap minors, nothing else. (1) Regression from r2: 'is/are up|down|behind N pawns' is an evaluation only when a side subject governs it AND it is not a material/structure description; material counts beside an engine eval ('Black is down 1 pawn but the engine has White at only +0.2') and pawn-shield/structure phrases ('The king is behind 3 pawns on f2, g2 and h2', 'The rook is behind 2 passed pawns', 'You are up 3 in material, but the engine says only +0.5') pass. (2) Possessive/noun subjects carry the side: \"<side>'s <noun>\", 'your <noun>', 'your opponent's <noun>', 'the White/Black pieces'. (3) 'mated in N' / 'gets mated in N' is a mate quote, the mated side being the subject's opposite. (4) minor: orCp (the second White-relative reading) applies only to White/Black subjects, never to 'you'/'your opponent'. (5) minor: a comparison ('than before', 'than after Bd3') or hypothetical ('would be', 'if ... you are') falls back to the unsided frames.",
+  "requirements": [
+    "FR-10",
+    "NFR-6"
+  ],
+  "contract": "Review 041 (at eac16da): all 037 findings fixed; no blocking. Findings to fix, with probes (make each a test):\n- MAJOR claims.ts:191 PRE_DIRECTION. Score +20: 'Black is down 1 pawn but the engine has White at only +0.2.' REJECTS (quote '1 pawn' cp 100 frame white) -> must PASS. Score +40, player w: 'You are down 2 pawns, but the engine says White is +0.4.' -> must PASS. Score +20: 'The king is behind 3 pawns on f2, g2 and h2.' -> PASS; 'The rook is behind 2 passed pawns.' -> PASS; 'You are up 3 in material, but the engine says only +0.5.' (score +50) -> PASS. Reviewer's suggested rule: read 'is up/down/behind N pawns' as an evaluation only with a side-word subject; and treat a whole-number 'N pawn(s)' after up/down as material when the same sentence also quotes an engine number, or after 'behind' as structure. Decide and document; keep r2's 'You are up 1.5 pawns.' (Black, +150) REJECTED and 'Black is better by 0.8' checked.\n- MAJOR claims.ts:186 SIDE_BEFORE bare side word only. Player b, score +150: 'Your position is up 1.5 pawns.' PASSES -> must REJECT. Score -150: \"White's position is better by 1.5.\" PASSES -> REJECT; 'The White pieces are up 1.5 pawns.' -> REJECT. evaluate_move for Black (addScore(-150,'b'), shown +150): \"White's position is +1.5.\" PASSES -> REJECT. Right-side versions pass.\n- MAJOR claims.ts:176 MATE_IN misses 'mated in'. Empty evidence: 'You are mated in 2.' (player w) and 'Black gets mated in 3.' PASS -> REJECT; with Black mating in 2 (mate -2), 'White gets mated in 2.' passes and 'Black gets mated in 2.' rejects.\n- minor claims.ts:254 orCp for you/opponent: score -150, player b: 'You are -1.5 here.' PASSES -> REJECT; player w: 'Your opponent is -1.5.' -> REJECT. 'Black is -1.5.' double reading stays (documented).\n- minor claims.ts:191 comparisons/hypotheticals stricter than the docblock: score 0, delta 150: 'Black is 1.5 pawns better than before.' REJECTS -> PASS (unsided, delta backs); 'White is worse by 1.5 than after Bd3.' -> PASS. Score 0, delta 250, player w: 'You missed a win: you would be up 2.5 pawns.' -> PASS.\nNot in scope this round (go to a follow-up): '-M3' sign ignored, 'You can mate in 3' losing the side, 'up 2 minutes on the clock' / 'up 2 to 1 on the queenside' read as evaluations (fix only if it falls out of item 1 for free).\nAll 037 and 041 'correct' verdicts must still hold (round-1 and round-2 tests green).\n\nCoordinator gate at eac16da: pnpm test 665 passed (40 files); typecheck exit 0. This is the last round under the cycle's 3-round limit; keep the change small.",
+  "scope": [
+    "packages/tutor/**"
+  ],
+  "negative": [
+    "Do not edit evals/, prompts/, other packages, docs, config, .github, root files or the lockfile.",
+    "No new dependencies.",
+    "Do not change the correction-turn prefix or the regrade bucket phrases.",
+    "Never call the real Anthropic API.",
+    "No changes beyond the five items."
+  ],
+  "rubric": [
+    "Tests first (red then green): every probe above with its expected verdict.",
+    "All earlier tests (rounds 1-2) still pass.",
+    "pnpm test and pnpm typecheck clean from the repo root.",
+    "files_changed lists every file changed in eac16da..your head. Commit message references FR-10, NFR-6 and #26."
+  ],
+  "concurrency": "#29 (evals/ only) is under re-review in parallel; don't touch evals/.",
+  "round": 3
+}

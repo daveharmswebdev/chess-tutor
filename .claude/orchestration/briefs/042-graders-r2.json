@@ -1,0 +1,27 @@
+{
+  "brief_id": "042-graders-r2",
+  "agent": "reviewer",
+  "issue": 29,
+  "base_sha": "def2477",
+  "scratch_dir": "/private/tmp/claude-501/-Users-daveharms-personal-workspace-chess-tutor/6f327728-079b-44d8-a290-4d4f254fe37a/scratchpad/042-graders-r2",
+  "objective": "Re-review the #29 grader fixes round 2: git diff f3bc58d..def2477 (your review 038 was of 743f9bf..f3bc58d). The commit is on branch worktree-agent-a5d752008f2674a89; read with git show / git diff. Re-run your 038 probes, confirm each major and the listed minors are fixed, and hunt for new false passes / false fails the structural rules open. Report blocking / major / minor, per-item Done-when status (CI gate out of scope), ship / no-ship.",
+  "requirements": [
+    "NFR-6",
+    "NFR-7",
+    "NFR-4"
+  ],
+  "contract": "Round 2 (brief 040, tutor-agent) summary: move numbers turned into a ply and compared with the current ply (earlier of fen/attemptFen, from FEN fullmove+turn); only an earlier number is a game record. Tense per clause: breaks at [.!?;,:] + space, newline, so/but/because/since/while/whereas/although/though/now that; last cue in the clause wins; past carries to the next mention only across a list gap (',', 'and', 'or', 'then', '...') when the next clause has no present cue. New lastMovePosition(history): position before the last move, no turn flip (only the side that made the last move plays there). Eval extraction: any unsigned decimal is an evaluation (DECIMAL_QUOTE) unless a non-eval unit follows (points, seconds, minutes, hours, %); whole numbers only when framed by EVAL_LEAD/EVAL_FOLLOW ('is/are up|down (by)', 'better|worse|ahead|behind by', 'worth', 'advantage|edge|lead of', or following edge/advantage/better/worse); 'up 2 pawns in material' = material claim, not graded (documented). UP accepts favour/favor. Castle word passes when the nearest subject in its clause is the opponent (opponent's colour, 'opponent', 'they', 'he', 'she'). notation.ts: PLAN_SQUARE ('the e4 pawn break', 'the e4-break'), PIECE_BELONGS ('your knight belongs on e5', plan), king's/queen's/kingside/queenside in PLACE_PIECE. Offline regrade of 22 recorded replies unchanged. Spoke's own finding: an unsigned non-eval decimal like '2.5 games' would be graded. Left as-is: recorder.ts:38 mid-stream usage null; cap overshoot with concurrency N (documented).\n\nCoordinator gate at def2477: pnpm test 701 passed; typecheck exit 0.",
+  "scope": [],
+  "negative": [
+    "Read-only: do not edit, commit, or run anything that writes to the repo.",
+    "Do not call the Anthropic API or run the live runner; pnpm test, vitest and offline probes are fine.",
+    "Do not review outside f3bc58d..def2477 except to confirm round-1 behaviour."
+  ],
+  "rubric": [
+    "Re-run your 038 probes (probe.mjs in your 038 scratch dir) and report each verdict.",
+    "New probes: clause-break and list-carry rules (e.g. past carry into a present-tense player move), lastMovePosition letting the player's own moves through, decimals that are not evaluations, opponent-castle subject rule with 'you castled after they did'.",
+    "Every finding cites file:line and a concrete failure scenario; per-item Done-when; ship / no-ship."
+  ],
+  "concurrency": "#26 re-review (packages/tutor) is running in parallel; ignore packages/.",
+  "round": 2
+}

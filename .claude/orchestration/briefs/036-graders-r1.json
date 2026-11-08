@@ -1,0 +1,36 @@
+{
+  "brief_id": "036-graders-r1",
+  "agent": "tutor-agent",
+  "issue": 29,
+  "base_sha": "743f9bf",
+  "scratch_dir": "/private/tmp/claude-501/-Users-daveharms-personal-workspace-chess-tutor/6f327728-079b-44d8-a290-4d4f254fe37a/scratchpad/036-graders-r1",
+  "objective": "Close the eval grader false-pass holes in evals/ (#29, grader items only): (1) NFR-6 eval extraction catches unsigned evaluations ('better by 2.3', 'down 0.4', 'a 1.5-pawn edge') but not material counts ('2 pawns on the queenside'); (2) NFR-6 legality: a move described as played now ('Play Nc3 now', imperative/now/next wording) is checked against the case's current position (fen, or attemptFen for the attempt) plus tool-line positions, not any earlier history position; past-tense references may still use history; (3) NFR-7 give-away grader catches 'a bishop check', 'checks with your bishop', 'castle' in words, 'the e4 break', 'putting your knight on e5', and when revealMove is null falls back to the case's engineBest instead of passing; (4) NFR-4 the runner's cost cap counts the usage of failed asks (recorded rounds' usage, not $0), with a runner test at concurrency > 1. The CI gate in .github/workflows/evals.yml is out of scope (coordinator, later).",
+  "requirements": [
+    "NFR-6",
+    "NFR-7",
+    "NFR-4"
+  ],
+  "contract": "Coordinator gate at base 743f9bf (main): pnpm test 648 passed, 40 files; pnpm --filter @chess-tutor/tutor typecheck and pnpm --filter ./evals typecheck both exit 0.\n\nFindings from review 034 of #10 at 0f0bedf (issue #29 technical notes):\n- Major evals/src/graders.ts:299 unsigned quotes are never extracted.\n- Major graders.ts:62 basePositions includes every history position. Probe: 'Play Nc3 now' and 'Black plays Nb8-c6' both pass on case hint-london-ne5.\n- Major graders.ts:173 and notation.ts:55 CHECK_NOUN, MOVE_VERBS and PIECE_TO miss the wordings in the objective.\n- Minor graders.ts:208 a null revealMove passes NFR-7 automatically.\n- Minor runner.ts:138 when ask throws, usage is 0 even though the recorded rounds were billed.\nGraders stay independent of packages/tutor internals (chess.js only). Also noted on #29: graders-q3/regrade tests took >5 s on CI runners (timeout raised to 20 s); speeding them up is welcome but optional.\nDo not re-run live evals (no API key; spending is the coordinator's call). Existing committed results in evals/results/ may be re-graded offline with regrade.ts if useful; report the before/after numbers if you do.",
+  "scope": [
+    "evals/**"
+  ],
+  "negative": [
+    "Do not edit packages/, prompts/, docs, config, .github, root files or the lockfile.",
+    "No new dependencies.",
+    "Never call the real Anthropic API or Lichess.",
+    "Do not depend on the exact unsupported_claim wording in packages/tutor session.ts; brief 035 is changing it."
+  ],
+  "rubric": [
+    "Tests first (red then green) for each probe: the three unsigned evals extracted, '2 pawns on the queenside' not; 'Play Nc3 now' and 'Black plays Nb8-c6' fail on hint-london-ne5; each of the five give-away wordings flagged when it matches revealMove; null revealMove graded against engineBest.",
+    "Runner test: a throwing ask with billed recorded rounds counts toward --max-usd, at concurrency >= 2.",
+    "No regressions on existing grader fixtures (the 12 bakeoff replies' legal moves still legal).",
+    "pnpm test and pnpm typecheck clean from the repo root.",
+    "files_changed lists every file changed in 743f9bf..your head. Commit message references NFR-4, NFR-6, NFR-7 and #29 (Part of #29)."
+  ],
+  "concurrency": "In parallel: brief 035 (tutor-agent, #26) edits packages/tutor/** only (evidence.ts, claims.ts, session.ts). You must not touch packages/. regrade.ts BUCKETS phrases and recorder.ts CORRECTION_PREFIX stay valid; 035 is told to keep them.",
+  "round": 1,
+  "contract_files": [
+    "evals/src/graders.ts",
+    "evals/src/notation.ts"
+  ]
+}
