@@ -38,4 +38,9 @@ export type {
   MoveView,
   NewGameRequest,
   PlayMoveRequest,
+  TutorArrow,
+  TutorKind,
+  TutorQuestion,
+  TutorReveal,
+  TutorStatus,
 } from "./api.ts";

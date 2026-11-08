@@ -86,3 +86,12 @@
 {"ts":"2026-11-07T23:20:17.604Z","event":"return_valid","agent_id":"a973e5a4d5d44e107","agent_type":"web-agent","via":"handback"}
 {"ts":"2026-11-07T23:22:34.724Z","event":"coordinator_verdict","brief_id":"024-bot-retry-web-r2","verdict":"accepted","reason":"verified diff, 375 passed, e2e, read reducer diff"}
 {"ts":"2026-11-07T23:22:34.724Z","event":"shipped","issue":23,"pr":25}
+{"ts":"2026-11-08T00:02:41.822Z","event":"dispatch","subagent_type":"tutor-agent","brief_id":"025-tutor-loop-r1","base_sha":"54b8f99","spoke":true}
+{"ts":"2026-11-08T00:03:40.205Z","event":"dispatch","subagent_type":"server-agent","brief_id":"026-tutor-server-r1","base_sha":"54b8f99","spoke":true}
+{"ts":"2026-11-08T00:04:20.489Z","event":"dispatch","subagent_type":"web-agent","brief_id":"027-tutor-web-r1","base_sha":"54b8f99","spoke":true}
+{"ts":"2026-11-08T00:04:20.936Z","event":"agent_complete","subagent_type":"tutor-agent","brief_id":"025-tutor-loop-r1","agent_id":"a462498ccce8e1af8","status":"async_launched","contract":"pending"}
+{"ts":"2026-11-08T00:04:20.960Z","event":"agent_complete","subagent_type":"web-agent","brief_id":"027-tutor-web-r1","agent_id":"a01cb5e945b0b73a8","status":"async_launched","contract":"pending"}
+{"ts":"2026-11-08T00:04:20.960Z","event":"agent_complete","subagent_type":"server-agent","brief_id":"026-tutor-server-r1","agent_id":"a4271a147d2588f1e","status":"async_launched","contract":"pending"}
+{"ts":"2026-11-08T00:13:29.197Z","event":"return_invalid","agent_id":"a01cb5e945b0b73a8","agent_type":"web-agent","attempt":1,"errors":["/tests_run: a 'gate' check failed, so this is not a success"]}
+{"ts":"2026-11-08T00:13:57.363Z","event":"return_valid","agent_id":"a01cb5e945b0b73a8","agent_type":"web-agent","via":"handback"}
+{"ts":"2026-11-08T00:14:41.247Z","event":"coordinator_verdict","brief_id":"027-tutor-web-r1","agent":"web-agent","verdict":"accepted","reason":"failure was a brief defect: base typecheck premise wrong (pnpm -r fail-fast hid 2 server errors, fixed by brief 026). Re-ran: 432 passed, web typecheck clean, diff == files_changed, in scope. Merge with 026.","tokens":111811,"duration_ms":576957}
