@@ -49,15 +49,37 @@ function momentData(moment: KeyMoment, fens: string[]) {
   }
 }
 
-function momentSans(moment: KeyMoment): string[] {
+/**
+ * Key-moment moves with the position each was played from: played / best / expected /
+ * opponentMove at fenBefore (the position before the triggering move), refutation at fen.
+ */
+function momentMoves(moment: KeyMoment): { san: string; at: "before" | "after" }[] {
   switch (moment.kind) {
     case "opponent_left_book":
-      return [...moment.expected, moment.played];
+      return [...moment.expected, moment.played].map((san) => ({ san, at: "before" as const }));
     case "player_blunder":
     case "missed_win":
-      return [moment.played, moment.best];
+      return [
+        { san: moment.played, at: "before" },
+        { san: moment.best, at: "before" },
+      ];
     case "punish_opponent":
-      return [moment.opponentMove, moment.refutation];
+      return [
+        { san: moment.opponentMove, at: "before" },
+        { san: moment.refutation, at: "after" },
+      ];
+  }
+}
+
+function momentScores(moment: KeyMoment): number[] {
+  switch (moment.kind) {
+    case "player_blunder":
+      return [moment.cpLoss];
+    case "missed_win":
+    case "punish_opponent":
+      return [moment.gainCp];
+    case "opponent_left_book":
+      return [];
   }
 }
 
@@ -84,18 +106,30 @@ export function requestTurn(request: TutorRequest, playerColor: Color): Anthropi
 }
 
 /**
- * What the model has been shown before any tool runs (FR-10): the request positions, every
- * position and move of the game so far, and the key-moment moves.
+ * What the model has been shown before any tool runs (FR-10): the request positions (focus),
+ * every position and move of the game so far (history: each move keyed by the position it was
+ * played in), and the key-moment moves and scores (backed where they were played).
  */
 export function buildEvidence(request: TutorRequest): Evidence {
   const evidence = new Evidence();
   const { fens, moves } = historyPositions(request.history);
   for (const fen of fens) evidence.addPosition(fen);
-  for (const m of moves) evidence.addSan(m.san);
-  evidence.addPosition(request.fen);
+  moves.forEach((m, i) => evidence.addHistoryMove(fens[i]!, m.uci));
+  evidence.addFocus(request.fen);
   if (request.kind === "key_moment") {
-    evidence.addPosition(request.attemptFen);
-    for (const san of momentSans(request.moment)) evidence.addSan(san);
+    evidence.addFocus(request.attemptFen);
+    const fenBefore = fens.length >= 2 ? fens[fens.length - 2]! : request.attemptFen;
+    for (const { san, at } of momentMoves(request.moment)) {
+      const candidates = at === "before" ? [fenBefore, request.attemptFen] : [request.fen];
+      for (const fen of candidates) {
+        const move = parseMove(fen, san);
+        if (move) {
+          evidence.addMove(fen, move.uci);
+          break;
+        }
+      }
+    }
+    for (const cp of momentScores(request.moment)) evidence.addCp(cp);
   }
   return evidence;
 }

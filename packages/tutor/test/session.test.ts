@@ -48,7 +48,7 @@ const BLUNDER_REPLY = {
   message: "Your knight went to c3. After Qb6, what happens to the pawn on b2?",
   reveal: "c3 keeps d4 protected, and after Qb6 you have Qb3.",
   revealMove: "c2c3",
-  arrows: [{ from: "c2", to: "c3" }],
+  arrows: [{ from: "d8", to: "b6" }],
 };
 
 /** Mentions only moves from the key-moment data, so it is valid without any tool call. */
@@ -66,7 +66,7 @@ const HINT_REQUEST: TutorRequest = { kind: "hint", fen: HINT_FEN, history: ["d2d
 const HINT_REPLY = {
   schemaVersion: 1,
   kind: "hint",
-  message: "Which bishop likes to come out before you play e3?",
+  message: "Which bishop likes to come out before your e-pawn moves?",
   reveal: "Bf4 is the London move: the bishop gets out before e3 locks it in.",
   revealMove: "c1f4",
   arrows: [],
@@ -433,6 +433,60 @@ describe("failure reasons: ask() never throws", () => {
     const [a, b] = await Promise.all([s.ask(KEY_REQUEST, noop), s.ask(KEY_REQUEST, noop)]);
     expect(a).toMatchObject({ ok: false, reason: "api_unavailable" });
     expect(b).toMatchObject({ ok: true });
+  });
+
+  it("an abort during the tool phase returns at once, runs no remaining tool step and makes no further API call", async () => {
+    const controller = new AbortController();
+    const engineCalls: string[] = [];
+    const releases: (() => void)[] = [];
+    const base = fakeEngine(ENGINE_LINES).engine;
+    const engine = {
+      analyze(fen: string, opts?: object) {
+        engineCalls.push(fen);
+        return new Promise<Awaited<ReturnType<typeof base.analyze>>>((resolve) => {
+          releases.push(() => void base.analyze(fen, opts).then(resolve));
+        });
+      },
+    };
+    const { s, calls } = session([keyMomentToolUse(), endTurnMsg(BLUNDER_REPLY)], { engine });
+    const done = s.ask(KEY_REQUEST, noop, controller.signal);
+    await waitFor(() => engineCalls.length === 2); // evaluate_move's first search + analyze_position
+    controller.abort();
+    // Returns while the searches are still pending.
+    expect(await done).toMatchObject({ ok: false, reason: "api_unavailable" });
+    expect(calls).toHaveLength(1);
+    // When the searches finish, evaluate_move does not start its second search.
+    releases.forEach((r) => r());
+    await new Promise((r) => setTimeout(r, 5));
+    expect(engineCalls).toHaveLength(2);
+    expect(calls).toHaveLength(1);
+  });
+
+  it("an abort just before the tools start runs none of them", async () => {
+    const controller = new AbortController();
+    const { engine, calls: engineCalls } = fakeEngine(ENGINE_LINES);
+    const { s, calls } = session([keyMomentToolUse(), endTurnMsg(BLUNDER_REPLY)], { engine });
+    const out = await s.ask(KEY_REQUEST, (p) => void (p.label.startsWith("Checking") && controller.abort()), controller.signal);
+    expect(out).toMatchObject({ ok: false, reason: "api_unavailable" });
+    expect(engineCalls).toHaveLength(0);
+    expect(calls).toHaveLength(1);
+  });
+
+  it("after an aborted ask, the next ask does not wait for its tool searches", async () => {
+    const controller = new AbortController();
+    const pending: string[] = [];
+    const engine = {
+      analyze(fen: string): Promise<never> {
+        pending.push(fen);
+        return new Promise<never>(() => {}); // never finishes
+      },
+    };
+    const { s } = session([toolUseMsg([{ name: "analyze_position", input: { fen: ATTEMPT_FEN } }]), endTurnMsg(SIMPLE_REPLY)], { engine });
+    const first = s.ask(KEY_REQUEST, noop, controller.signal);
+    await waitFor(() => pending.length === 1);
+    controller.abort();
+    expect((await first).ok).toBe(false);
+    expect(await s.ask(KEY_REQUEST, noop)).toMatchObject({ ok: true });
   });
 
   it("authentication and permission errors -> auth", async () => {

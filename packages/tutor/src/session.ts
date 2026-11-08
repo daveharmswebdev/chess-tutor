@@ -64,6 +64,7 @@ export function createTutorSession(deps: TutorDeps, game: TutorGame): TutorSessi
       playerColor: game.playerColor,
       history: request.history,
       evidence,
+      ...(signal ? { signal } : {}),
     };
     const expectedKind = request.kind === "hint" ? "hint" : request.moment.kind;
     const revealFen = request.kind === "hint" ? request.fen : request.attemptFen;
@@ -112,7 +113,12 @@ export function createTutorSession(deps: TutorDeps, game: TutorGame): TutorSessi
         if (stop === "tool_use") {
           for (const block of toolUses) progress(toolLabel(block.name, block.input));
           // Every tool_use block runs in parallel and is answered in ONE user turn, in block order.
-          const results = await Promise.all(toolUses.map((block) => runOne(block, tools)));
+          // An abort ends the ask at once: it does not wait for searches already queued.
+          const results = await untilAborted(
+            Promise.all(toolUses.map((block) => runOne(block, tools))),
+            signal,
+          );
+          if (results === ABORTED || signal?.aborted) return done({ ok: false, reason: "api_unavailable", detail: "aborted" });
           staged.push({ role: "user", content: results });
         }
         continue;
@@ -173,7 +179,30 @@ function correction(problem: string): string {
   );
 }
 
+const ABORTED = Symbol("aborted");
+
+/** Resolves with `work`, or with ABORTED as soon as `signal` aborts (the work is left to finish on its own). */
+function untilAborted<T>(work: Promise<T>, signal: AbortSignal | undefined): Promise<T | typeof ABORTED> {
+  if (!signal) return work;
+  if (signal.aborted) return Promise.resolve(ABORTED);
+  return new Promise((resolve, reject) => {
+    const onAbort = () => resolve(ABORTED);
+    signal.addEventListener("abort", onAbort, { once: true });
+    work.then(
+      (v) => {
+        signal.removeEventListener("abort", onAbort);
+        resolve(v);
+      },
+      (e: unknown) => {
+        signal.removeEventListener("abort", onAbort);
+        reject(e);
+      },
+    );
+  });
+}
+
 async function runOne(block: Anthropic.ToolUseBlock, ctx: ToolContext): Promise<Anthropic.ToolResultBlockParam> {
+  if (ctx.signal?.aborted) return { type: "tool_result", tool_use_id: block.id, content: "aborted", is_error: true };
   try {
     const result = await runTool(block.name, block.input, ctx);
     return { type: "tool_result", tool_use_id: block.id, content: JSON.stringify(result) };
