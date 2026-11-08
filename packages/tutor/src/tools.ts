@@ -82,6 +82,12 @@ export interface ToolContext {
   /** UCI history of the current request, from the start position (for the repertoire). */
   history: string[];
   evidence: Evidence;
+  /** The ask's AbortSignal: a tool checks it between engine searches. */
+  signal?: AbortSignal;
+}
+
+function throwIfAborted(ctx: ToolContext): void {
+  if (ctx.signal?.aborted) throw new Error("aborted");
 }
 
 const FenInput = z.object({ fen: z.string() });
@@ -159,11 +165,14 @@ async function analyzePosition(input: z.infer<typeof AnalyzeInput>, ctx: ToolCon
     fen: input.fen,
     side_to_move: colorName(sideToMove(input.fen)),
     depth: analysis.depth,
-    lines: analysis.lines.map((line) => ({
-      rank: line.rank,
-      ...describe(line.score, "w"),
-      moves: ctx.evidence.addLine(input.fen, line.moves.slice(0, MAX_LINE_PLIES)),
-    })),
+    lines: analysis.lines.map((line) => {
+      ctx.evidence.addScore(line.score);
+      return {
+        rank: line.rank,
+        ...describe(line.score, "w"),
+        moves: ctx.evidence.addLine(input.fen, line.moves.slice(0, MAX_LINE_PLIES)),
+      };
+    }),
   };
 }
 
@@ -184,6 +193,7 @@ async function evaluateMove(input: z.infer<typeof EvaluateInput>, ctx: ToolConte
   const opts = engineOpts(ctx.config, null, 1);
 
   const before = await ctx.engine.analyze(input.fen, opts);
+  throwIfAborted(ctx); // do not queue a second search for an aborted ask
   const bestUci = before.lines[0]?.moves[0] ?? before.bestMove;
   const best = ctx.evidence.addMove(input.fen, bestUci);
   ctx.evidence.addMove(input.fen, played.uci);
@@ -197,6 +207,9 @@ async function evaluateMove(input: z.infer<typeof EvaluateInput>, ctx: ToolConte
   const bestCp = before.lines[0] ? scoreToCp(before.lines[0].score, mover, mover) : 0;
   const playedCp = cpFor(after, afterFen, mover);
   const cpLoss = played.uci === best?.uci ? 0 : Math.min(9999, Math.max(0, bestCp - playedCp));
+  if (before.lines[0]) ctx.evidence.addScore(before.lines[0].score);
+  if (after.lines[0]) ctx.evidence.addScore(after.lines[0].score);
+  ctx.evidence.addCp(cpLoss);
 
   return {
     move: played,

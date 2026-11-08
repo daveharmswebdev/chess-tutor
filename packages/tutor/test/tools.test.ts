@@ -53,7 +53,12 @@ describe("analyze_position (FR-16)", () => {
       ],
     });
     expect(result.lines[1].moves).toEqual([{ san: "Nf3", uci: "g1f3" }]);
-    expect(c.evidence.backs("Nf3")).toBe(true);
+    expect(c.evidence.backsMove(FEN, "g1f3")).toBe(true);
+    // Each ply is backed in the position it is played from, not anywhere else.
+    expect(c.evidence.backsMove(fenAfter([...HISTORY, "e2e3"]), "e7e6")).toBe(true);
+    expect(c.evidence.backsMove(FEN, "e7e6")).toBe(false);
+    expect(c.evidence.backsEval({ cp: 35 })).toBe(true);
+    expect(c.evidence.backsEval({ cp: 20 })).toBe(true);
   });
 
   it("uses smaller requested values and config defaults", async () => {
@@ -98,8 +103,11 @@ describe("evaluate_move (FR-17)", () => {
     expect(r.best).toEqual({ san: "e3", uci: "e2e3" });
     expect(r.cp_loss).toBe(70);
     expect(r.reply).toEqual({ san: "Bf5", uci: "c8f5" });
-    expect(c.evidence.backs("Bf5")).toBe(true);
-    expect(c.evidence.backs("Nc3")).toBe(true);
+    expect(c.evidence.backsMove(fenAfter([...HISTORY, "b1c3"]), "c8f5")).toBe(true);
+    expect(c.evidence.backsMove(FEN, "b1c3")).toBe(true);
+    expect(c.evidence.backsMove(FEN, "c8f5")).toBe(false);
+    expect(c.evidence.backsEval({ cp: 70 })).toBe(true); // the cp_loss
+    expect(c.evidence.backsEval({ cp: 30 })).toBe(true); // the eval after Nc3
   });
 
   it("accepts UCI and reports zero loss for the best move", async () => {
@@ -149,7 +157,7 @@ describe("opening_explorer (FR-18)", () => {
     expect(r.total_games).toBe(1000);
     expect(r.opening).toBe("D02 London System");
     expect(r.moves[0]).toEqual({ san: "e3", uci: "e2e3", games: 600, share_pct: 60, white_pct: 50, draw_pct: 17, black_pct: 33 });
-    expect(c.evidence.backs("Nf3")).toBe(true);
+    expect(c.evidence.backsMove(FEN, "g1f3")).toBe(true);
   });
 
   it("reports unavailable data as a result, not an error", async () => {
@@ -175,7 +183,7 @@ describe("get_repertoire_context (FR-19)", () => {
     const r = (await runTool("get_repertoire_context", { fen: FEN }, c)) as any;
     expect(r).toMatchObject({ in_repertoire: true, line: "London System", next_moves: [{ san: "e3", uci: "e2e3" }] });
     expect(r.color).toBe("white");
-    expect(c.evidence.backs("e3")).toBe(true);
+    expect(c.evidence.backsMove(FEN, "e2e3")).toBe(true);
   });
 
   it("finds earlier positions of the game and one move ahead", async () => {
