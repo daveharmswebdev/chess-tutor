@@ -48,7 +48,7 @@ export interface TutorProgress {
 
 export type TutorFailureReason =
   | "invalid_reply" // failed validation twice (NFR-8: retry once, then give up)
-  | "unsupported_claim" // mentioned a move that is illegal or came from no tool result / key-moment data (FR-10)
+  | "unsupported_claim" // mentioned a move or evaluation that is illegal or came from no tool result / key-moment data (FR-10)
   | "tool_rounds_exceeded" // more than config.maxToolRounds tool rounds
   | "refusal"
   | "max_tokens"
