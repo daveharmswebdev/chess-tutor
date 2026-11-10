@@ -1,7 +1,7 @@
 ---
 name: cycle
 description: One full coordinator cycle with the user's standing answers already given — orient, file untracked gaps through /triage without asking, then work the READY issues in parallel (one spoke worktree each) through /delegate and /ship. Can repeat for N rounds or until the work runs out. Use when the user says "cycle", "the usual", or "keep going".
-argument-hint: "[max-parallel, default 2] [rounds: a number or 'all', default 1]"
+argument-hint: "[#issue ...] [max-parallel, default 2] [rounds: a number or 'all', default 1]"
 ---
 
 # Cycle
@@ -9,8 +9,12 @@ argument-hint: "[max-parallel, default 2] [rounds: a number or 'all', default 1]
 The user's standing answers: "yes, triage the gaps" and "work the ready items in
 parallel, in separate worktrees". Don't ask those again; report what you did.
 
-Arguments: `$ARGUMENTS`. First: the most issues to work at once (default 2). Second:
-how many rounds (a number, or `all` until a stop condition in step 6 fires; default 1).
+Arguments: `$ARGUMENTS`. Tokens of the form `#n` are **focus issues** (any position, in
+priority order): the user wants these worked first. Of the bare numbers that remain,
+the first is the most issues to work at once (default 2) and the second is how many
+rounds (a number, or `all` until a stop condition in step 6 fires; default 1). So
+`/cycle #26 #28` means focus #26 then #28, 2 at once, 1 round; `/cycle #9 1 all` means
+focus #9, 1 at a time, until a stop condition.
 
 **Prerequisite:** the delegation hooks must be active (`.claude/settings.json` has a
 `hooks` block). If they aren't, stop and tell the user. Parallel spokes without the
@@ -24,7 +28,9 @@ gaps judged not worth filing (and why), and the spokes in flight. It lives at
 
 - **Read it first** whenever it exists, at the start and straight after any compaction.
   A gap under **Not filed** stays unfiled unless there's new evidence.
-- A new `/cycle` appends `# Cycle <date> — args <max-parallel> <rounds>`.
+- A new `/cycle` appends `# Cycle <date> — args <max-parallel> <rounds>`, plus
+  `focus #a #b` when focus issues were given. After a compaction, the focus list comes
+  from this header.
 - **Keep In flight current**, one line per pick: issue, agent, agent ID, worktree,
   branch, round, next step. Delete the line once the pick ships or is parked.
 - Append each round's report (step 5) when the round ends.
@@ -41,8 +47,24 @@ authorized to file is not the same as must file. P0/P1 and product decisions go 
 
 ## 3. Pick the batch
 
-From **Ready now**, take up to max-parallel issues in this order: `from-you`, then P0–P1,
-then P2, then P3. Skip an issue when:
+Take up to max-parallel issues in this order: **focus issues** (in the order given),
+then from **Ready now**: `from-you`, then P0–P1, then P2, then P3. Focus issues fill
+slots first; any slots left are filled the usual way.
+
+Focus issues get extra effort, not exemptions:
+
+- A focus issue that isn't in **Ready now** (blocked, claimed, closed, an Epic) is still
+  not picked. Say why in the report, and name what would unblock it.
+- If a focus issue needs a dependency or a contract change first, do that inline **this
+  round**, then pick it in the same round if nothing collides. Don't defer it to next
+  round as you would for other issues.
+- If two focus issues collide (shared files, or one prompt/schema version), don't run
+  them in parallel. Either combine them into one pick (one branch, one brief that covers
+  both issues, and a PR that closes both) when they are one change, or run them one
+  after the other. Say which you chose and why.
+- Focus issues stay focus issues across rounds until they ship or are parked.
+
+Skip an issue when:
 
 - its files would collide with an in-flight branch or another pick in this batch.
   Two picks may share an owner only if their files don't overlap.
@@ -77,6 +99,7 @@ Inline work (a typo, a one-line fix, docs, config) skips delegation.
 
 ```
 ## Cycle — <date>, round <k> of <rounds|all>
+**Focus:** #a → shipped | in flight | skipped: <why> …   (omit this line when no focus was given)
 **Filed:** #n (Kind, Priority) … | none   **Not filed:** <gap — reason>
 **Shipped:** #n → PR #p (tests: N passed, CI green)
 **Parked:** #n — <why, and what's needed>
@@ -91,6 +114,8 @@ Once every pick from this round has shipped or been parked, start the next round
 step 1 (orient again). Stop when any of these is true, and say which one fired:
 
 - the requested number of rounds is done;
+- with `all` rounds and focus issues given: every focus issue has shipped or been parked
+  (don't carry on through the general backlog unless the user asked for that);
 - nothing is ready and triage filed nothing (the work has run out, or is blocked on you);
 - two rounds in a row shipped nothing (stuck, not finished);
 - something needs the user before anything else can go ahead safely (red `main`, a
