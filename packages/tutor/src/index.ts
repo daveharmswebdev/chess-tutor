@@ -13,4 +13,5 @@ export {
   type TutorSession,
   type TutorUsage,
 } from "./contract.ts";
+export { moverOf } from "./claims.ts";
 export { createTutorSession } from "./session.ts";

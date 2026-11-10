@@ -243,7 +243,12 @@ const MOVER_BEFORE = new RegExp(
   "i",
 );
 
-function moverOf(before: string, playerColor: Color | undefined): Color | null {
+/**
+ * The side named as the mover right before a move mention (`before` is the text up to it):
+ * "White played ", "your opponent's ", "Black castled with ". Null when no side is named or a
+ * copula or comma breaks the link. Shared with the eval graders (evals/src/graders.ts, #29).
+ */
+export function moverOf(before: string, playerColor: Color | undefined): Color | null {
   const clause = clauseBefore(before, before.length);
   const m = MOVER_BEFORE.exec(clause.slice(clause.lastIndexOf(",") + 1));
   if (!m) return null;
