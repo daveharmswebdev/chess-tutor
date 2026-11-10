@@ -131,3 +131,86 @@ describe("C: PR #32 minors", () => {
     expect(illegal(NE5, "Now you have Nc3 available.")).toEqual(["Nc3"]);
   });
 });
+
+/** Review 052 (brief 053): the round-1 exemptions narrowed so nothing the base graders caught passes. */
+describe("review 052 of #29 (round 2)", () => {
+  const evalsPass = (message: string) => gradeEvals(input(NE5, { message })).pass;
+
+  describe("(1) versions, accuracies and piece values: unsigned numbers only", () => {
+    it.each([
+      ["Stockfish is +2.1 here."],
+      ["Stockfish: +3.2 for White."],
+      ["Stockfish score was -1.5."],
+      ["Stockfish score was −1.5."],
+      ["Stockfish score was –1.5."],
+      ["The extra pawn is worth +1.8 here."],
+      ["Stockfish gives +3.2."],
+    ])("grades the signed quote in '%s'", (message) => {
+      expect(quotes(message).length).toBe(1);
+      expect(evalsPass(message)).toBe(false);
+    });
+    it.each([["Stockfish 16.1 likes this position."], ["Your accuracy was 87.5 in that game."], ["A bishop is worth 3 pawns."]])("still passes '%s'", (message) => {
+      expect(evalsPass(message)).toBe(true);
+    });
+  });
+
+  describe("(2) the named opponent's move is skipped only when that side played it", () => {
+    it.each([["White fears dxe5."], ["White hopes you miss dxe5."], ["White played dxe5, so play dxe5 too."]])("flags '%s'", (message) => {
+      expect(giveAway(EXCHANGE, message).length).toBeGreaterThan(0);
+    });
+    it("keeps the played moves passing", () => {
+      expect(giveAway(EXCHANGE, "White played dxe5, opening the d-file. How do you recapture?")).toEqual([]);
+      expect(giveAway(E5_PUSH, "White pushed the pawn to e5, attacking your knight. What now?")).toEqual([]);
+    });
+  });
+
+  describe("(3) a move number skips only an earlier ply, in the past", () => {
+    it.each([
+      [NF3_MOVE2, "Play 3...d5 now."],
+      [NF3_MOVE2, "Play 1...d5 now, it is still the main move."],
+      [NF3_MOVE2, "2...d5 is the move."],
+      [NE5, "10.e4 is the move to find."],
+    ])("flags (case %#) '%s'", (c, message) => {
+      expect(giveAway(c, message).length).toBeGreaterThan(0);
+    });
+    it("keeps 'It is not 1...d5 or 1...Nf6' passing", () => {
+      expect(giveAway(NF3_MOVE2, "It is not 1...d5 or 1...Nf6 any more: White played 2.Nf3. What fits your setup?")).toEqual([]);
+    });
+  });
+
+  describe("(4) material: up or down only, not when an engine frames it", () => {
+    it.each([["The engine says you are up 3 pawns."], ["Stockfish has White ahead by 4 pawns."]])("fails '%s'", (message) => {
+      expect(evalsPass(message)).toBe(false);
+    });
+    it.each([["You are up 2 pawns."], ["Black is down 1 pawn."]])("passes '%s'", (message) => {
+      expect(evalsPass(message)).toBe(true);
+    });
+    it("grades 'White is ahead by 3 pawns' like 'White is ahead by 3'", () => {
+      expect(quotes("White is ahead by 3 pawns.").map((q) => q.cp)).toEqual([300]);
+      expect(quotes("White is ahead by 3.").map((q) => q.cp)).toEqual([300]);
+    });
+  });
+
+  describe("(5) a 'last move' apposition is the history's actual last move only", () => {
+    it.each([["Black's last move was ...Qb6, hitting b2."], ["Black's last move, ...Qb6, hit b2."]])("flags Qb6 in '%s'", (message) => {
+      expect(illegal(NE5, message)).toEqual(["Qb6"]);
+    });
+    it("keeps the real last move passing", () => {
+      expect(illegal(QD6_NC3, "Black's last move, Qd6, left something hanging.")).toEqual([]);
+    });
+  });
+
+  describe("(6) 'you have <piece><square>' needs the subject's own piece there", () => {
+    it.each([["You have Nf6 with a fork."], ["Now you have Nf6, so the e4 square is covered."]])("flags Nf6 in '%s'", (message) => {
+      expect(illegal(NE5, message)).toEqual(["Nf6"]);
+    });
+    it("keeps 'now you have Nd2' passing", () => {
+      expect(illegal(NE5, "Now you have Nd2, which supports e4.")).toEqual([]);
+    });
+  });
+
+  it("(7) 'too' / 'as well' after the opponent castled gives castling away", () => {
+    expect(giveAway(NE5, "Black castled already; you should too.", "e1g1").join(" ")).toMatch(/castl/);
+    expect(giveAway(NE5, "Black castled already; your king wants safety as well.", "e1g1").join(" ")).toMatch(/castl/);
+  });
+});

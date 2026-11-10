@@ -4,7 +4,7 @@ import type { RunMetrics } from "../src/types.ts";
 
 /** The --gate decision of `pnpm eval` (NFR-6, NFR-7, NFR-10; #29). */
 
-const metrics = (over: Partial<RunMetrics>): RunMetrics => ({ ...computeMetrics([]), graded: 40, moveLegalPct: 1, evalMatchPct: 1, noGiveAwayPct: 0.95, ...over });
+const metrics = (over: Partial<RunMetrics>): RunMetrics => ({ ...computeMetrics([]), cases: 40, okRate: 1, graded: 40, moveLegalPct: 1, evalMatchPct: 1, noGiveAwayPct: 0.95, ...over });
 
 describe("gateMisses", () => {
   it("is empty when every threshold is met", () => {
@@ -36,8 +36,10 @@ describe("gateMisses", () => {
 
   it("counts a null metric with zero graded replies as a miss", () => {
     const misses = gateMisses(computeMetrics([]));
-    expect(misses).toHaveLength(3);
-    for (const m of misses) expect(m).toMatch(/n\/a \(0 graded replies\)/);
+    // Three metric lines, plus the graded-share line (no cases at all).
+    expect(misses).toHaveLength(4);
+    for (const m of misses.slice(0, 3)) expect(m).toMatch(/n\/a \(0 graded replies\)/);
+    expect(misses[3]).toMatch(/graded n\/a of cases/);
   });
 });
 
@@ -59,5 +61,24 @@ describe("gateDecision", () => {
   it("without --gate leaves the exit code and output unchanged", () => {
     expect(gateDecision(failing, false)).toEqual({ exitCode: 0, lines: [] });
     expect(gateDecision(computeMetrics([]), false)).toEqual({ exitCode: 0, lines: [] });
+  });
+});
+
+describe("gate: share of cases graded (review 052)", () => {
+  it("misses when fewer than 90% of the cases were graded", () => {
+    const misses = gateMisses(metrics({ cases: 10, graded: 8, okRate: 0.8 }));
+    expect(misses).toHaveLength(1);
+    expect(misses[0]).toMatch(/graded 80% of cases \(need >= 90%\)/);
+  });
+
+  it("counts cases the budget stopped as not graded", () => {
+    const m = metrics({ cases: 9, graded: 9, okRate: 1 });
+    expect(gateMisses(m, 0)).toEqual([]);
+    expect(gateMisses(m, 2)[0]).toMatch(/graded 81\.8% of cases \(need >= 90%\)/);
+    expect(gateDecision(m, true, 2).exitCode).toBe(1);
+  });
+
+  it("passes at 90%", () => {
+    expect(gateMisses(metrics({ cases: 10, graded: 9, okRate: 0.9 }))).toEqual([]);
   });
 });

@@ -10,7 +10,8 @@
  * --model defaults to config/models.json "eval".tutor, --effort to config/tutor.json.
  * --gate: after the report is written, exit 1 and print one "gate: ..." line per missed threshold
  * when NFR-6 move legality < 100%, NFR-6 eval match < 100% or NFR-7 no give-away < 90% (a metric
- * with no graded replies is a miss). Without --gate the exit code does not depend on the metrics.
+ * with no graded replies is a miss), or when fewer than 90% of the cases (not-started ones
+ * included) were graded. Without --gate the exit code does not depend on the metrics.
  */
 import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { basename, join, resolve } from "node:path";
@@ -136,7 +137,7 @@ async function run(args: string[]): Promise<void> {
       `\nok ${p(m.okRate)} | moves legal ${p(m.moveLegalPct)} | evals matched ${p(m.evalMatchPct)} | no give-away ${p(m.noGiveAwayPct)} | spent $${summary.spentUsd.toFixed(3)}${summary.stoppedByBudget ? ` (budget reached, ${summary.skipped.length} not started)` : ""}`,
     );
     console.log(`Wrote ${join(outDir, "report.md")}`);
-    const gate = gateDecision(m, values.gate === true);
+    const gate = gateDecision(m, values.gate === true, summary.skipped.length);
     for (const line of gate.lines) console.error(line);
     if (gate.exitCode !== 0) process.exitCode = gate.exitCode;
   } finally {

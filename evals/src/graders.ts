@@ -107,11 +107,22 @@ const NUMBERED = /(?:^|[^\w.])(\d+)\.(\.\.)?\s?$/;
 /** Text between two moves of one list or line: "Nc6, ...Bd6 and ...O-O", "2.Bf4 Nf6". */
 const LIST_GAP = /^\s*(?:,|and|or|then|,\s*and|,\s*or|,\s*then)?\s*(?:\.\.\.)?\s*$/i;
 
+/** SAN after "your", "the", "Black's" names a piece where it stands ("your Bf4"), not a move. */
+const PIECE_REF = /\b(?:your|the|their|his|her|my|our|white's|black's|opponent's)\s+$/i;
 /**
- * SAN after "your", "the", "Black's" names a piece where it stands ("your Bf4"), not a move; so
- * does SAN after "have"/"has" ("now you have Nd2") when that piece stands there (#29, PR #32).
+ * SAN after "<subject> have/has" ("now you have Nd2") names a piece where it stands, but only the
+ * subject's own piece: "You have Nf6" with Black's knight on f6 is still a move (#29, review 052).
  */
-const PIECE_REF = /\b(?:your|the|their|his|her|my|our|white's|black's|opponent's|have|has|had)\s+$/i;
+const HAVE_REF = /\b(you|we|white|black|they|he|she|opponent|your opponent)\s+(?:(?:still|now|also|already)\s+)?(?:have|has|had)\s+$/i;
+
+/** The colour a HAVE_REF subject owns: "you"/"we" the player, "White"/"Black" that side, others the opponent. */
+function haveOwner(subject: string, player: Color): Color {
+  const w = subject.toLowerCase();
+  if (w === "white") return "w";
+  if (w === "black") return "b";
+  if (w === "you" || w === "we") return player;
+  return player === "w" ? "b" : "w";
+}
 
 /**
  * "Black's last move, Qd6", "your opponent's previous move was ...b6": the side named owns a move
@@ -138,14 +149,46 @@ function playedBy(history: string[], side: Color, s: Mention["spec"]): boolean {
   });
 }
 
+/**
+ * True when the mention is `side`'s last move of the game, from that move's own position ("Black's
+ * last move, Qd6" after 3...Qd6 4.Nc3): the only move a "last move" apposition may name (review 052).
+ */
+function lastMoveOf(history: string[], side: Color, s: Mention["spec"]): string | null {
+  const fens = historyFens(history);
+  for (let i = Math.min(history.length, fens.length - 1) - 1; i >= 0; i--) {
+    if (fens[i]!.split(" ")[1] !== side) continue;
+    const mv = resolve(fens[i]!, s).find((x) => uciOf(x) === history[i]);
+    return mv ? mv.after : null;
+  }
+  return null;
+}
+
+/** True when the last tense cue in the clause before the mention is a past one ("White played", "White pushed the"). */
+function pastHead(text: string, at: number): boolean {
+  const head = text.slice(clauseStart(text, at), at);
+  const last = (re: RegExp) => Math.max(-1, ...[...head.matchAll(re)].map((m) => m.index!));
+  const past = last(PAST_CUE);
+  return past >= 0 && past > last(PRESENT_CUE);
+}
+
+/** The side of the side word nearest before the mention in its clause ("White hopes you miss dxe5": you). */
+function nearestSide(text: string, at: number, player: Color): Color | null {
+  const head = text.slice(clauseStart(text, at), at);
+  const w = [...head.matchAll(/\b(white|black|you|your|opponent|opponent's)\b/gi)].pop()?.[1]?.toLowerCase();
+  if (w === undefined) return null;
+  if (w === "white") return "w";
+  if (w === "black") return "b";
+  return w.startsWith("you") ? player : player === "w" ? "b" : "w";
+}
+
 /** True when the clause before the mention has a present cue ("Black plays", "Black threatens"). */
 function presentClause(text: string, at: number): boolean {
   return new RegExp(PRESENT_CUE.source, "i").test(text.slice(clauseStart(text, at), at));
 }
 
-function pieceStands(fen: string, piece: string, square: string): boolean {
+function pieceStands(fen: string, piece: string, square: string, color?: Color): boolean {
   const at = board(fen)?.get(square as never);
-  return at !== undefined && at.type === piece;
+  return at !== undefined && at.type === piece && (color === undefined || at.color === color);
 }
 
 /** The ply a NUMBERED match names: "9." is White's 9th move, "9..." Black's. */
@@ -260,7 +303,8 @@ const MAX_POSITIONS = 400;
  * now", "Black plays Nb8-c6", "9.Nc3!") is held to currentPositions and the last move's own
  * position (lastMovePosition, the history's last move only); only a past-tense reference ("you
  * played Nd2", "Black's last move, Qd6") or an earlier move number ("2.Bf4") may use the game's
- * earlier positions (#29). A side named as the mover (moverOf: "White's dxe5 opens the d-file")
+ * earlier positions (#29). A "last move" apposition ("Black's last move, Qd6") passes only for
+ * that side's actual last move of the game (review 052). A side named as the mover (moverOf: "White's dxe5 opens the d-file")
  * that is the opponent may also name a move that side already played, unless its clause has a
  * present cue ("Black plays Nb8-c6" is checked now).
  * Either side may be to move: explanations often give one side's plan ("g6, Bg7, O-O") without
@@ -282,7 +326,9 @@ export function gradeMoves(input: GradeInput): MovesGrade {
     for (const m of findMentions(text)) {
       if (m.plan) continue;
       const named = namedMover(text, m.start, input.playerColor);
-      const past = isPastMention(text, m.start, m.end, ctx) || named.lastMove;
+      // "Black's last move, Qd6": that side's real last move, or else graded as played now (review 052).
+      const lastOfSide = named.lastMove && named.mover ? lastMoveOf(input.history, named.mover, m.spec) : null;
+      const past = !named.lastMove && isPastMention(text, m.start, m.end, ctx);
       ctx.prev = { end: m.end, past };
       const reached: string[] = [];
       for (const fen of past ? all : now) {
@@ -293,13 +339,17 @@ export function gradeMoves(input: GradeInput): MovesGrade {
       }
       // The opponent's last move, from the position before it: that move only (review 042).
       if (!past && lastFen) for (const mv of resolve(lastFen, m.spec)) if (uciOf(mv) === lastUci) reached.push(mv.after);
+      if (lastOfSide) reached.push(lastOfSide);
       let legal = reached.length > 0;
       // A move the named opponent already played ("White's dxe5 opens the d-file"), unless the
       // clause puts it now ("Black plays Nb8-c6"): a game reference, not the player's move now.
       const opponentNamed = named.mover !== null && named.mover !== input.playerColor;
-      if (!legal && opponentNamed && !presentClause(text, m.start) && playedBy(input.history, named.mover!, m.spec)) legal = true;
-      if (!legal && m.spec.piece && m.spec.to && !m.spec.capture && PIECE_REF.test(text.slice(0, m.start))) {
-        legal = (past ? all : now).some((fen) => pieceStands(fen, m.spec.piece!, m.spec.to!));
+      if (!legal && !named.lastMove && opponentNamed && !presentClause(text, m.start) && playedBy(input.history, named.mover!, m.spec)) legal = true;
+      if (!legal && m.spec.piece && m.spec.to && !m.spec.capture) {
+        const before = text.slice(0, m.start);
+        const have = HAVE_REF.exec(before);
+        const owner = have ? haveOwner(have[1]!, input.playerColor) : undefined;
+        if (have || PIECE_REF.test(before)) legal = (past ? all : now).some((fen) => pieceStands(fen, m.spec.piece!, m.spec.to!, owner));
       }
       mentions.push({ field, raw: m.raw, legal });
       if (!past) now = unique([...now, ...reached]).slice(0, MAX_POSITIONS);
@@ -348,7 +398,7 @@ const SUBJECT = /\b(white|black|you|your|you're|opponent|opponent's|they|their|h
 
 /** "Do the same", "follow suit": copies what the opponent did (review 042: "Black has castled. Do the same!"). */
 const DO_SAME =
-  /\b(?:do|doing|does)\s+the\s+same\b|\bfollow(?:s|ing)?\s+suit\b|\bthe\s+same\s+(?:thing|idea|plan)\b|\blikewise\b|\bcopy\s+(?:that|them|it|him|her|white|black|your\s+opponent)\b/i;
+  /\b(?:do|doing|does)\s+the\s+same\b|\bfollow(?:s|ing)?\s+suit\b|\bthe\s+same\s+(?:thing|idea|plan)\b|\blikewise\b|\btoo\b|\bas\s+well\b|\bcopy\s+(?:that|them|it|him|her|white|black|your\s+opponent)\b/i;
 
 /** Whether some castle word in `text` is about the player, and whether one is about the opponent ("Black castled"). */
 function castleWords(text: string, player: Color): { player: boolean; opponent: boolean } {
@@ -395,9 +445,12 @@ function alongLine(from: string, to: string, a: { from: string; to: string }): b
  * on its empty to-square is a Socratic nudge: reported in `nudges` ("points at the answer
  * square"), not a give-away. Malformed arrows (the session drops them) are ignored here.
  * Without a revealMove the answer is the case's engineBest: a reply that names the engine's
- * move without revealing it still gives it away (#29). A mention whose named mover (moverOf) is
- * the side not to move ("White played dxe5"), or whose move number names another ply ("1...d5"
- * when Black plays move 2), is not the answer.
+ * move without revealing it still gives it away (#29). Not the answer (review 052 narrowed both):
+ * a mention whose named mover (moverOf, and the nearest side word) is the side not to move, told
+ * in the past, and that side played it in the game ("White played dxe5"; "White fears dxe5" and
+ * "White hopes you miss dxe5" are still graded); a mention numbered as an earlier ply, without a
+ * present cue or predicate ("It is not 1...d5" when Black plays move 2; "Play 1...d5 now" and
+ * "10.e4 is the move" are still graded).
  */
 export function gradeGiveAway(input: GradeInput): GiveAwayGrade {
   const problems: string[] = [];
@@ -418,13 +471,20 @@ export function gradeGiveAway(input: GradeInput): GiveAwayGrade {
 
   const toMove: Color = attempt.trim().split(/\s+/)[1] === "b" ? "b" : "w";
   const attemptPly = plyOf(attempt);
-  for (const m of findMentions(input.reply.message)) {
-    // The named opponent's move ("White played dxe5", "White pushed the pawn to e5") is not the answer (#29).
-    const mover = namedMover(input.reply.message, m.start, input.playerColor).mover;
-    if (mover !== null && mover !== toMove) continue;
-    // Nor is a move numbered as another ply ("It is not 1...d5" when Black plays move 2).
-    const numbered = NUMBERED.exec(input.reply.message.slice(0, m.start));
-    if (numbered && numberedPly(numbered) !== attemptPly) continue;
+  const msg = input.reply.message;
+  for (const m of findMentions(msg)) {
+    const now = presentClause(msg, m.start) || OWN_PRESENT.test(msg.slice(m.end, clauseEnd(msg, m.end)));
+    // The named opponent's move, told in the past and played in the game ("White played dxe5",
+    // "White pushed the pawn to e5"), is not the answer (#29); "White fears dxe5" still is (review 052).
+    const named = namedMover(msg, m.start, input.playerColor);
+    const nearest = nearestSide(msg, m.start, input.playerColor);
+    if (named.mover !== null && named.mover !== toMove && nearest === named.mover && !now) {
+      const played = named.lastMove ? lastMoveOf(input.history, named.mover, m.spec) !== null : pastHead(msg, m.start) && playedBy(input.history, named.mover, m.spec);
+      if (played) continue;
+    }
+    // Nor is a move numbered as an earlier ply, told in the past ("It is not 1...d5" when Black plays move 2).
+    const numbered = NUMBERED.exec(msg.slice(0, m.start));
+    if (numbered && numberedPly(numbered) < attemptPly && !now) continue;
     if (namesMove(attempt, m, answer)) problems.push(`message names the answer ${answer} as "${m.raw}"`);
   }
   if (played?.move.san.endsWith("+") || played?.move.san.endsWith("#")) {
@@ -533,8 +593,13 @@ const INTEGER_QUOTE =
 const EVAL_LEAD =
   /(?:\b(?:is|are|am|be|been|being|stays?|remains?|still|now|you're|we're|they're|white's|black's|it's)\s+(?:up|down|ahead|behind)(?:\s+by)?|\b(?:better|worse|ahead|behind|leads?|trails?)\s+by|\bworth|\b(?:advantage|edge|lead|deficit)\s+of)\s+(?:(?:about|roughly|around|nearly|almost|just|only|over|under)\s+)?$/i;
 const EVAL_FOLLOW = /^\s+(?:edge|advantage|lead|deficit|better|worse|ahead|behind)\b/i;
-/** "up 2 pawns", "down 1 pawn", "ahead by 2 pawns": a whole number of pawns up or down is material (#29, PR #32). */
-const MATERIAL_LEAD = /\b(?:up|down|ahead|behind)(?:\s+by)?\s+(?:(?:about|roughly|around|nearly|almost|just|only|over|under)\s+)?$/i;
+/**
+ * "up 2 pawns", "down 1 pawn": a whole number of pawns up or down is material (#29, PR #32); not
+ * "ahead by" / "behind by", and not when an engine word frames the clause ("The engine says you
+ * are up 3 pawns", review 052).
+ */
+const MATERIAL_LEAD = /\b(?:up|down)(?:\s+by)?\s+(?:(?:about|roughly|around|nearly|almost|just|only|over|under)\s+)?$/i;
+const ENGINE_FRAME = /\b(?:engine|stockfish|eval|evals|evaluation|evaluates|says|gives)\b|\bhas\s+(?:white|black|you|them|us)\s+(?:up|down|ahead|behind)\b/i;
 /** A number that names something other than an evaluation: "Stockfish 16.1", "accuracy was 87.5", "depth 18". */
 const NOT_EVAL_BEFORE = /\b(?:stockfish|version|accuracy|accuracies|rating|elo|depth)(?:\s+(?:score|was|is|of|at|around|about))*\s*[:=]?\s*$/i;
 /** A piece value: "A bishop is worth 3 pawns", "a rook is worth about 5" (review 042). */
@@ -559,7 +624,7 @@ export function findEvalQuotes(text: string): RawQuote[] {
   for (const m of text.matchAll(UNIT_QUOTE)) {
     const [raw, sign, num, unit] = m as unknown as [string, string | undefined, string, string];
     const whole = sign === undefined && !num.includes(".") && unit.toLowerCase().startsWith("p");
-    if (whole && (!framed(m.index!, raw) || MATERIAL_FOLLOW.test(text.slice(m.index! + raw.length)) || MATERIAL_LEAD.test(text.slice(0, m.index!)))) continue;
+    if (whole && (!framed(m.index!, raw) || MATERIAL_FOLLOW.test(text.slice(m.index! + raw.length)) || (MATERIAL_LEAD.test(text.slice(0, m.index!)) && !ENGINE_FRAME.test(text.slice(clauseStart(text, m.index!), m.index!))))) continue;
     found.push({ raw, index: m.index!, mate: null, sign, num, unit: unit.toLowerCase() });
   }
   for (const m of text.matchAll(SIGNED_QUOTE)) found.push({ raw: m[0], index: m.index!, mate: null, sign: m[1], num: m[2]!, unit: "" });
@@ -568,7 +633,8 @@ export function findEvalQuotes(text: string): RawQuote[] {
     if (framed(m.index!, m[0])) found.push({ raw: m[0], index: m.index!, mate: null, sign: undefined, num: m[1]!, unit: "" });
   }
   const sorted = found
-    .filter((q) => !NOT_EVAL_BEFORE.test(text.slice(0, q.index)) && !PIECE_VALUE_BEFORE.test(text.slice(0, q.index)))
+    // Versions, accuracies and piece values are unsigned; a signed quote is always graded (review 052).
+    .filter((q) => q.sign !== undefined || /[–]\s*$/.test(text.slice(0, q.index)) || (!NOT_EVAL_BEFORE.test(text.slice(0, q.index)) && !PIECE_VALUE_BEFORE.test(text.slice(0, q.index))))
     .sort((a, b) => a.index - b.index || b.raw.length - a.raw.length);
   const out: RawQuote[] = [];
   for (const q of sorted) {
