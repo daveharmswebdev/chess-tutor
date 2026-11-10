@@ -90,7 +90,7 @@ export function lastMovePosition(history: string[]): string | null {
 // any position of the game may hold it. Present or none: now, next, a plan or a line, held to the
 // current positions. Decided per clause: the last cue before the mention in its clause wins.
 const PAST_CUE =
-  /\b(?:played|went|moved|took|captured|castled|developed|pushed|answered|replied|responded|chose|was|were|had|did|earlier|already|ago|previously|previous|(?:just|has|have|had)\s+put)\b/gi;
+  /\b(?:played|went|moved|took|captured|castled|developed|pushed|traded|exchanged|recaptured|advanced|answered|replied|responded|chose|was|were|had|did|earlier|already|ago|previously|previous|(?:just|has|have|had)\s+put)\b/gi;
 const PRESENT_CUE =
   /\b(?:now|next|play|plays|push|pushes|try|tries|can|could|should|will|would|must|threatens?|wants?|consider)\b/gi;
 /** Clause boundaries: punctuation, and conjunctions that start a new clause. */
@@ -171,14 +171,51 @@ function pastHead(text: string, at: number): boolean {
   return past >= 0 && past > last(PRESENT_CUE);
 }
 
+/** Side words that can be a clause's subject; a possessive "your" ("took your pawn") is an object (review 054). */
+const SUBJECT_SIDE = /\b(white|black|you|your\s+opponent|the\s+opponent|opponent)\b/gi;
+
+function sideWord(w: string, player: Color): Color {
+  const x = w.toLowerCase();
+  if (x === "white") return "w";
+  if (x === "black") return "b";
+  return x === "you" ? player : player === "w" ? "b" : "w";
+}
+
 /** The side of the side word nearest before the mention in its clause ("White hopes you miss dxe5": you). */
 function nearestSide(text: string, at: number, player: Color): Color | null {
   const head = text.slice(clauseStart(text, at), at);
-  const w = [...head.matchAll(/\b(white|black|you|your|opponent|opponent's)\b/gi)].pop()?.[1]?.toLowerCase();
-  if (w === undefined) return null;
-  if (w === "white") return "w";
-  if (w === "black") return "b";
-  return w.startsWith("you") ? player : player === "w" ? "b" : "w";
+  const w = [...head.matchAll(SUBJECT_SIDE)].pop()?.[1];
+  return w === undefined ? null : sideWord(w, player);
+}
+
+/** The clause's subject: its first side word ("White took your pawn with dxe5": White). */
+function subjectSide(text: string, at: number, player: Color): Color | null {
+  const head = text.slice(clauseStart(text, at), at);
+  const w = [...head.matchAll(SUBJECT_SIDE)][0]?.[1];
+  return w === undefined ? null : sideWord(w, player);
+}
+
+/** A possessive right before the mention: "White's dxe5", "After Black's ...Qd6", "your ...e5" (review 054). */
+const POSSESSIVE_BEFORE = /\b(?:(white|black|your opponent|the opponent|opponent)['’]s|(your))\s+(?:\.\.\.\s?)?$/i;
+
+function possessiveSide(before: string, player: Color): Color | null {
+  const m = POSSESSIVE_BEFORE.exec(before);
+  if (!m) return null;
+  return m[2] ? player : sideWord(m[1]!.replace(/^(?:your|the)\s+/i, ""), player);
+}
+
+/**
+ * The side a history reference points at: "After X" (the opponent), a possessive ("Black's
+ * ...Qd6"), or "With ...X Black ..." (the side named after it). Null when the mention is none.
+ */
+function historyRefSide(text: string, at: number, end: number, player: Color): Color | null {
+  const before = text.slice(0, at);
+  const possessive = possessiveSide(before, player);
+  if (possessive !== null) return possessive;
+  if (/\bafter\s+(?:\.\.\.\s?)?$/i.test(before)) return player === "w" ? "b" : "w";
+  const named = /^\s+(white|black|your opponent|the opponent)\b/i.exec(text.slice(end));
+  if (/\bwith\s+(?:\.\.\.\s?)?$/i.test(before) && named) return sideWord(named[1]!.replace(/^(?:your|the)\s+/i, ""), player);
+  return null;
 }
 
 /** True when the clause before the mention has a present cue ("Black plays", "Black threatens"). */
@@ -345,6 +382,12 @@ export function gradeMoves(input: GradeInput): MovesGrade {
       // clause puts it now ("Black plays Nb8-c6"): a game reference, not the player's move now.
       const opponentNamed = named.mover !== null && named.mover !== input.playerColor;
       if (!legal && !named.lastMove && opponentNamed && !presentClause(text, m.start) && playedBy(input.history, named.mover!, m.spec)) legal = true;
+      // The opponent's own last move named as history: "After Qd6 ...", "Black's ...Qd6 hangs",
+      // "With ...Qd6 Black ..." is checked against the position before it (review 054).
+      if (!legal) {
+        const ref = historyRefSide(text, m.start, m.end, input.playerColor);
+        if (ref !== null && ref !== input.playerColor && lastMoveOf(input.history, ref, m.spec)) legal = true;
+      }
       if (!legal && m.spec.piece && m.spec.to && !m.spec.capture) {
         const before = text.slice(0, m.start);
         const have = HAVE_REF.exec(before);
@@ -398,17 +441,56 @@ const SUBJECT = /\b(white|black|you|your|you're|opponent|opponent's|they|their|h
 
 /** "Do the same", "follow suit": copies what the opponent did (review 042: "Black has castled. Do the same!"). */
 const DO_SAME =
-  /\b(?:do|doing|does)\s+the\s+same\b|\bfollow(?:s|ing)?\s+suit\b|\bthe\s+same\s+(?:thing|idea|plan)\b|\blikewise\b|\btoo\b|\bas\s+well\b|\bcopy\s+(?:that|them|it|him|her|white|black|your\s+opponent)\b/i;
+  /\b(?:do|doing|does)\s+the\s+same\b|\bfollow(?:s|ing)?\s+suit\b|\bthe\s+same\s+(?:thing|idea|plan)\b|\bcopy\s+(?:that|them|it|him|her|white|black|your\s+opponent)\b/i;
+/** "too", "as well", "likewise": a copy only right after the opponent castled, addressed to the player (review 054). */
+const TOO = /\btoo\b|\bas\s+well\b|\blikewise\b/gi;
+/** Addressed to the player: "you", "your", or an imperative at the clause start. */
+const ADDRESSED = /\b(?:you|your|you're)\b|^\s*(?:castle|do|follow|get|bring|tuck|go|play|make)\b/i;
+/** A castle word that says the side did not castle: "hasn't castled", "skipped castling", "yet to castle". */
+const NEGATED = /\b(?:hasn't|has\s+not|haven't|have\s+not|hadn't|had\s+not|didn't|did\s+not|doesn't|does\s+not|not|never|yet\s+to|skipped|skips|skipping|skip|without|won't|can't|cannot)\b/i;
 
-/** Whether some castle word in `text` is about the player, and whether one is about the opponent ("Black castled"). */
-function castleWords(text: string, player: Color): { player: boolean; opponent: boolean } {
-  const out = { player: false, opponent: false };
+/** Non-empty clauses of `text`, in order (CLAUSE_BREAK boundaries). */
+function clauses(text: string): { start: number; end: number }[] {
+  const out: { start: number; end: number }[] = [];
+  let start = 0;
+  const push = (end: number) => {
+    if (text.slice(start, end).trim()) out.push({ start, end });
+  };
+  for (const m of text.matchAll(CLAUSE_BREAK)) {
+    push(m.index!);
+    start = m.index! + m[0].length;
+  }
+  push(text.length);
+  return out;
+}
+
+/**
+ * Whether some castle word in `text` is about the player, whether the opponent positively castled
+ * ("Black castled"; not "White hasn't castled"), and whether a "too" / "as well" copies it: in the
+ * same clause after it or in the next clause, addressed to the player ("Black castled; you should too").
+ */
+function castleWords(text: string, player: Color): { player: boolean; opponent: boolean; copied: boolean } {
+  const out = { player: false, opponent: false, copied: false };
+  const list = clauses(text);
+  const clauseOf = (at: number) => list.findIndex((c) => at >= c.start && at < c.end);
+  const toos = [...text.matchAll(TOO)].map((t) => t.index!);
   for (const m of text.matchAll(CASTLE_WORD)) {
     const head = text.slice(clauseStart(text, m.index!), m.index!);
-    const subject = [...head.matchAll(SUBJECT)].pop()?.[1]?.toLowerCase();
+    const found = [...head.matchAll(SUBJECT)].pop();
+    const subject = found?.[1]?.toLowerCase();
     const opponent = subject === undefined ? false : subject === "white" ? player === "b" : subject === "black" ? player === "w" : !subject.startsWith("you");
-    if (opponent) out.opponent = true;
-    else out.player = true;
+    if (!opponent) {
+      out.player = true;
+      continue;
+    }
+    if (NEGATED.test(head.slice(found!.index!))) continue;
+    out.opponent = true;
+    const here = clauseOf(m.index!);
+    for (const t of toos) {
+      const c = clauseOf(t);
+      if (c === here && ADDRESSED.test(text.slice(m.index!, t))) out.copied = true;
+      if (c === here + 1 && ADDRESSED.test(text.slice(list[c]!.start, t))) out.copied = true;
+    }
   }
   return out;
 }
@@ -439,7 +521,9 @@ function alongLine(from: string, to: string, a: { from: string; to: string }): b
  *   ("can a check with your other bishop ...", "a bishop check", "checks with your bishop");
  * - the message says "castle" (in any form) when the answer is castling, unless its clause is
  *   about the opponent ("Black has already castled"); an opponent's castling with "do the same"
- *   ("Black castled already; you should do the same.") still gives it away;
+ *   ("Black castled already; you should do the same.") still gives it away, and so does "too" /
+ *   "as well" / "likewise" right after a positive opponent castle, addressed to the player
+ *   ("Black castled; you should too"; not "White hasn't castled ... too", review 054);
  * - an arrow is the answer move or starts on its from-square (shows the piece).
  * An arrow that only ends on the answer's to-square, runs along its line through it, or starts
  * on its empty to-square is a Socratic nudge: reported in `nudges` ("points at the answer
@@ -462,7 +546,7 @@ export function gradeGiveAway(input: GradeInput): GiveAwayGrade {
   if (played?.move.san.startsWith("O-O")) {
     const words = castleWords(input.reply.message, input.playerColor);
     if (words.player) problems.push(`message says "castle" and the answer ${answer} is castling (${played.move.san})`);
-    else if (words.opponent && DO_SAME.test(input.reply.message)) {
+    else if (words.copied || (words.opponent && DO_SAME.test(input.reply.message))) {
       problems.push(`message says the opponent castled and to do the same, and the answer ${answer} is castling (${played.move.san})`);
     }
   }
@@ -477,11 +561,15 @@ export function gradeGiveAway(input: GradeInput): GiveAwayGrade {
     // The named opponent's move, told in the past and played in the game ("White played dxe5",
     // "White pushed the pawn to e5"), is not the answer (#29); "White fears dxe5" still is (review 052).
     const named = namedMover(msg, m.start, input.playerColor);
-    const nearest = nearestSide(msg, m.start, input.playerColor);
-    if (named.mover !== null && named.mover !== toMove && nearest === named.mover && !now) {
-      const played = named.lastMove ? lastMoveOf(input.history, named.mover, m.spec) !== null : pastHead(msg, m.start) && playedBy(input.history, named.mover, m.spec);
-      if (played) continue;
-    }
+    // (a) "White's last move, dxe5, ...": that side's real last move (review 054).
+    if (named.lastMove && named.mover !== null && named.mover !== toMove && lastMoveOf(input.history, named.mover, m.spec)) continue;
+    // (b) A possessive ("White's dxe5", "After your ...e5") naming that side's real last move, not put now.
+    const possessive = possessiveSide(msg.slice(0, m.start), input.playerColor);
+    if (possessive !== null && !presentClause(msg, m.start) && lastMoveOf(input.history, possessive, m.spec)) continue;
+    // (c, d) Told in the past by the clause's subject, who is also the nearest side word.
+    const subject = subjectSide(msg, m.start, input.playerColor) ?? named.mover;
+    const nearest = nearestSide(msg, m.start, input.playerColor) ?? named.mover;
+    if (!named.lastMove && subject !== null && subject !== toMove && nearest === subject && !now && pastHead(msg, m.start) && playedBy(input.history, subject, m.spec)) continue;
     // Nor is a move numbered as an earlier ply, told in the past ("It is not 1...d5" when Black plays move 2).
     const numbered = NUMBERED.exec(msg.slice(0, m.start));
     if (numbered && numberedPly(numbered) < attemptPly && !now) continue;
@@ -598,10 +686,21 @@ const EVAL_FOLLOW = /^\s+(?:edge|advantage|lead|deficit|better|worse|ahead|behin
  * "ahead by" / "behind by", and not when an engine word frames the clause ("The engine says you
  * are up 3 pawns", review 052).
  */
-const MATERIAL_LEAD = /\b(?:up|down)(?:\s+by)?\s+(?:(?:about|roughly|around|nearly|almost|just|only|over|under)\s+)?$/i;
-const ENGINE_FRAME = /\b(?:engine|stockfish|eval|evals|evaluation|evaluates|says|gives)\b|\bhas\s+(?:white|black|you|them|us)\s+(?:up|down|ahead|behind)\b/i;
+const MATERIAL_LEAD = /\b(?:(?<!\bend(?:s|ed|ing)?\s+)up|down)(?:\s+by)?\s+(?:(?:about|roughly|around|nearly|almost|just|only|over|under)\s+)?$/i;
+/** An engine word anywhere in the sentence makes "up 3 pawns" an evaluation (review 054); "says" / "gives" alone do not. */
+const ENGINE_WORD = /\b(?:engines?|stockfish|evals?|evaluations?|evaluates|computer|analysis)\b/i;
+
+/** The sentence holding `at`: between [.!?] breaks, so it spans commas, colons and semicolons. */
+function sentenceAt(text: string, at: number): string {
+  let start = 0;
+  for (const m of text.matchAll(/[.!?](?=\s|$)|\n/g)) {
+    if (m.index! >= at) return text.slice(start, m.index!);
+    start = m.index! + 1;
+  }
+  return text.slice(start);
+}
 /** A number that names something other than an evaluation: "Stockfish 16.1", "accuracy was 87.5", "depth 18". */
-const NOT_EVAL_BEFORE = /\b(?:stockfish|version|accuracy|accuracies|rating|elo|depth)(?:\s+(?:score|was|is|of|at|around|about))*\s*[:=]?\s*$/i;
+const NOT_EVAL_BEFORE = /\bstockfish\s+$|\b(?:version|accuracy|accuracies|rating|elo|depth)(?:\s+(?:score|was|is|of|at|around|about))*\s*[:=]?\s*$/i;
 /** A piece value: "A bishop is worth 3 pawns", "a rook is worth about 5" (review 042). */
 const PIECE_VALUE_BEFORE =
   /\b(?:pawns?|knights?|bishops?|rooks?|queens?|pieces?|exchange)\s+(?:is|are)\s+(?:(?:usually|normally|generally|roughly|about|around|only|still|each|traditionally)\s+)*worth\s+(?:(?:about|roughly|around|nearly|almost|just|only|over|under)\s+)?$/i;
@@ -624,7 +723,7 @@ export function findEvalQuotes(text: string): RawQuote[] {
   for (const m of text.matchAll(UNIT_QUOTE)) {
     const [raw, sign, num, unit] = m as unknown as [string, string | undefined, string, string];
     const whole = sign === undefined && !num.includes(".") && unit.toLowerCase().startsWith("p");
-    if (whole && (!framed(m.index!, raw) || MATERIAL_FOLLOW.test(text.slice(m.index! + raw.length)) || (MATERIAL_LEAD.test(text.slice(0, m.index!)) && !ENGINE_FRAME.test(text.slice(clauseStart(text, m.index!), m.index!))))) continue;
+    if (whole && (!framed(m.index!, raw) || MATERIAL_FOLLOW.test(text.slice(m.index! + raw.length)) || (MATERIAL_LEAD.test(text.slice(0, m.index!)) && !EVAL_FOLLOW.test(text.slice(m.index! + raw.length)) && !ENGINE_WORD.test(sentenceAt(text, m.index!))))) continue;
     found.push({ raw, index: m.index!, mate: null, sign, num, unit: unit.toLowerCase() });
   }
   for (const m of text.matchAll(SIGNED_QUOTE)) found.push({ raw: m[0], index: m.index!, mate: null, sign: m[1], num: m[2]!, unit: "" });

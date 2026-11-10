@@ -214,3 +214,104 @@ describe("review 052 of #29 (round 2)", () => {
     expect(giveAway(NE5, "Black castled already; your king wants safety as well.", "e1g1").join(" ")).toMatch(/castl/);
   });
 });
+
+/** Review 054 (brief 055): false fails and false passes left after round 2. */
+describe("review 054 of #29 (round 3)", () => {
+  /** KID Saemisch, Black to move after 5.f3; the answer is castling (e8g8). */
+  const SAEMISCH = evalCase("lb-kid-saemisch");
+  const evalsPass = (message: string) => gradeEvals(input(NE5, { message })).pass;
+
+  describe("(1) 'too' / 'as well' give castling away only right after a positive opponent castle, addressed to the player", () => {
+    it.each([
+      [SAEMISCH, "White hasn't castled yet. White's king is in the centre, and f3 takes a square from the knight too. What now?", "e8g8"],
+      [SAEMISCH, "White didn't castle. The f3 pawn props up e4 but weakens e3 as well.", "e8g8"],
+      [SAEMISCH, "White skipped castling and played f3. Your king is still in the middle too.", "e8g8"],
+      [NE5, "Black has already castled, so the kingside is closed. Your bishop on d3 is strong too.", "e1g1"],
+      [NE5, "Black castled. Look at your pieces: the knight on b1 wants to develop, and the bishop too.", "e1g1"],
+    ])("passes (case %#) '%s'", (c, message, revealMove) => {
+      expect(giveAway(c, message, revealMove)).toEqual([]);
+    });
+    it.each([
+      ["Black castled already; you should do the same."],
+      ["Black has castled. Do the same!"],
+      ["Black castled already; you should too."],
+      ["Black castled; you can as well."],
+    ])("flags '%s'", (message) => {
+      expect(giveAway(NE5, message, "e1g1").join(" ")).toMatch(/castl/);
+    });
+  });
+
+  describe("(2) 'says' / 'gives' alone do not make an engine frame", () => {
+    it.each([
+      ["Bxh7+ gives you a pawn and you are up 1 pawn."],
+      ["That trade gives you the bishop pair and you are up 1 pawn."],
+      ["It gives you the e5 square and you are up 1 pawn."],
+      ["You are up 2 pawns."],
+      ["Black is down 1 pawn."],
+    ])("passes '%s' (material)", (message) => {
+      expect(evalsPass(message)).toBe(true);
+    });
+  });
+
+  describe("(3) an engine word anywhere in the sentence, 'end up', and a following advantage word grade a whole-pawn quote", () => {
+    it.each([
+      ["The engine says you are up 3 pawns."],
+      ["Stockfish has White ahead by 4 pawns."],
+      ["According to the engine, you are up 3 pawns."],
+      ["Engine: you are up 3 pawns."],
+      ["You are up 3 pawns according to Stockfish."],
+      ["You are up 3 pawns in the evaluation."],
+      ["Stockfish likes e4; you are up 1 pawn after it."],
+      ["The position ends up about 2 pawns better for White."],
+      ["You end up 3 pawns ahead."],
+    ])("grades '%s'", (message) => {
+      const q = quotes(message);
+      expect(q.length).toBe(1);
+      expect(q[0]!.problem).toBe("unmatched");
+    });
+  });
+
+  describe("(4) the named opponent's history move is not the answer", () => {
+    it.each([
+      ["White's last move, dxe5, opened the d-file. How do you recapture?"],
+      ["White's dxe5 opened the d-file."],
+      ["After White's dxe5, the d-file is open."],
+      ["White traded with dxe5."],
+      ["White exchanged pawns with dxe5."],
+      ["White took your pawn with dxe5."],
+      ["After your ...e5, White played dxe5."],
+    ])("passes '%s'", (message) => {
+      expect(giveAway(EXCHANGE, message)).toEqual([]);
+    });
+    it.each([["White fears dxe5."], ["White hopes you miss dxe5."], ["White played dxe5, so play dxe5 too."]])("flags '%s'", (message) => {
+      expect(giveAway(EXCHANGE, message).length).toBeGreaterThan(0);
+    });
+  });
+
+  describe("(5) only 'Stockfish <number>' right after the name is a version", () => {
+    it.each([["Stockfish: 2.5."], ["Stockfish score: 2.5."], ["Stockfish is 2.5 for White."], ["The Stockfish score is 2.5."], ["Stockfish was at 1.8 a move ago."]])(
+      "grades '%s'",
+      (message) => {
+        const q = quotes(message);
+        expect(q.length).toBe(1);
+        expect(q[0]!.problem).toBe("unmatched");
+      },
+    );
+    it.each([["Stockfish 16.1 likes this."], ["Stockfish 17 thinks so too."]])("passes '%s'", (message) => {
+      expect(evalsPass(message)).toBe(true);
+    });
+  });
+
+  describe("(6) the opponent's last move named with 'After', a possessive or 'With ... Black' is history", () => {
+    it.each([
+      ["After Qd6 the queen was standing right on your f4 bishop's diagonal."],
+      ["Black's ...Qd6 hangs the queen."],
+      ["With ...Qd6 Black put the queen en prise."],
+    ])("'%s' is legal", (message) => {
+      expect(illegal(QD6_NC3, message)).toEqual([]);
+    });
+    it("a move that is not the opponent's last move is still checked now", () => {
+      expect(illegal(NE5, "After ...Qb6 the b2 pawn hangs.")).toEqual(["Qb6"]);
+    });
+  });
+});
