@@ -1,0 +1,28 @@
+{
+  "brief_id": "052-review-grader-holes-gate-r1",
+  "agent": "reviewer",
+  "issue": 29,
+  "base_sha": "eb68809",
+  "scratch_dir": "/private/tmp/claude-501/-Users-daveharms-personal-workspace-chess-tutor/e44abc73-cc44-4eab-b116-07c015bcf559/scratchpad/052-review-grader-holes-gate-r1",
+  "objective": "Review #29 round 1 at eb68809: `git diff 4a0c7b2..eb68809` (one commit: evals/ grader fixes, --gate, moverOf exported from packages/tutor). Severities blocking / major / minor. This grader is about to become a blocking CI gate (NFR-10), so both directions matter. Focus: (1) false passes (NFR-6, NFR-7): can a reply that names an illegal move to play now, a wrong or unbacked evaluation, or the answer move still pass? Probe around each new exemption: present-predicate detection (A1), last-move-only history (A2), castle 'do the same' (A3), piece values / version numbers / accuracy / 'up N pawns' material exemption (A4, C), 'now you have Nd2' piece-on-square reading, the named-mover exemption and the extra \"last move, X\" pattern, and the move-number ply comparison ('It is not 1...d5'). For each exemption, try a sentence that abuses it to sneak a give-away or illegal move past ('White played Nc3, so play Nc3 too', 'Black's last move, Qd6; now you play Qd6', 'You are up 2 pawns' when the engine says -3.0, '2...d5 is the move'). (2) false fails: wordings from recorded live runs that should pass. (3) packages/tutor: moverOf export changed nothing in claims.ts behaviour; TutorReply untouched. (4) --gate: thresholds exactly NFR-6 100% legality and eval match, NFR-7 >= 90%; exit code set without cutting engine shutdown short; null metrics are misses; no behaviour change without the flag. (5) Test quality: does each new test fail without its code? Ship / no-ship.",
+  "requirements": [
+    "NFR-6",
+    "NFR-7",
+    "NFR-10"
+  ],
+  "contract": "Issue #29 Done-when (remaining items): review-042 majors A1 past tense not carried into a mention with its own present predicate; A2 only the history's own last move accepted from the pre-last-move position; A3 'Black castled already; you should do the same.' fails NFR-7 when the answer is O-O; A4 'A bishop is worth 3 pawns' not an evaluation. Named mover: 'White played dxe5...', 'White pushed the pawn to e5...', 'It is not 1...d5 or 1...Nf6', \"Black's last move, Qd6\" are not give-aways or illegal. PR #32 minors: 'Stockfish 16.1', 'accuracy was 87.5', 'You are up 2 pawns' not evaluations; 'now you have Nd2' checked as a move only when it reads as one. Then evals.yml blocks when NFR-6 < 100% or NFR-7 < 90%. Spoke-reported design: present predicate = mention followed by its own present-tense verb ('is', 'will', 'can', not 'would have'); moverOf stops at a comma, so graders.ts adds a small 'last move' pattern mapped through moverOf; move-number ply compared with the current ply; whole pawns after up/down/ahead/behind are material (matches claims.ts extractEvals); report.ts gateMisses/gateDecision; run.ts sets process.exitCode. One earlier test changed: 'White is up 2 pawns.' -> 'White has an advantage of 2 pawns.'. Recorded live runs (gitignored) under /Users/daveharms/personal-workspace/chess-tutor/evals/results/ (read with absolute paths; `pnpm eval -- regrade <dir>` re-grades recorded replies offline without the API, writing only under your scratch dir if you pass --out there). Coordinator gate at eb68809: 774 passed (44 files), typecheck 0.",
+  "scope": [],
+  "negative": [
+    "Read-only: do not edit, commit, or run anything that writes to the repo.",
+    "Never call the Anthropic API (regrade of recorded runs is offline and fine, with --out in your scratch dir).",
+    "Read code with git diff / git show <sha>:<path>; vitest probes in your own scratch dir are fine."
+  ],
+  "rubric": [
+    "Probe each focus area with concrete sentences and report each verdict.",
+    "Regrade at least two recorded live runs and report how the scores move versus their original reports, naming any case whose verdict flipped and whether the flip is right.",
+    "Classify every finding blocking / major / minor with evidence.",
+    "Ship / no-ship."
+  ],
+  "concurrency": "PR #34 (#12, apps/server) is in CI; no spoke is editing. Do not touch other worktrees.",
+  "round": 1
+}

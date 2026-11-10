@@ -1,0 +1,29 @@
+{
+  "brief_id": "054-review-grader-holes-gate-r2",
+  "agent": "reviewer",
+  "issue": 29,
+  "base_sha": "7c52da6",
+  "scratch_dir": "/private/tmp/claude-501/-Users-daveharms-personal-workspace-chess-tutor/e44abc73-cc44-4eab-b116-07c015bcf559/scratchpad/054-review-grader-holes-gate-r2",
+  "objective": "Re-review #29 round 2 at 7c52da6: `git diff eb68809..7c52da6` (round 2 only; round 1 was review 052). Severities blocking / major / minor. (1) Confirm each of review 052's findings is fixed with its probe: signed quotes after Stockfish/score/worth graded; named-mover give-away skip needs nearest side + past + playedBy + !present; move-number skip only for earlier plies without present cues; MATERIAL_LEAD up/down only and engine-framed material graded; 'last move' apposition only for the side's actual last move; 'X have <piece><square>' colour-checked; DO_SAME too/as well; gate graded-share >= 90% (graded / (cases + skipped)). (2) Hunt for NEW false passes the round-2 code opens, and for false fails it causes on recorded live replies: the gate is about to block PRs, so a false fail that recurs in normal tutor output (e.g. bare 'too' in a message when the answer is castling and the opponent castled; 'fears'/'threatens' wording; mis-tensed history mentions) matters as much as a false pass. (3) Regrade copies of all recorded runs under /Users/daveharms/personal-workspace/chess-tutor/evals/results/ (regrade rewrites in place; only copies in your scratch dir) and list every verdict that flipped vs base 4a0c7b2 and vs eb68809, with right/wrong. Ship / no-ship.",
+  "requirements": [
+    "NFR-6",
+    "NFR-7",
+    "NFR-10"
+  ],
+  "contract": "Round 2 per its return: NOT_EVAL/PIECE_VALUE exemptions only for unsigned numbers (signed or after en dash always graded); gradeGiveAway named-opponent skip requires nearest side word = that side, no presentClause cue nor own present predicate, last tense cue past, playedBy (or lastMoveOf for 'last move' wording); move-number skip only earlier ply with no present cue; MATERIAL_LEAD up/down only, ENGINE_FRAME (engine, stockfish, eval, evaluation, says, gives, 'has <side> up/down/ahead/behind') re-enables grading; lastMoveOf for 'last move' apposition; HAVE_REF colour check ('you'/'we' = player); DO_SAME adds too / as well; gateMisses(m, skipped) misses graded/(cases+skipped) < 0.9, line 'graded 80% of cases (need >= 90%): 8 of 10'. Spoke regrade: 2026-11-10T12-49-12 and 12-54-19 both 100/100/100, graded 63 of 66; only flip vs originals is 12-54-19 mw-london-qd6-nc3 moves false->true (correct, also found by review 052). Spoke's own notes: 'White fears dxe5' is flagged only via the past-cue requirement; bare 'too' anywhere flags NFR-7 when the answer is castling and the opponent's castling is mentioned. Coordinator gate at 7c52da6: 808 passed, typecheck 0.",
+  "scope": [],
+  "negative": [
+    "Read-only: do not edit, commit, or run anything that writes to the repo.",
+    "Never call the Anthropic API; never modify evals/results/ originals (regrade only copies in your scratch dir).",
+    "Read code with git diff / git show <sha>:<path>; vitest probes in your own scratch dir are fine."
+  ],
+  "rubric": [
+    "Each review-052 finding: fixed / not fixed, with its probe result.",
+    "New probes in both directions with verdicts.",
+    "Regrade flips listed with right/wrong.",
+    "Every finding classified blocking / major / minor with evidence.",
+    "Ship / no-ship."
+  ],
+  "concurrency": "No spoke in flight. Do not touch other worktrees.",
+  "round": 2
+}

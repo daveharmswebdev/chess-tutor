@@ -1,0 +1,35 @@
+{
+  "brief_id": "055-grader-holes-gate-r3",
+  "agent": "tutor-agent",
+  "issue": 29,
+  "base_sha": "7c52da6",
+  "scratch_dir": "/private/tmp/claude-501/-Users-daveharms-personal-workspace-chess-tutor/e44abc73-cc44-4eab-b116-07c015bcf559/scratchpad/055-grader-holes-gate-r3",
+  "objective": "Round 3, the LAST round under the 3-round limit, on your branch (base 7c52da6). Review 054 confirmed every review-052 fix and found no blocking issue, but five majors stop --gate from blocking PRs. Fix exactly these, nothing else: (1) MAJOR false fail graders.ts:401 DO_SAME: count 'too' / 'as well' / 'likewise' as a castling give-away only in a clause addressed to the player ('you', 'your', imperative) that follows a POSITIVE opponent castle statement; negated castle words ('hasn't castled', 'didn't castle', 'skipped castling', 'not castled', 'yet to castle') are not the opponent castling. (2) MAJOR false fail graders.ts:602 ENGINE_FRAME: drop bare 'says' / 'gives'; an engine frame needs an engine word (engine, stockfish, eval, evaluation, computer, analysis) in the same sentence, optionally with says/gives. (3) MAJOR false pass graders.ts:627: an engine word anywhere in the SENTENCE (before or after the number, across a comma or colon) re-enables grading of a whole-pawn quote; MATERIAL_LEAD must not match phrasal 'ends up' / 'end up', and a whole-pawn quote followed by better / worse / advantage / edge / ahead / behind is graded as an evaluation. (4) MAJOR false fail graders.ts:481 named-opponent skip in gradeGiveAway: (a) when the mention is a 'last move' apposition and lastMoveOf(history, side) equals it, skip without the nearestSide test; (b) accept a possessive mover ('White's dxe5', 'After White's dxe5') when the move is that side's last move (lastMoveOf) and the clause has no present cue; (c) add traded, exchanged, recaptured, captured, took, pushed, advanced to PAST_CUE if missing; (d) 'White took your pawn with dxe5': the subject (first side word of the clause) is the mover, not a possessive 'your' object. (5) MAJOR false pass graders.ts:604 NOT_EVAL_BEFORE: exempt an unsigned number after 'Stockfish' only when it directly follows ('Stockfish 16.1', 'Stockfish 17'); 'Stockfish: 2.5', 'Stockfish score: 2.5', 'Stockfish is 2.5', 'The Stockfish score is 2.5', 'Stockfish was at 1.8' are graded. (6) minor (old false fail, in a recorded run) gradeMoves graders.ts:336: an opponent move that is the side's actual last move (lastMoveOf) named with 'After X', a possessive (\"Black's ...Qd6\"), or 'With ...X Black ...' is history, checked against the position before it, not the current position. Document in evals/README.md that a 'last move' / 'previous move' apposition must be the side's real last move (review 054 minor, kept strict).",
+  "requirements": [
+    "NFR-6",
+    "NFR-7",
+    "NFR-10"
+  ],
+  "contract": "Review 054 probes (make each a test; expected verdict after your fix; base=4a0c7b2, r2=7c52da6 verdicts shown):\n(1) lb-kid-saemisch (engineBest e8g8, answer castling): 'White hasn't castled yet. White's king is in the centre, and f3 takes a square from the knight too. What now?', 'White didn't castle. The f3 pawn props up e4 but weakens e3 as well.', 'White skipped castling and played f3. Your king is still in the middle too.' -> base ok, r2 GIVEAWAY -> must be ok. hint-london-ne5 with revealMove e1g1: 'Black has already castled, so the kingside is closed. Your bishop on d3 is strong too.' and 'Black castled. Look at your pieces: the knight on b1 wants to develop, and the bishop too.' -> must be ok. Keep flagged: 'Black castled already; you should do the same.', 'Black has castled. Do the same!', 'Black castled already; you should too.', 'Black castled; you can as well.'\n(2) hint-london-ne5: 'Bxh7+ gives you a pawn and you are up 1 pawn.', 'That trade gives you the bishop pair and you are up 1 pawn.', 'It gives you the e5 square and you are up 1 pawn.' -> r2 ['1 pawn:unmatched'] -> must pass (material). Keep graded: 'The engine says you are up 3 pawns.', 'Stockfish has White ahead by 4 pawns.'\n(3) hint-london-ne5 no tools, must be graded (unmatched): 'According to the engine, you are up 3 pawns.', 'Engine: you are up 3 pawns.', 'You are up 3 pawns according to Stockfish.', 'You are up 3 pawns in the evaluation.', 'Stockfish likes e4; you are up 1 pawn after it.', 'The position ends up about 2 pawns better for White.', 'You end up 3 pawns ahead.' Keep passing: 'You are up 2 pawns', 'Black is down 1 pawn'.\n(4) lb-kid-exchange (answer d6e5, White's last move dxe5): must be ok (not give-away): \"White's last move, dxe5, opened the d-file. How do you recapture?\", \"White's dxe5 opened the d-file.\", \"After White's dxe5, the d-file is open.\", 'White traded with dxe5.', 'White exchanged pawns with dxe5.', 'White took your pawn with dxe5.', 'After your ...e5, White played dxe5.'. Keep flagged: 'White fears dxe5.', 'White hopes you miss dxe5.', 'White played dxe5, so play dxe5 too.'\n(5) hint-london-ne5 no tools, must be graded (unmatched): 'Stockfish: 2.5.', 'Stockfish score: 2.5.', 'Stockfish is 2.5 for White.', 'The Stockfish score is 2.5.', 'Stockfish was at 1.8 a move ago.'. Keep passing: 'Stockfish 16.1', 'Stockfish 17 thinks so too'.\n(6) mw-london-qd6-nc3 (Black's last move ...Qd6): must be legal: 'After Qd6 the queen was standing right on your f4 bishop's diagonal', \"Black's ...Qd6 hangs the queen.\", 'With ...Qd6 Black put the queen en prise.'. Recorded q3-opus-low mw-london-qd6-bd3 reveal has the first sentence; after the fix that run's moves legal should be 100%.\nRegression net: review 054 regraded copies of all 7 recorded runs at 7c52da6 with no verdict flips vs eb68809 and one correct flip vs base (12-54-19 mw-london-qd6-nc3 moves false->true). Regrade copies (in your scratch dir; regrade rewrites in place, never touch the originals under /Users/daveharms/personal-workspace/chess-tutor/evals/results/) before and after, and report every flip. 2026-11-10T12-49-12 and 12-54-19 must stay 100/100/100.\nCoordinator gate at 7c52da6: 808 passed, typecheck 0.",
+  "scope": [
+    "packages/tutor/**",
+    "prompts/**",
+    "evals/**"
+  ],
+  "negative": [
+    "Do not edit files outside scope, docs, config, .github, root files or the lockfile.",
+    "No new dependencies.",
+    "Do not change packages/tutor, the TutorReply type or prompts/.",
+    "Never call the real Anthropic API; never modify anything under evals/results/ in any checkout.",
+    "No changes beyond the six items and the README note; do not widen any other exemption."
+  ],
+  "rubric": [
+    "Tests first (red then green): every probe above with its expected verdict, both the must-change and the keep ones.",
+    "Regrade flips reported (before vs after) for all 7 recorded runs, each judged right/wrong.",
+    "All earlier tests still pass.",
+    "pnpm test and pnpm typecheck clean from the repo root.",
+    "files_changed lists every file changed in 7c52da6..your head. Commit message references NFR-6, NFR-7, NFR-10 and #29."
+  ],
+  "concurrency": "No other spoke is in flight. Do not rebase; the coordinator will.",
+  "round": 3
+}

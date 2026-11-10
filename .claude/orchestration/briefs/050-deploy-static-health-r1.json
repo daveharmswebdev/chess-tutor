@@ -1,0 +1,26 @@
+{
+  "brief_id": "050-deploy-static-health-r1",
+  "agent": "server-agent",
+  "issue": 12,
+  "base_sha": "4a0c7b2",
+  "scratch_dir": "/private/tmp/claude-501/-Users-daveharms-personal-workspace-chess-tutor/e44abc73-cc44-4eab-b116-07c015bcf559/scratchpad/050-deploy-static-health-r1",
+  "objective": "Make apps/server deployable as the single Render web service of docs/architecture.md section 6.1: (1) when WEB_DIST names a directory, serve it as static files at / with @fastify/static (already a dependency, 10.1.7), with an SPA fallback: a GET for any non-/api path that is not a file returns index.html; /api/* paths that don't exist keep today's JSON 404 ({ error }); non-GET unknown routes keep the JSON 404. A relative WEB_DIST resolves against the repository root (pnpm --filter starts the server with cwd apps/server). WEB_DIST unset or empty: no static serving, behaviour unchanged. WEB_DIST set but the directory (or its index.html) is missing: fail at startup with a clear error. (2) GET /api/health: 200 { ok: true, engine: 'ready' } once the engine has answered a depth-1 search on the start position within 5 s and the store is open; 503 { ok: false, reason } otherwise (engine timeout or error, store closed). The probe goes through the engine's normal queue; keep it cheap. Wire both through buildServer's deps (injectable for tests, e.g. a `health` probe dep and a `webDist` option) and main.ts.",
+  "requirements": ["NFR-13"],
+  "contract": "docs/architecture.md section 6.1 (verbatim):\n- One process serves everything. apps/server serves the API under /api/* and, when WEB_DIST names a directory (a relative path resolves against the repository root, since pnpm --filter starts the server in apps/server), the built apps/web (vite build -> apps/web/dist) as static files at /. A GET for any other non-/api path returns index.html (SPA fallback). /api/* routes that don't exist stay JSON 404s. No CORS, since there's one origin. Local dev is unchanged: the Vite proxy, and no WEB_DIST.\n- Health check: GET /api/health returns 200 { ok: true, engine: \"ready\" } once Stockfish has answered a shallow search (depth 1 on the start position, at most 5 s) and the store is open, and 503 { ok: false, reason } otherwise. It goes through the engine's normal queue (one search at a time per process), so it must stay cheap. Render's healthCheckPath points at it.\n- render.yaml (coordinator-owned, already on main): buildCommand `pnpm install --frozen-lockfile && pnpm --filter @chess-tutor/web build`, startCommand `pnpm --filter @chess-tutor/server start`, healthCheckPath /api/health, env HOST=0.0.0.0, DB_PATH=/var/data/chess-tutor.sqlite, WEB_DIST=apps/web/dist; Render sets PORT.\nCurrent code: apps/server/src/app.ts `buildServer(deps: ServerDeps)` with ServerDeps { bot, store, coaching?, newId?, now?, logger?, keepAliveMs? }; app.setNotFoundHandler returns 404 apiError(`no route ${method} ${url}`). main.ts builds `engine = createEngineFromEnv(...)` (StockfishEngine with analyze(fen, { depth, movetimeMs, multiPv })) and the store (createSqliteGameStore); apps/server/src/store.ts resolveDbPath shows the repo-root resolution pattern (fileURLToPath(new URL('../../../...', import.meta.url))). The GameStore interface may need an `isOpen`-style check, or the probe can run a trivial store read; your choice, inside apps/server.\nCoordinator gate at 4a0c7b2: pnpm test 733 passed (41 files), pnpm typecheck clean.",
+  "scope": ["apps/server/**"],
+  "negative": [
+    "Do not edit files outside scope, docs, config, .github, root files, render.yaml or the lockfile.",
+    "No new dependencies (@fastify/static 10.1.7 is already in apps/server/package.json).",
+    "Do not change existing API routes or their responses.",
+    "Do not touch packages/ or evals/ (another spoke is working there)."
+  ],
+  "rubric": [
+    "Tests first (red then green), with fastify.inject and a temp directory as WEB_DIST: a real file is served; an unknown non-/api GET (e.g. /games/abc) returns index.html; an unknown /api GET returns the JSON 404; no WEB_DIST means / is a JSON 404 as today; a missing WEB_DIST directory fails at startup; relative WEB_DIST resolves against the repo root.",
+    "Health tests with a fake probe/engine: ready -> 200 { ok: true, engine: 'ready' }; engine error -> 503 with a reason; engine slower than the timeout -> 503 (use a short injected timeout or fake timers, not a 5 s wait); store closed -> 503. One test against the real WASM engine is welcome if it stays under about 2 s.",
+    "All earlier tests still pass.",
+    "pnpm test and pnpm typecheck clean from the repo root.",
+    "files_changed lists every file changed in 4a0c7b2..your head. Commit message references NFR-13 and #12."
+  ],
+  "concurrency": "tutor-agent is working on #29 at the same time in evals/** and packages/tutor/** only. No file overlap; do not edit those.",
+  "round": 1
+}

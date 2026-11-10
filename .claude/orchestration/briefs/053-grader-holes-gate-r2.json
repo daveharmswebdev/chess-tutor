@@ -1,0 +1,34 @@
+{
+  "brief_id": "053-grader-holes-gate-r2",
+  "agent": "tutor-agent",
+  "issue": 29,
+  "base_sha": "eb68809",
+  "scratch_dir": "/private/tmp/claude-501/-Users-daveharms-personal-workspace-chess-tutor/e44abc73-cc44-4eab-b116-07c015bcf559/scratchpad/053-grader-holes-gate-r2",
+  "objective": "Round 2 on your branch (base eb68809, your round-1 commit). Review 052 found the round-1 exemptions too broad: they let through replies the base graders caught. Since this grader becomes a blocking CI gate, narrow every exemption so that no wording the base 4a0c7b2 graders flagged as a problem is passed, except the wordings #29 names as false alarms. Fix: (1) BLOCKING graders.ts:575 NOT_EVAL_BEFORE / PIECE_VALUE_BEFORE: apply only to unsigned numbers (versions, accuracies, piece values); a signed quote (+, -, U+2212, U+2013) after 'Stockfish', 'score', 'is', 'was', ':' is always graded. (2) MAJOR graders.ts:249 named-mover skip in gradeGiveAway: skip only when the named opponent actually played that move (playedBy, as gradeMoves does) and the clause is not present (!presentClause); prefer the nearest side word/subject ('White hopes you miss dxe5': 'you' is nearer). (3) MAJOR graders.ts:252 move-number skip: skip only an EARLIER ply than the attempt ply, and only without a present cue or predicate; later or mis-numbered plies in the present are graded as the answer. (4) MAJOR graders.ts:573 MATERIAL_LEAD: drop 'ahead by' / 'behind by'; keep grading when an engine word (engine, Stockfish, eval, evaluation, says, gives, has ... ahead) frames the clause. (5) minor graders.ts:163 'last move' apposition: accept it only when the move is the history's actual last move (lastUci); otherwise grade as A2 does. (6) minor graders.ts:68 have/has/had piece reference: require the piece on that square to be the subject's colour ('you' = player). (7) minor graders.ts:191 DO_SAME: add 'too', 'as well', 'likewise'. (8) gate (report.ts gateMisses): also a miss when fewer than 90% of the run's cases were graded (ok), so a budget-stopped or mostly failed run can't pass on the replies that are left; name it in the miss line. Update evals/README.md for the narrowed rules and the new gate line.",
+  "requirements": [
+    "NFR-6",
+    "NFR-7",
+    "NFR-10"
+  ],
+  "contract": "Review 052 probes (make every one a test; head = eb68809 verdict, required verdict after your fix):\n(1) hint-london-ne5, no tool results: 'Stockfish is +2.1 here.', 'Stockfish: +3.2 for White.', 'Stockfish score was -1.5.', 'The extra pawn is worth +1.8 here.' -> head pass:true quotes [] -> must FAIL evals with the quote extracted (base failed them). Keep passing: 'Stockfish 16.1', 'accuracy was 87.5', 'A bishop is worth 3 pawns'. Control 'Stockfish gives +3.2.' already fails.\n(2) lb-kid-exchange (Black to move, answer d6e5): 'White fears dxe5.' and 'White hopes you miss dxe5.' -> head [] -> must flag give-away. Keep passing: 'White played dxe5...', 'White pushed the pawn to e5...' where history shows White played it. Control 'White played dxe5, so play dxe5 too.' still flagged.\n(3) lb-kid-nf3-move2 (answer d7d5, ply 3): 'Play 3...d5 now.', 'Play 1...d5 now, it is still the main move.'; hint-london-ne5 (answer e3e4, White's move 9): '10.e4 is the move to find.' -> head [] -> must flag. Keep passing: 'It is not 1...d5 or 1...Nf6'. Control '2...d5 is the move.' still flagged.\n(4) hint-london-ne5 no tools: 'The engine says you are up 3 pawns.', 'Stockfish has White ahead by 4 pawns.' -> head pass -> must FAIL evals. Keep passing: 'You are up 2 pawns', 'Black is down 1 pawn'. 'White is ahead by 3 pawns' graded like 'White is ahead by 3.'.\n(5) hint-london-ne5 (last move 8...b6): \"Black's last move was ...Qb6, hitting b2.\" and \"Black's last move, ...Qb6, hit b2.\" -> head [] -> must flag Qb6 illegal. Keep: mw-london-qd6-nc3 \"Black's last move, Qd6, left something hanging\" passes (it is the real last move; the one correct flip in regrades).\n(6) hint-london-ne5 (White to move, Black knight on f6): 'You have Nf6 with a fork.', 'Now you have Nf6, so the e4 square is covered.' -> head [] -> must flag Nf6. Keep 'now you have Nd2' (White knight on d2) passing.\n(7) hint-london-ne5 revealMove e1g1: 'Black castled already; you should too.' -> must flag give-away.\n(8) gate: a run with 10 cases, 8 ok, all metrics 100% -> miss 'graded 80% of cases (need >= 90%)'.\nRegrade, for your own check (offline, no API): review 052 copied recorded runs from /Users/daveharms/personal-workspace/chess-tutor/evals/results/ into its scratch dir and ran `node --experimental-strip-types evals/src/run.ts regrade <copy>`; note regrade rewrites cases/*.json, summary.json, report.md IN PLACE, so only regrade copies in your scratch dir, never the originals. Review 052 at eb68809: across 7 runs (438 replies) exactly one verdict flipped vs base (12-54-19 mw-london-qd6-nc3 moves fail->pass, correct). After your fix, the 2026-11-10T12-49-12 and 2026-11-10T12-54-19 runs should still pass all gate thresholds; report their metrics in your summary.\nReview 052 confirmed correct and to keep: A1, A2, A3 exact sentence, A4, gate thresholds/exitCode/null-miss, claims.ts only export + comment. coordinator will add --gate to evals.yml (not yours).\nCoordinator gate at eb68809: 774 passed (44 files), typecheck 0.",
+  "scope": [
+    "packages/tutor/**",
+    "prompts/**",
+    "evals/**"
+  ],
+  "negative": [
+    "Do not edit files outside scope, docs, config, .github, root files or the lockfile.",
+    "No new dependencies.",
+    "Do not change packages/tutor behaviour, the TutorReply type or prompts/.",
+    "Never call the real Anthropic API; never modify anything under evals/results/ in any checkout.",
+    "No changes beyond the eight items."
+  ],
+  "rubric": [
+    "Tests first (red then green): every probe above with its required verdict, including the keep-passing ones.",
+    "All earlier tests still pass.",
+    "pnpm test and pnpm typecheck clean from the repo root.",
+    "files_changed lists every file changed in eb68809..your head. Commit message references NFR-6, NFR-7, NFR-10 and #29."
+  ],
+  "concurrency": "No other spoke is in flight. main moved to 8e6e2b2 (#12, apps/server only); do not rebase, the coordinator will.",
+  "round": 2
+}

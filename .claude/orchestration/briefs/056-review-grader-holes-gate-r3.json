@@ -1,0 +1,29 @@
+{
+  "brief_id": "056-review-grader-holes-gate-r3",
+  "agent": "reviewer",
+  "issue": 29,
+  "base_sha": "837e07d",
+  "scratch_dir": "/private/tmp/claude-501/-Users-daveharms-personal-workspace-chess-tutor/e44abc73-cc44-4eab-b116-07c015bcf559/scratchpad/056-review-grader-holes-gate-r3",
+  "objective": "Final review of #29 round 3 at 837e07d: `git diff 7c52da6..837e07d` (round 3 only; rounds 1-2 were reviews 052 and 054). Severities blocking / major / minor. Decision this review feeds: whether the coordinator turns on `--gate` in evals.yml so live evals BLOCK PRs. (1) Each review-054 major fixed, with its probe: castle too/as well/likewise only in a player-addressed clause after a positive opponent castle, negations not castling; ENGINE_FRAME needs an engine word in the sentence (not bare says/gives); engine word anywhere in the sentence, EVAL_FOLLOW words and 'end up' re-enable whole-pawn grading; named-opponent history skips (apposition, possessive, PAST_CUE additions, subject as mover); 'Stockfish <n>' exemption only when adjacent; gradeMoves history forms for the real last move. (2) New false passes or false fails opened by round 3, in both directions; weigh false fails by how likely the v2 tutor is to write them (the gate fails a PR on one unmatched eval or one illegal move). (3) Regrade copies of all 7 recorded runs (regrade rewrites in place; copies only, in your scratch dir) and list flips vs 7c52da6. (4) Gate verdict: is --gate safe to enable now? Answer 'enable' or 'do not enable yet' with reasons; a no-ship on gating need not block merging the grader fixes, so give both verdicts separately: merge-fixes ship/no-ship, enable-gate yes/no.",
+  "requirements": [
+    "NFR-6",
+    "NFR-7",
+    "NFR-10"
+  ],
+  "contract": "Round 3 per its return: DO_SAME without too/as well/likewise; those count only in the same or next non-empty clause after a positive opponent castle, addressed to the player (you/your or leading imperative); negations (hasn't, didn't, not, never, yet to, skipped, without) block castle words. Material exemption off when an engine word (engine, stockfish, eval, evaluation, computer, analysis) is in the same sentence (split at . ! ? newline), when EVAL_FOLLOW (better/worse/advantage/edge/ahead/behind) follows, or for end/ends/ended/ending up. Stockfish version exemption only when the number directly follows. Give-away: 'last move' apposition naming the side's real last move skipped (even with a present predicate, spoke's choice); possessive mover skipped when it is that side's last move and no present cue; PAST_CUE += traded, exchanged, recaptured, advanced; first side word of the clause is the mover. gradeMoves: the opponent's real last move as 'After X' / possessive / 'With ...X Black' is legal from the position before it. Spoke regrade at 837e07d: one flip vs 7c52da6 (q3 opus-low mw-london-qd6-bd3 moves false->true, right); 12-49-12 and 12-54-19 at 100/100/100, 63/66 graded; opus-low 98/100/85 (lb-kid-e4 'put the bishop on g7' plan sentence still illegal, out of scope); other older runs below the 90% NFR-7 line (those are v1-prompt runs; the current prompt is v2, and the v2 runs are 12-49-12 and 12-54-19). Last CI live run (PR #33, v2 prompt, Sonnet medium, old graders): ok 98%, legal 97%, evals 97%, NFR-7 98%. Coordinator gate at 837e07d: 852 passed, typecheck 0.",
+  "scope": [],
+  "negative": [
+    "Read-only: do not edit, commit, or run anything that writes to the repo.",
+    "Never call the Anthropic API; never modify evals/results/ originals (regrade only copies in your scratch dir).",
+    "Read code with git diff / git show <sha>:<path>; vitest probes in your own scratch dir are fine."
+  ],
+  "rubric": [
+    "Each review-054 major: fixed / not fixed, with its probe result.",
+    "New probes in both directions with verdicts.",
+    "Regrade flips listed with right/wrong.",
+    "Every finding classified blocking / major / minor with evidence.",
+    "Two verdicts: merge-fixes ship/no-ship, and enable-gate yes/no."
+  ],
+  "concurrency": "No spoke in flight. Do not touch other worktrees.",
+  "round": 3
+}

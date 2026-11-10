@@ -1,0 +1,26 @@
+{
+  "brief_id": "051-review-deploy-static-health-r1",
+  "agent": "reviewer",
+  "issue": 12,
+  "base_sha": "491fd64",
+  "scratch_dir": "/private/tmp/claude-501/-Users-daveharms-personal-workspace-chess-tutor/e44abc73-cc44-4eab-b116-07c015bcf559/scratchpad/051-review-deploy-static-health-r1",
+  "objective": "Review #12 round 1 at 491fd64: `git diff 4a0c7b2..491fd64` (one commit, apps/server only). Severities blocking / major / minor. Focus: (1) static serving + SPA fallback: does any /api path (including /api, /api?x, /api/ unknown, HEAD, POST) ever get index.html instead of the JSON 404? Path traversal or serving files outside WEB_DIST? Do existing /api routes, SSE streams and their content types still behave the same with webDist set? Does @fastify/static's own 404 or wildcard interfere with the not-found handler? (2) WEB_DIST resolution: relative vs absolute, blank, missing dir, missing index.html; startup fails clearly before the engine and store start. (3) /api/health: 200/503 bodies as specified; the probe goes through the engine queue and stays cheap (shared search, no stacking of timed-out searches); can a hung or slow health search delay the bot's moves or tutor analysis (NFR-3), and how badly under Render's health-check cadence? Store-closed detection actually reflects a closed SQLite store. (4) Will it work on Render as render.yaml declares it (cwd apps/server via pnpm --filter, WEB_DIST=apps/web/dist, HOST=0.0.0.0, PORT)? (5) Test quality: does each test fail without the code it covers? Ship / no-ship.",
+  "requirements": [
+    "NFR-13",
+    "NFR-3"
+  ],
+  "contract": "docs/architecture.md section 6.1 is the design (read it at 491fd64). render.yaml at the repo root is the Blueprint. Spoke summary: new apps/server/src/static.ts (REPO_ROOT, resolveWebDist, checkWebDist, WebDistError, isApiPath) and health.ts (createHealthProbe({ engine, store, timeoutMs = 5000 }): store.get read first, then depth-1 analyze of the start position raced against the timeout; concurrent probes share one search; a timed-out search still queued is reused). buildServer gains optional webDist and health deps; /api/health without a probe returns 503. main.ts resolves WEB_DIST before store/engine start. Spoke did not run a manual curl smoke test of the start script. Coordinator gate at 491fd64: 758 passed (42 files), typecheck 0.",
+  "scope": [],
+  "negative": [
+    "Read-only: do not edit, commit, or run anything that writes to the repo.",
+    "Never call the Anthropic API.",
+    "Read code with git diff / git show <sha>:<path>; vitest probes and a local server started from your own scratch dir (WEB_DIST pointing at a temp dir, PORT=0 or a free port, DB_PATH=:memory:) are fine; stop any process you start."
+  ],
+  "rubric": [
+    "Probe each focus area with concrete requests and report each verdict.",
+    "Classify every finding blocking / major / minor with evidence.",
+    "Ship / no-ship."
+  ],
+  "concurrency": "tutor-agent is working on #29 in its own worktree (evals/, packages/tutor/). Do not read or touch it.",
+  "round": 1
+}

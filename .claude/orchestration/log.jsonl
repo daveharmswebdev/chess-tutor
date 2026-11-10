@@ -174,3 +174,35 @@
 {"ts":"2026-11-10T13:04:19.248Z","event":"coordinator_verdict","brief_id":"048-evals-field-prompt-v2-r3","agent":"tutor-agent","verdict":"accepted","reason":"gate green (733, tc 0), files match; both 047 majors fixed with probe tests; ship","tokens":202576,"duration_ms":132952}
 {"ts":"2026-11-10T13:19:08.104Z","event":"shipped","issue":26,"pr":33}
 {"ts":"2026-11-10T13:19:08.105Z","event":"shipped","issue":28,"pr":33}
+{"ts":"2026-11-10T14:22:30.974Z","event":"dispatch","subagent_type":"tutor-agent","brief_id":"049-grader-holes-gate-r1","base_sha":"4a0c7b2","spoke":true}
+{"ts":"2026-11-10T14:22:50.370Z","event":"dispatch","subagent_type":"server-agent","brief_id":"050-deploy-static-health-r1","base_sha":"4a0c7b2","spoke":true}
+{"ts":"2026-11-10T14:22:50.700Z","event":"agent_complete","subagent_type":"server-agent","brief_id":"050-deploy-static-health-r1","agent_id":"a097d0a1577658856","status":"async_launched","contract":"pending"}
+{"ts":"2026-11-10T14:22:50.709Z","event":"agent_complete","subagent_type":"tutor-agent","brief_id":"049-grader-holes-gate-r1","agent_id":"a7721cbea7146a203","status":"async_launched","contract":"pending"}
+{"ts":"2026-11-10T14:26:53.977Z","event":"return_valid","agent_id":"a097d0a1577658856","agent_type":"server-agent","via":"handback"}
+{"ts":"2026-11-10T14:27:40.819Z","event":"coordinator_verdict","brief_id":"050-deploy-static-health-r1","agent":"server-agent","verdict":"accepted","reason":"diff = files_changed in apps/server; gate re-run 758 passed, typecheck 0","tokens":46714,"duration_ms":243895}
+{"ts":"2026-11-10T14:28:15.246Z","event":"dispatch","subagent_type":"reviewer","brief_id":"051-review-deploy-static-health-r1","base_sha":"491fd64","spoke":true}
+{"ts":"2026-11-10T14:28:15.464Z","event":"agent_complete","subagent_type":"reviewer","brief_id":"051-review-deploy-static-health-r1","agent_id":"aac42e98a05471e18","status":"async_launched","contract":"pending"}
+{"ts":"2026-11-10T14:31:47.946Z","event":"return_valid","agent_id":"aac42e98a05471e18","agent_type":"reviewer","via":"handback"}
+{"ts":"2026-11-10T14:32:02.669Z","event":"coordinator_verdict","brief_id":"051-review-deploy-static-health-r1","agent":"reviewer","verdict":"review","reason":"ship; 5 minors (dotfiles, stale-chunk 200 html + caching, test gaps, /API case, engine threads on starter) -> triage at round end","tokens":51781,"duration_ms":212796}
+{"ts":"2026-11-10T14:32:10.189Z","event":"return_valid","agent_id":"a7721cbea7146a203","agent_type":"tutor-agent","via":"handback"}
+{"ts":"2026-11-10T14:33:04.994Z","event":"coordinator_verdict","brief_id":"049-grader-holes-gate-r1","agent":"tutor-agent","verdict":"accepted","reason":"diff = files_changed (evals/, packages/tutor moverOf export); gate re-run 774 passed, typecheck 0; brief defect: moverOf null on \"Black's last move, Qd6\" (comma)","tokens":127076,"duration_ms":559977}
+{"ts":"2026-11-10T14:33:43.651Z","event":"dispatch","subagent_type":"reviewer","brief_id":"052-review-grader-holes-gate-r1","base_sha":"eb68809","spoke":true}
+{"ts":"2026-11-10T14:33:43.873Z","event":"agent_complete","subagent_type":"reviewer","brief_id":"052-review-grader-holes-gate-r1","agent_id":"ae3c13730dfd2e5c7","status":"async_launched","contract":"pending"}
+{"ts":"2026-11-10T14:35:32.583Z","event":"shipped","issue":12,"pr":34}
+{"ts":"2026-11-10T14:43:20.413Z","event":"return_valid","agent_id":"ae3c13730dfd2e5c7","agent_type":"reviewer","via":"handback"}
+{"ts":"2026-11-10T14:43:56.513Z","event":"coordinator_verdict","brief_id":"052-review-grader-holes-gate-r1","agent":"reviewer","verdict":"review","reason":"no-ship: 1 blocking (NOT_EVAL_BEFORE hides signed Stockfish evals), 3 major (named-mover skip, move-number skip, material lead), 4 minor -> round 2 (brief 053)","tokens":106085,"duration_ms":576852}
+{"ts":"2026-11-10T14:49:50.154Z","event":"return_valid","agent_id":"a7721cbea7146a203","agent_type":"tutor-agent","via":"handback"}
+{"ts":"2026-11-10T14:50:40.586Z","event":"coordinator_verdict","brief_id":"053-grader-holes-gate-r2","agent":"tutor-agent","verdict":"accepted","reason":"diff = files_changed (evals/ only); gate re-run 808 passed, typecheck 0","tokens":166932,"duration_ms":320261}
+{"ts":"2026-11-10T14:51:04.033Z","event":"dispatch","subagent_type":"reviewer","brief_id":"054-review-grader-holes-gate-r2","base_sha":"7c52da6","spoke":true}
+{"ts":"2026-11-10T14:51:04.252Z","event":"agent_complete","subagent_type":"reviewer","brief_id":"054-review-grader-holes-gate-r2","agent_id":"a9d777e4ee43d6943","status":"async_launched","contract":"pending"}
+{"ts":"2026-11-10T16:34:32.936Z","event":"return_valid","agent_id":"a9d777e4ee43d6943","agent_type":"reviewer","via":"handback"}
+{"ts":"2026-11-10T16:35:12.432Z","event":"coordinator_verdict","brief_id":"054-review-grader-holes-gate-r2","agent":"reviewer","verdict":"review","reason":"052 fixes all confirmed; no blocking; 5 major (3 false fails: bare too/negated castle, gives/says frame, named-opponent apposition/possessive; 2 false passes: engine word after number, unsigned Stockfish score) -> round 3 (last)","tokens":0,"duration_ms":0}
+{"ts":"2026-11-10T16:35:18.112Z","event":"coordinator_verdict","brief_id":"054-review-grader-holes-gate-r2","agent":"reviewer","verdict":"review","reason":"cost record (verdict logged above with 0 tokens before usage arrived)","tokens":113951,"duration_ms":6208996}
+{"ts":"2026-11-10T16:41:49.062Z","event":"return_valid","agent_id":"a7721cbea7146a203","agent_type":"tutor-agent","via":"handback"}
+{"ts":"2026-11-10T16:42:46.328Z","event":"coordinator_verdict","brief_id":"055-grader-holes-gate-r3","agent":"tutor-agent","verdict":"accepted","reason":"diff = files_changed (evals/ only); gate re-run 852 passed, typecheck 0; brief defect: opus-low legality 98% (lb-kid-e4 plan wording, out of scope)","tokens":205150,"duration_ms":361768}
+{"ts":"2026-11-10T16:43:13.202Z","event":"dispatch","subagent_type":"reviewer","brief_id":"056-review-grader-holes-gate-r3","base_sha":"837e07d","spoke":true}
+{"ts":"2026-11-10T16:43:13.416Z","event":"agent_complete","subagent_type":"reviewer","brief_id":"056-review-grader-holes-gate-r3","agent_id":"a6b1ef1cb723d7c49","status":"async_launched","contract":"pending"}
+{"ts":"2026-11-10T17:19:41.820Z","event":"return_valid","agent_id":"a6b1ef1cb723d7c49","agent_type":"reviewer","via":"handback"}
+{"ts":"2026-11-10T17:19:56.178Z","event":"coordinator_verdict","brief_id":"056-review-grader-holes-gate-r3","agent":"reviewer","verdict":"review","reason":"merge-fixes ship; enable-gate not yet: regrade PR #33 CI artifact first; 1 major (subject past-cue skip too lenient, NFR-7 only), 5 minors -> triage","tokens":0,"duration_ms":0}
+{"ts":"2026-11-10T17:20:04.320Z","event":"coordinator_verdict","brief_id":"056-review-grader-holes-gate-r3","agent":"reviewer","verdict":"review","reason":"cost record","tokens":123026,"duration_ms":2188722}
+{"ts":"2026-11-10T17:30:00.793Z","event":"shipped","issue":29,"pr":35,"note":"part of #29; gate reverted after first gated CI run (grader false fails)"}
