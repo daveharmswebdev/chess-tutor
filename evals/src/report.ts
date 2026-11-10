@@ -5,6 +5,45 @@ import { KEY_MOMENTS_PER_GAME, NEEDS_JUDGE, type CaseResult, type CaseRow, type 
 /** The NFR-7 target: at least 90% of replies keep the answer back. */
 export const NFR7_TARGET = 0.9;
 
+/** --gate thresholds (#29): NFR-6 needs every reply legal and every quote backed, NFR-7 its target. */
+const GATE: { label: string; value: (m: RunMetrics) => number | null; min: number }[] = [
+  { label: "NFR-6 move legality", value: (m) => m.moveLegalPct, min: 1 },
+  { label: "NFR-6 eval match", value: (m) => m.evalMatchPct, min: 1 },
+  { label: "NFR-7 no give-away", value: (m) => m.noGiveAwayPct, min: NFR7_TARGET },
+];
+
+const gatePct = (x: number) => `${Number((x * 100).toFixed(1))}%`;
+
+/** Share of the run's cases (asked plus not started) that must be graded for --gate (review 052). */
+export const GATE_GRADED_MIN = 0.9;
+
+/**
+ * One line per missed --gate threshold; a null metric (no graded replies) is a miss. Also a miss
+ * when fewer than 90% of the run's cases were graded, counting `skipped` cases (not started, e.g.
+ * stopped by the budget), so a mostly failed run cannot pass on the replies that are left.
+ */
+export function gateMisses(m: RunMetrics, skipped = 0): string[] {
+  const out: string[] = [];
+  for (const g of GATE) {
+    const v = g.value(m);
+    if (v === null) out.push(`${g.label} n/a (${m.graded} graded replies), needs >= ${gatePct(g.min)}`);
+    else if (v < g.min) out.push(`${g.label} ${gatePct(v)} < ${gatePct(g.min)}`);
+  }
+  const total = m.cases + skipped;
+  const share = total === 0 ? null : m.graded / total;
+  const need = `(need >= ${gatePct(GATE_GRADED_MIN)})`;
+  if (share === null) out.push(`graded n/a of cases (0 cases) ${need}`);
+  else if (share < GATE_GRADED_MIN) out.push(`graded ${gatePct(share)} of cases ${need}: ${m.graded} of ${total}${skipped ? `, ${skipped} not started` : ""}`);
+  return out;
+}
+
+/** What `pnpm eval` does after the report: with --gate, exit 1 and print the misses; without it, nothing changes. */
+export function gateDecision(m: RunMetrics, gate: boolean, skipped = 0): { exitCode: 0 | 1; lines: string[] } {
+  if (!gate) return { exitCode: 0, lines: [] };
+  const lines = gateMisses(m, skipped).map((l) => `gate: ${l}`);
+  return { exitCode: lines.length ? 1 : 0, lines };
+}
+
 export function toRow(r: CaseResult): CaseRow {
   const g = r.grades;
   const problems = g

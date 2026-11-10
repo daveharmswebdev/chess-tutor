@@ -191,7 +191,8 @@ describe("review 038 of #29 (round 2)", () => {
   });
 
   it("keeps whole-pawn evaluations that a lead word frames", () => {
-    expect(quotes("White is up 2 pawns.").map((q) => q.cp)).toEqual([200]);
+    // "up 2 pawns" alone is material since brief 049 (#29); an advantage word still frames an evaluation.
+    expect(quotes("White has an advantage of 2 pawns.").map((q) => q.cp)).toEqual([200]);
     expect(quotes("You are better by 1 here.").map((q) => q.cp)).toEqual([100]);
   });
 
