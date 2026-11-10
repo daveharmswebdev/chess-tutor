@@ -1,8 +1,11 @@
 import Fastify, { type FastifyInstance, type FastifyServerOptions } from "fastify";
 import type { ServerResponse } from "node:http";
+import fastifyStatic from "@fastify/static";
 import type { ApiError, GameEvent, SparringBot } from "@chess-tutor/chess-core";
 import type { CoachingDeps } from "./coaching.ts";
 import { createGameManager, GameError, type GameManager } from "./games.ts";
+import type { HealthProbe } from "./health.ts";
+import { checkWebDist, isApiPath } from "./static.ts";
 import type { GameStore } from "./store.ts";
 
 export type { CoachingDeps } from "./coaching.ts";
@@ -18,6 +21,13 @@ export interface ServerDeps {
   logger?: FastifyServerOptions["logger"];
   /** SSE keep-alive comment interval. */
   keepAliveMs?: number;
+  /** GET /api/health (NFR-13). Without it, health reports 503 "no health probe configured". */
+  health?: HealthProbe;
+  /**
+   * Absolute directory of the built web app (see resolveWebDist). When set, it is served
+   * at / with an SPA fallback to index.html for non-/api GETs. Must hold index.html.
+   */
+  webDist?: string;
 }
 
 const DEFAULT_KEEP_ALIVE_MS = 15_000;
@@ -72,8 +82,25 @@ export function buildServer(deps: ServerDeps): { app: FastifyInstance; games: Ga
     return reply.status(status).send(apiError(err.message));
   });
 
+  // Static web build (architecture §6.1): files at /, index.html for any other non-/api
+  // GET or HEAD (SPA fallback). /api/* and other methods keep the JSON 404.
+  const webDist = deps.webDist;
+  if (webDist !== undefined) {
+    checkWebDist(webDist);
+    void app.register(fastifyStatic, { root: webDist });
+  }
+
   app.setNotFoundHandler((request, reply) => {
-    reply.status(404).send(apiError(`no route ${request.method} ${request.url}`));
+    const method = request.method;
+    if (webDist !== undefined && (method === "GET" || method === "HEAD") && !isApiPath(request.url)) {
+      return reply.status(200).sendFile("index.html");
+    }
+    return reply.status(404).send(apiError(`no route ${method} ${request.url}`));
+  });
+
+  app.get("/api/health", async (_request, reply) => {
+    const status = deps.health ? await deps.health() : { ok: false as const, reason: "no health probe configured" };
+    return reply.status(status.ok ? 200 : 503).send(status);
   });
 
   app.post("/api/games", async (request, reply) => {
