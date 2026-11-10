@@ -93,6 +93,16 @@ describe("analyze_position (FR-16)", () => {
 });
 
 describe("evaluate_move (FR-17)", () => {
+  it("records the played_eval it shows when the move ends the game (review 047 minor 4)", async () => {
+    // White: Kg6, Qf5; Black: Kh8. Qf7 stalemates.
+    const fen = "7k/8/6K1/5Q2/8/8/8/8 w - - 0 1";
+    const c = ctx({ engine: fakeEngine({ [fen]: [{ moves: ["f5c8"], cp: 500 }] }).engine });
+    const r = (await runTool("evaluate_move", { fen, move: "Qf7" }, c)) as any;
+    expect(r.game_over_after_move).toBe(true);
+    expect(r.played_eval).toEqual({ eval_cp: 0, mate_in: null });
+    expect(c.evidence.backsEntry({ side: "white", cp: 0, mate: null })).toBe(true);
+  });
+
   const lines = {
     [FEN]: [{ moves: ["e2e3", "e7e6"], cp: 40 }],
     [fenAfter([...HISTORY, "b1c3"])]: [{ moves: ["c8f5", "e2e3"], cp: -30 }],

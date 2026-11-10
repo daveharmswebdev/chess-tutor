@@ -435,3 +435,72 @@ describe("checkClaims: false alarms on moves of the game (#26 round 1, review 03
     expect(checkClaims(reply("White is fine, so O-O now."), e, fen).length).toBeGreaterThan(0);
   });
 });
+
+describe("review 047 fixes (FR-8, FR-10, NFR-6, #26, #28)", () => {
+  const reply = (over: Partial<TutorDraft>): TutorDraft => ({
+    schemaVersion: 1,
+    kind: "hint",
+    message: "What now?",
+    reveal: null,
+    revealMove: null,
+    arrows: [],
+    evals: [],
+    ...over,
+  });
+
+  describe("major 1: a mention whose named mover is the opponent is no give-away", () => {
+    // 1.d4 Nf6 2.c4 g6 3.Nc3 Bg7 4.e4 d6 5.e5, Black to move; the answer is dxe5.
+    const history = ["d2d4", "g8f6", "c2c4", "g7g6", "b1c3", "f8g7", "e2e4", "d7d6", "e4e5"];
+    const fen = fenAfter(history);
+    const evidence = () => {
+      const e = buildEvidence({ kind: "hint", fen, history });
+      e.addLine(fen, ["d6e5"]);
+      return e;
+    };
+
+    it("passes the po-kid-e5-push message (White's pawn to e5 is the opponent's move)", () => {
+      const message =
+        "White pushed a pawn to e5, deep into your side of the board. Look at that pawn. Who defends it, and can one of your pawns challenge it?";
+      expect(checkClaims(reply({ message, revealMove: "d6e5" }), evidence(), fen, "b")).toEqual([]);
+    });
+
+    it("still rejects the mention with no side named, or with the player's side named", () => {
+      for (const message of ["What about the pawn to e5?", "Can your pawn to e5 help?", "Can Black play dxe5 now?"]) {
+        expect(checkClaims(reply({ message, revealMove: "d6e5" }), evidence(), fen, "b").join(" "), message).toMatch(/gives the answer away/);
+      }
+    });
+  });
+
+  describe("major 2: a signed mate quote keeps its sign (White's view)", () => {
+    const history = ["d2d4", "d7d5"];
+    const fen = fenAfter(history);
+    const e = () => {
+      const ev = buildEvidence({ kind: "hint", fen, history });
+      ev.addScore(mate(-3));
+      return ev;
+    };
+    const evals = [BM(3)];
+
+    it("rejects +M3 when Black mates, passes -M3 and an unsigned mate in 3", () => {
+      expect(checkClaims(reply({ message: "White is +M3 here.", evals }), e(), fen).join(" ")).toMatch(/quotes the evaluation "\+M3"/);
+      expect(checkClaims(reply({ message: "Black mates: -M3.", evals }), e(), fen)).toEqual([]);
+      expect(checkClaims(reply({ message: "Black mates: −M3.", evals }), e(), fen)).toEqual([]);
+      expect(checkClaims(reply({ message: "Black has mate in 3.", evals }), e(), fen)).toEqual([]);
+    });
+
+    it("keeps the sign in extractEvals", () => {
+      expect(extractEvals("-M4")).toEqual([{ raw: "-M4", quote: { kind: "mate", n: 4, white: -4 } }]);
+      expect(extractEvals("+M4")[0]!.quote).toEqual({ kind: "mate", n: 4, white: 4 });
+      expect(extractEvals("M4")[0]!.quote).toEqual({ kind: "mate", n: 4, white: null });
+    });
+  });
+
+  it("minor 3: reads an en dash as a minus sign", () => {
+    const history = ["d2d4", "d7d5"];
+    const fen = fenAfter(history);
+    const ev = buildEvidence({ kind: "hint", fen, history });
+    ev.addScore(cp(150));
+    expect(checkClaims(reply({ message: "White is –1.5.", evals: [W(150)] }), ev, fen).join(" ")).toMatch(/quotes the evaluation "–1\.5"/);
+    expect(checkClaims(reply({ message: "White is +1.5.", evals: [W(150)] }), ev, fen)).toEqual([]);
+  });
+});

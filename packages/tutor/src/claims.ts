@@ -133,17 +133,18 @@ export interface EvalMention {
   quote:
     | { kind: "signed"; cp: number; tolerance: number } // White's point of view
     | { kind: "size"; cp: number; tolerance: number } // no sign: a size, either side
-    | { kind: "mate"; n: number };
+    | { kind: "mate"; n: number; white: number | null }; // white: a signed "+M3" / "-M3" in White's view
 }
 
 /**
  * Evaluation-like numbers in prose (#26). Every one must be backed by an entry in `evals`.
  *
  * A number is evaluation-like when it is
- * - signed: "+0.4", "-1.5", "−2", "+2 pawns", "+150 cp";
+ * - signed: "+0.4", "-1.5", "−2", "–2" (en dash), "+2 pawns", "+150 cp";
  * - a decimal with "pawn(s)" or no unit: "1.5 pawns", "a 1.5-pawn edge", "the engine gives 1.8";
  * - in centipawns: "150 cp", "90 centipawns";
- * - a mate: "mate in 3", "mated in 3", "M3", "#3".
+ * - a mate: "mate in 3", "mated in 3", "M3", "#3"; a signed one ("+M3", "-M3") is read from
+ *   White's point of view like a signed number: +M3 = White mates in 3, -M3 = Black does.
  * Not evaluation-like: a whole number of pawns without a sign ("up 2 pawns in material", "down
  * 1 pawn": material counts), any other whole number ("3 moves", "move 12"), clock and score
  * phrases ("10.5 seconds", "1:30", "0.5 points", "2.5/3", "1-0", "1/2-1/2"), percentages, and
@@ -153,15 +154,20 @@ export interface EvalMention {
  * `tolerance` is the rounding of the written number: half its last digit ("+1.5" covers 145 to
  * 155 cp, "+2" covers 150 to 250, "150 cp" is exact).
  */
-const NUMBER = /(?<![\w.\/:+\-−])([+\-−])?(\d+(?:\.(\d+))?)(?!\d|\.\d|%|\/|:\d)/g;
+const NUMBER = /(?<![\w.\/:+\-−–])([+\-−–])?(\d+(?:\.(\d+))?)(?!\d|\.\d|%|\/|:\d)/g;
 const EVAL_UNIT = /^\s*(?:-\s*)?(cp|centipawns?|pawns?)\b/i;
 const OTHER_UNIT = /^\s*(?:-\s*)?(?:s|secs?|seconds?|mins?|minutes?|hours?|hrs?|ms|points?|pts|percent)\b/i;
-const MATE_QUOTES = [/\bmated? in (\d+)\b/gi, /(?<![\w#])[+\-−]?M(\d+)\b/g, /(?<![\w#])#(\d+)\b/g];
+const MATE_QUOTES = [/\bmated? in (\d+)\b/gi, /(?<![\w#])([+\-−–]?)M(\d+)\b/g, /(?<![\w#])#(\d+)\b/g];
 
 export function extractEvals(text: string): EvalMention[] {
   const found: (EvalMention & { start: number; end: number })[] = [];
   for (const re of MATE_QUOTES) {
-    for (const m of text.matchAll(re)) found.push({ raw: m[0], start: m.index, end: m.index + m[0].length, quote: { kind: "mate", n: Number(m[1]) } });
+    for (const m of text.matchAll(re)) {
+      const sign = m.length > 2 ? m[1] : "";
+      const n = Number(m[m.length - 1]);
+      const white = sign ? (sign === "+" ? n : -n) : null;
+      found.push({ raw: m[0], start: m.index, end: m.index + m[0].length, quote: { kind: "mate", n, white } });
+    }
   }
   for (const m of text.matchAll(NUMBER)) {
     const [num, sign, digits, decimals] = m as unknown as [string, string | undefined, string, string | undefined];
@@ -195,7 +201,10 @@ function listed(quote: EvalMention["quote"], evals: EvalEntry[]): boolean {
   const near = (a: number, b: number, tol: number) => Math.abs(a - b) <= tol + 1e-9;
   return evals.some((e) => {
     const white = e.side === "white" ? 1 : -1;
-    if (quote.kind === "mate") return e.mate !== null && Math.abs(e.mate) === quote.n;
+    if (quote.kind === "mate") {
+      if (e.mate === null) return false;
+      return quote.white !== null ? white * e.mate === quote.white : Math.abs(e.mate) === quote.n;
+    }
     if (e.cp === null) return false;
     if (quote.kind === "signed") return near(quote.cp, white * e.cp, quote.tolerance);
     return near(quote.cp, Math.abs(e.cp), quote.tolerance);
@@ -356,7 +365,12 @@ export function checkClaims(reply: TutorDraft, evidence: Evidence, revealFen: st
       if (!evidence.backsMove(revealFen, uci)) {
         problems.push(`revealMove "${uci}" (${move.san}) is not backed by this turn's tool results or the key-moment data for this position.`);
       }
+      // A mention whose named mover is the side not to move here describes the opponent's move
+      // ("White pushed a pawn to e5"), not the answer (review 047).
+      const toMove = sideToMove(revealFen);
       const named = findMentions(reply.message).some((m) => {
+        const mover = moverOf(reply.message.slice(0, m.start), playerColor);
+        if (mover !== null && mover !== toMove) return false;
         const board = boardOf(revealFen);
         return board !== null && m.resolve(board).includes(uci);
       });
