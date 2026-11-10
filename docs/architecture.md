@@ -218,6 +218,19 @@ SQLite through Node's built-in `node:sqlite` (`DatabaseSync`, no native dependen
 | Team Claude Code settings | `.claude/settings.json`, `CLAUDE.md` | yes |
 | Personal Claude Code settings | `.claude/settings.local.json`, `CLAUDE.local.md` | **no** |
 
+### 6.1 Deployment (Render), covering NFR-13 (#12)
+
+*Decided 2026-11-10 (user, on #12): one paid web service with a persistent disk; Postgres waits for multi-user or v2.*
+
+- **One process serves everything.** `apps/server` serves the API under `/api/*` and, when `WEB_DIST` names a directory (a relative path resolves against the repository root, since `pnpm --filter` starts the server in `apps/server`), the built `apps/web` (`vite build` → `apps/web/dist`) as static files at `/`. A `GET` for any other non-`/api` path returns `index.html` (SPA fallback). `/api/*` routes that don't exist stay JSON 404s. No CORS, since there's one origin. Local dev is unchanged: the Vite proxy, and no `WEB_DIST`.
+- **Health check:** `GET /api/health` returns `200 { ok: true, engine: "ready" }` once Stockfish has answered a shallow search (depth 1 on the start position, at most 5 s) and the store is open, and `503 { ok: false, reason }` otherwise. It goes through the engine's normal queue (one search at a time per process), so it must stay cheap. Render's `healthCheckPath` points at it.
+- **Blueprint:** `render.yaml` at the repo root. Node runtime, `plan: starter` (free instances can't have a disk), one instance. Disk `chess-tutor-data` at `/var/data`, 1 GB, with `DB_PATH=/var/data/chess-tutor.sqlite`. `HOST=0.0.0.0`; Render sets `PORT`. Build: `pnpm install --frozen-lockfile && pnpm --filter @chess-tutor/web build`. Start: `pnpm --filter @chess-tutor/server start`. `autoDeployTrigger: checksPass`, so `main` deploys only after CI is green.
+- **Secrets:** `ANTHROPIC_API_KEY` and `LICHESS_TOKEN` are `sync: false` in the Blueprint and get set in the Render dashboard (NFR-12). Without them the game still runs: coaching is off, and the explorer works unauthenticated or degrades (NFR-9).
+- **Engine:** WASM Stockfish (the default; no `STOCKFISH_PATH`).
+- **Constraints, accepted:** a disk means one instance and no zero-downtime deploys (a short restart on each deploy). Disk snapshots are daily.
+- **Licence (spike 001):** Stockfish is GPL-3.0. Running it as a network service isn't distribution, and the repository is public anyway, so the source is available.
+- **Creating the service is the user's click**: Render dashboard → New → Blueprint → this repository.
+
 ## 7. Testing
 
 - **Vitest** everywhere.

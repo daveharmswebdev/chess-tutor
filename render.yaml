@@ -1,0 +1,32 @@
+# Render Blueprint (#12, NFR-13). Design: docs/architecture.md §6.1.
+# One web service with a persistent disk for the SQLite file. Create it once from the
+# Render dashboard (New → Blueprint → this repository); after that, main deploys
+# itself when CI passes.
+services:
+  - type: web
+    name: chess-tutor
+    runtime: node
+    plan: starter # free instances can't attach a disk
+    numInstances: 1 # a disk allows only one instance
+    buildCommand: pnpm install --frozen-lockfile && pnpm --filter @chess-tutor/web build
+    startCommand: pnpm --filter @chess-tutor/server start
+    healthCheckPath: /api/health
+    autoDeployTrigger: checksPass
+    disk:
+      name: chess-tutor-data
+      mountPath: /var/data
+      sizeGB: 1
+    envVars:
+      - key: NODE_VERSION
+        value: "22"
+      - key: HOST
+        value: 0.0.0.0
+      - key: DB_PATH
+        value: /var/data/chess-tutor.sqlite
+      - key: WEB_DIST
+        value: apps/web/dist
+      # Secrets: set in the Render dashboard, never in this file (NFR-12).
+      - key: ANTHROPIC_API_KEY
+        sync: false
+      - key: LICHESS_TOKEN
+        sync: false
