@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { TutorReply } from "../src/contract.ts";
-import { TUTOR_REPLY_JSON_SCHEMA, parseReply } from "../src/schema.ts";
+import { EvalEntry, TUTOR_REPLY_JSON_SCHEMA, TutorDraft, parseReply } from "../src/schema.ts";
 
 type Node = Record<string, unknown>;
 
@@ -22,11 +22,23 @@ describe("TutorReply JSON Schema (spike 003)", () => {
         expect([...(n.required as string[])].sort()).toEqual(Object.keys(n.properties as Node).sort());
       }
     });
-    expect(objects).toBe(2);
+    expect(objects).toBe(3);
   });
 
-  it("has the same fields as the zod TutorReply", () => {
-    expect(Object.keys(TUTOR_REPLY_JSON_SCHEMA.properties).sort()).toEqual(Object.keys(TutorReply.shape).sort());
+  it("has the same fields as the zod draft type (TutorReply plus evals, #26)", () => {
+    expect(Object.keys(TUTOR_REPLY_JSON_SCHEMA.properties).sort()).toEqual(Object.keys(TutorDraft.shape).sort());
+    expect(Object.keys(TutorDraft.shape).sort()).toEqual([...Object.keys(TutorReply.shape), "evals"].sort());
+    const item = TUTOR_REPLY_JSON_SCHEMA.properties.evals.items;
+    expect(Object.keys(item.properties).sort()).toEqual(Object.keys(EvalEntry.shape).sort());
+    expect(item.properties.side.enum).toEqual(EvalEntry.shape.side.options);
+    expect(item.properties.cp).toEqual({ anyOf: [{ type: "integer" }, { type: "null" }] });
+    expect(item.properties.mate).toEqual({ anyOf: [{ type: "integer" }, { type: "null" }] });
+    expect(TUTOR_REPLY_JSON_SCHEMA.required).toContain("evals");
+  });
+
+  it("keeps the public TutorReply without evals (schemaVersion 1)", () => {
+    expect(Object.keys(TutorReply.shape)).not.toContain("evals");
+    expect(TUTOR_REPLY_JSON_SCHEMA.properties.schemaVersion).toEqual({ type: "integer", enum: [1] });
   });
 
   it("writes nullable fields as anyOf [T, null] and uses no unsupported constraints", () => {
@@ -42,7 +54,7 @@ describe("TutorReply JSON Schema (spike 003)", () => {
 });
 
 describe("parseReply (NFR-8)", () => {
-  const good = { schemaVersion: 1, kind: "hint", message: "Q?", reveal: null, revealMove: null, arrows: [] };
+  const good = { schemaVersion: 1, kind: "hint", message: "Q?", reveal: null, revealMove: null, arrows: [], evals: [] };
 
   it("accepts a valid reply and normalises kind case", () => {
     expect(parseReply(JSON.stringify(good), "hint")).toEqual({ ok: true, reply: good });
@@ -60,5 +72,30 @@ describe("parseReply (NFR-8)", () => {
     const offBoard = { ...good, arrows: [{ from: "e2", to: "e9" }] };
     expect(parseReply(JSON.stringify(offBoard), "hint")).toMatchObject({ ok: true });
     expect(parseReply(JSON.stringify(good), "player_blunder")).toMatchObject({ ok: false, problem: expect.stringMatching(/kind/) });
+  });
+});
+
+describe("parseReply: the evals field (#26)", () => {
+  const good = { schemaVersion: 1, kind: "hint", message: "Q?", reveal: null, revealMove: null, arrows: [], evals: [] };
+
+  it("accepts entries with exactly one of cp and mate", () => {
+    const evals = [
+      { side: "white", cp: 35, mate: null },
+      { side: "black", cp: null, mate: 3 },
+    ];
+    expect(parseReply(JSON.stringify({ ...good, evals }), "hint")).toEqual({ ok: true, reply: { ...good, evals } });
+  });
+
+  it("rejects a missing evals, both or neither of cp and mate, a non-integer and an unknown side", () => {
+    const { evals: _drop, ...noEvals } = good;
+    expect(parseReply(JSON.stringify(noEvals), "hint")).toMatchObject({ ok: false, problem: expect.stringMatching(/evals/) });
+    for (const e of [
+      { side: "white", cp: 35, mate: 2 },
+      { side: "white", cp: null, mate: null },
+      { side: "white", cp: 1.5, mate: null },
+      { side: "you", cp: 35, mate: null },
+    ]) {
+      expect(parseReply(JSON.stringify({ ...good, evals: [e] }), "hint"), JSON.stringify(e)).toMatchObject({ ok: false, problem: expect.stringMatching(/evals/) });
+    }
   });
 });

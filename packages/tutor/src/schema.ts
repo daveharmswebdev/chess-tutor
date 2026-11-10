@@ -1,10 +1,35 @@
+import { z } from "zod";
 import { TutorReply } from "./contract.ts";
 
 /**
- * TutorReply as the JSON Schema sent in output_config.format, written by hand so its shape is
+ * One evaluation the tutor quotes (#26): `side`'s point of view, positive = good for that side.
+ * Exactly one of `cp` (centipawns) and `mate` (mate in N; positive = `side` mates) is a number.
+ */
+export const EvalEntry = z
+  .object({
+    side: z.enum(["white", "black"]),
+    cp: z.number().int().nullable(),
+    mate: z.number().int().nullable(),
+  })
+  .refine((e) => (e.cp === null) !== (e.mate === null), { message: "exactly one of cp and mate must be a number, the other null" });
+export type EvalEntry = z.infer<typeof EvalEntry>;
+
+/**
+ * The reply as the MODEL writes it (#26): the public TutorReply plus `evals`, every evaluation
+ * the text quotes. The claims check uses `evals`; session.ts strips it before the reply leaves
+ * the package, so the public TutorReply (contract.ts, schemaVersion 1) is unchanged.
+ */
+export const TutorDraft = TutorReply.extend({ evals: z.array(EvalEntry) });
+export type TutorDraft = z.infer<typeof TutorDraft>;
+
+const nullableInteger = { anyOf: [{ type: "integer" }, { type: "null" }] } as const;
+
+/**
+ * TutorDraft as the JSON Schema sent in output_config.format, written by hand so its shape is
  * exactly what spike 003 requires: every object closed and every property required, nullable
- * fields as anyOf [T, null], and no unsupported constraints (arrows.max(3) is checked by zod
- * after the reply arrives). schema.test.ts checks it against the zod TutorReply.
+ * fields as anyOf [T, null], and no unsupported constraints (arrows.max(3) and the evals
+ * one-of-cp-or-mate rule are checked by zod after the reply arrives). schema.test.ts checks it
+ * against the zod TutorDraft.
  */
 export const TUTOR_REPLY_JSON_SCHEMA = {
   type: "object",
@@ -23,12 +48,25 @@ export const TUTOR_REPLY_JSON_SCHEMA = {
         additionalProperties: false,
       },
     },
+    evals: {
+      type: "array",
+      items: {
+        type: "object",
+        properties: {
+          side: { type: "string", enum: [...EvalEntry.shape.side.options] },
+          cp: nullableInteger,
+          mate: nullableInteger,
+        },
+        required: ["side", "cp", "mate"],
+        additionalProperties: false,
+      },
+    },
   },
-  required: ["schemaVersion", "kind", "message", "reveal", "revealMove", "arrows"],
+  required: ["schemaVersion", "kind", "message", "reveal", "revealMove", "arrows", "evals"],
   additionalProperties: false,
 } as const;
 
-export type ParsedReply = { ok: true; reply: TutorReply } | { ok: false; problem: string };
+export type ParsedReply = { ok: true; reply: TutorDraft } | { ok: false; problem: string };
 
 const SQUARE = /^[a-h][1-8]$/;
 
@@ -51,7 +89,7 @@ export function parseReply(text: string, expectedKind: TutorReply["kind"]): Pars
     const r = raw as { kind: string };
     raw = { ...r, kind: r.kind.trim().toLowerCase().replace(/[\s-]+/g, "_") };
   }
-  const parsed = TutorReply.safeParse(raw);
+  const parsed = TutorDraft.safeParse(raw);
   if (!parsed.success) {
     const issues = parsed.error.issues.map((i) => `${i.path.join(".") || "(root)"}: ${i.message}`).join("; ");
     return { ok: false, problem: `Your reply did not match the schema: ${issues}.` };
@@ -67,7 +105,13 @@ export function parseReply(text: string, expectedKind: TutorReply["kind"]): Pars
  * FR-11: drops arrows that are not between two different real squares (h7->h7, e2->e9). They
  * cannot be drawn and are not worth a correction round; the rest of the reply stays as it is.
  */
-export function dropMalformedArrows(reply: TutorReply): TutorReply {
+export function dropMalformedArrows<T extends Pick<TutorReply, "arrows">>(reply: T): T {
   const arrows = reply.arrows.filter((a) => SQUARE.test(a.from) && SQUARE.test(a.to) && a.from !== a.to);
   return arrows.length === reply.arrows.length ? reply : { ...reply, arrows };
+}
+
+/** The public TutorReply: the draft without `evals` (#26). */
+export function publicReply(draft: TutorDraft): TutorReply {
+  const { evals: _evals, ...reply } = draft;
+  return reply;
 }

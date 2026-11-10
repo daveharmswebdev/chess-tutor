@@ -379,8 +379,28 @@ describe("failure reasons: ask() never throws", () => {
 
   it("an unbacked move twice -> unsupported_claim; the correction names the move", async () => {
     const bad = { ...BLUNDER_REPLY, message: "Why not Nh4 instead?" };
-    const { calls } = await fails([endTurnMsg(bad), endTurnMsg(bad)], "unsupported_claim");
+    const { out, calls } = await fails([endTurnMsg(bad), endTurnMsg(bad)], "unsupported_claim");
     expect(JSON.stringify(calls[1]!.params.messages.at(-1))).toContain("Nh4");
+    if (!out.ok) expect(out.message).toMatch(/a move or evaluation/);
+  });
+
+  it("an unbacked evaluation twice -> unsupported_claim, named as a move or evaluation (#26)", async () => {
+    const bad = { ...BLUNDER_REPLY, message: "White is +9.9 here." };
+    const { out, calls } = await fails([endTurnMsg(bad), endTurnMsg(bad)], "unsupported_claim");
+    expect(JSON.stringify(calls[1]!.params.messages.at(-1))).toMatch(/Your last reply was not accepted.*quotes the evaluation/);
+    if (!out.ok) expect(out.message).toMatch(/a move or evaluation/);
+  });
+
+  it("an evals entry the engine did not give twice -> unsupported_claim (#26)", async () => {
+    const bad = { ...SIMPLE_REPLY, evals: [{ side: "white", cp: 250, mate: null }] };
+    const { calls } = await fails([endTurnMsg(bad), endTurnMsg(bad)], "unsupported_claim");
+    expect(JSON.stringify(calls[1]!.params.messages.at(-1))).toMatch(/evals quotes the evaluation/);
+  });
+
+  it("a reply without the evals field -> invalid_reply (#26)", async () => {
+    const bad = { ...SIMPLE_REPLY, evals: undefined };
+    const { calls } = await fails([endTurnMsg(bad), endTurnMsg(bad)], "invalid_reply");
+    expect(JSON.stringify(calls[1]!.params.messages.at(-1))).toMatch(/evals/);
   });
 
   it("an unbacked move once, then a backed reply -> ok", async () => {
@@ -545,3 +565,29 @@ async function waitFor(cond: () => boolean) {
   for (let i = 0; i < 100 && !cond(); i++) await new Promise((r) => setTimeout(r, 1));
   expect(cond()).toBe(true);
 }
+
+describe("the evals field stays inside the package (#26)", () => {
+  it("checks a listed evaluation against the tool results, then strips evals from the reply", async () => {
+    const reply = {
+      ...BLUNDER_REPLY,
+      message: "The engine had White at +0.3 before your knight move. After Qb6, what happens to the pawn on b2?",
+      evals: [{ side: "white", cp: 30, mate: null }],
+    };
+    const { s, calls } = session([keyMomentToolUse(), endTurnMsg(reply)]);
+    const out = await s.ask(KEY_REQUEST, noop);
+    expect(out.ok).toBe(true);
+    if (!out.ok) return;
+    expect(Object.keys(out.reply)).not.toContain("evals");
+    expect(out.reply).toEqual({ ...BLUNDER_REPLY, message: reply.message });
+    expect(calls).toHaveLength(2);
+  });
+
+  it("sends evals as a required field of the output schema and never returns it", async () => {
+    const { s, calls } = session([endTurnMsg(SIMPLE_REPLY)]);
+    const out = await s.ask(KEY_REQUEST, noop);
+    expect(out.ok).toBe(true);
+    if (out.ok) expect(Object.keys(out.reply)).not.toContain("evals");
+    const params = calls[0]!.params as unknown as { output_config: { format: { schema: typeof TUTOR_REPLY_JSON_SCHEMA } } };
+    expect(params.output_config.format.schema.required).toContain("evals");
+  });
+});

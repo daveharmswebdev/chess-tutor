@@ -1,5 +1,6 @@
-import type { Score } from "@chess-tutor/chess-core";
+import type { Color, Score } from "@chess-tutor/chess-core";
 import { boardOf, playUci, uciOf, type MovePair } from "./chess-util.ts";
+import type { EvalEntry } from "./schema.ts";
 
 /** A position without its move counters: placement, side to move, castling, en passant. */
 export function positionKey(fen: string): string {
@@ -16,16 +17,21 @@ export function positionKey(fen: string): string {
  *   Black's O-O, and an engine line's third ply is backed only after its first two.
  * - history moves: (position, UCI) pairs of the game so far. They let the tutor mention a
  *   move already played, but never back a move in the current (focus) position.
- * - scores: absolute centipawn values and mate distances from tool results and the key moment,
- *   for checking quoted evaluations.
+ * - scores (#26): engine scores from tool results, signed and White-relative as the engine
+ *   gives them (centipawns, or mate in N with positive = White mates). They back the reply's
+ *   `evals` entries, exactly.
+ * - deltas: centipawn changes, not standings (evaluate_move's cp_loss, the key moment's cpLoss
+ *   and gainCp). They back nothing; the claims check only uses them to explain a rejection.
  */
 export class Evidence {
   private readonly positions = new Map<string, string>(); // key -> full FEN
   private readonly focus = new Set<string>();
   private readonly backed = new Set<string>();
   private readonly history = new Set<string>();
-  private readonly cps: number[] = [];
+  private readonly historyPlies: { fen: string; uci: string }[] = [];
+  private readonly cps = new Set<number>();
   private readonly mates = new Set<number>();
+  private readonly deltas = new Set<number>();
 
   addPosition(fen: string): void {
     const board = boardOf(fen);
@@ -54,7 +60,21 @@ export class Evidence {
 
   /** A move of the game, backed for mentions of what was played (not for the focus position). */
   addHistoryMove(fen: string, uci: string): void {
-    this.play(fen, [uci], this.history);
+    const pair = this.play(fen, [uci], this.history)[0];
+    if (pair) this.historyPlies.push({ fen: boardOf(fen)!.fen(), uci: pair.uci });
+  }
+
+  /**
+   * The game's move at move number `moveNumber` for `color` ("3.Bf4" is 3 / w, "3...Bg7" is
+   * 3 / b), read from the move counters of the history positions. Null when there is none.
+   */
+  historyPly(moveNumber: number, color: Color): { fen: string; uci: string } | null {
+    return (
+      this.historyPlies.find((p) => {
+        const parts = p.fen.split(" ");
+        return parts[1] === color && Number(parts[5]) === moveNumber;
+      }) ?? null
+    );
   }
 
   backsMove(fen: string, uci: string): boolean {
@@ -69,27 +89,31 @@ export class Evidence {
     return [...this.positions.values()];
   }
 
+  /** An engine score, White-relative as the engine gives it (chess-core Score). */
   addScore(score: Score): void {
-    if (score.kind === "mate") this.addMate(score.value);
-    else this.addCp(score.value);
+    if (!Number.isFinite(score.value)) return;
+    (score.kind === "mate" ? this.mates : this.cps).add(score.value + 0); // + 0 turns -0 into 0
   }
 
-  addCp(cp: number): void {
-    if (Number.isFinite(cp)) this.cps.push(Math.abs(cp));
+  /** A centipawn change (a move's loss or gain), not a standing: it backs no evals entry. */
+  addDelta(cp: number): void {
+    if (Number.isFinite(cp)) this.deltas.add(Math.abs(cp));
   }
 
-  addMate(n: number): void {
-    if (Number.isFinite(n)) this.mates.add(Math.abs(n));
+  isDelta(cp: number): boolean {
+    return this.deltas.has(Math.abs(cp));
   }
 
   /**
-   * A quoted evaluation is backed when it is within EVAL_TOLERANCE_CP of a backed score in
-   * absolute value (either side's point of view), or, for mate in N, when N matches exactly.
+   * An `evals` entry is backed when, converted to White's point of view, it is exactly an engine
+   * score of the same kind from this turn (#26): {black, cp 150} needs a score of -150, and
+   * {black, mate 3} needs mate -3 (Black mates in 3). No tolerance: the tutor copies the number.
    */
-  backsEval(quote: { cp: number } | { mate: number }): boolean {
-    if ("mate" in quote) return this.mates.has(Math.abs(quote.mate));
-    const q = Math.abs(quote.cp);
-    return this.cps.some((s) => Math.abs(s - q) <= EVAL_TOLERANCE_CP + 1e-9);
+  backsEntry(entry: EvalEntry): boolean {
+    const sign = entry.side === "white" ? 1 : -1;
+    if (entry.cp !== null) return this.cps.has(sign * entry.cp + 0);
+    if (entry.mate !== null) return this.mates.has(sign * entry.mate + 0);
+    return false;
   }
 
   private play(fen: string, line: string[], into: Set<string>): MovePair[] {
@@ -109,6 +133,3 @@ export class Evidence {
     return pairs;
   }
 }
-
-/** 0.3 pawns: engine scores drift between depths, and the tutor rounds. */
-export const EVAL_TOLERANCE_CP = 30;

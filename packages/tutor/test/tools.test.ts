@@ -57,8 +57,11 @@ describe("analyze_position (FR-16)", () => {
     // Each ply is backed in the position it is played from, not anywhere else.
     expect(c.evidence.backsMove(fenAfter([...HISTORY, "e2e3"]), "e7e6")).toBe(true);
     expect(c.evidence.backsMove(FEN, "e7e6")).toBe(false);
-    expect(c.evidence.backsEval({ cp: 35 })).toBe(true);
-    expect(c.evidence.backsEval({ cp: 20 })).toBe(true);
+    // Scores are kept signed, White-relative (#26): an evals entry must name the right side.
+    expect(c.evidence.backsEntry({ side: "white", cp: 35, mate: null })).toBe(true);
+    expect(c.evidence.backsEntry({ side: "black", cp: -20, mate: null })).toBe(true);
+    expect(c.evidence.backsEntry({ side: "black", cp: 20, mate: null })).toBe(false);
+    expect(c.evidence.backsEntry({ side: "white", cp: 30, mate: null })).toBe(false);
   });
 
   it("uses smaller requested values and config defaults", async () => {
@@ -106,8 +109,12 @@ describe("evaluate_move (FR-17)", () => {
     expect(c.evidence.backsMove(fenAfter([...HISTORY, "b1c3"]), "c8f5")).toBe(true);
     expect(c.evidence.backsMove(FEN, "b1c3")).toBe(true);
     expect(c.evidence.backsMove(FEN, "c8f5")).toBe(false);
-    expect(c.evidence.backsEval({ cp: 70 })).toBe(true); // the cp_loss
-    expect(c.evidence.backsEval({ cp: 30 })).toBe(true); // the eval after Nc3
+    // The scores before (+40) and after Nc3 (-30), White-relative; cp_loss is a change, not a standing (#26).
+    expect(c.evidence.backsEntry({ side: "white", cp: 40, mate: null })).toBe(true);
+    expect(c.evidence.backsEntry({ side: "white", cp: -30, mate: null })).toBe(true);
+    expect(c.evidence.backsEntry({ side: "black", cp: 30, mate: null })).toBe(true);
+    expect(c.evidence.backsEntry({ side: "white", cp: 70, mate: null })).toBe(false);
+    expect(c.evidence.isDelta(70)).toBe(true);
   });
 
   it("accepts UCI and reports zero loss for the best move", async () => {

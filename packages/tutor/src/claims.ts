@@ -1,7 +1,8 @@
+import type { Color } from "@chess-tutor/chess-core";
 import type { Chess } from "chess.js";
-import { boardOf, isUci, normalizeSan, playSan, playUci, uciOf } from "./chess-util.ts";
-import type { TutorReply } from "./contract.ts";
+import { boardOf, isUci, normalizeSan, playSan, playUci, sideToMove, uciOf } from "./chess-util.ts";
 import { positionKey, type Evidence } from "./evidence.ts";
+import type { EvalEntry, TutorDraft } from "./schema.ts";
 
 /**
  * The FR-10 check: the tutor may only name moves and evaluations that this turn's tool results
@@ -126,71 +127,195 @@ export function extractMoveTokens(text: string): string[] {
   return findMentions(text).map((m) => m.raw);
 }
 
+/** An evaluation quoted in prose, as the claims check reads it (#26). */
 export interface EvalMention {
   raw: string;
-  quote: { cp: number } | { mate: number };
+  quote:
+    | { kind: "signed"; cp: number; tolerance: number } // White's point of view
+    | { kind: "size"; cp: number; tolerance: number } // no sign: a size, either side
+    | { kind: "mate"; n: number };
 }
 
 /**
- * Quoted evaluations: signed numbers (+4.2, -1.5: pawns), "N.N pawns", "N pawns up/down/ahead/
- * behind/better/worse", centipawns ("150 cp", "90 centipawns"), "mate in N" and "M3". Plain
- * numbers (3 moves, move 12, 1-0, 20%) and words ("two pawns up") are not evaluations here.
+ * Evaluation-like numbers in prose (#26). Every one must be backed by an entry in `evals`.
+ *
+ * A number is evaluation-like when it is
+ * - signed: "+0.4", "-1.5", "−2", "+2 pawns", "+150 cp";
+ * - a decimal with "pawn(s)" or no unit: "1.5 pawns", "a 1.5-pawn edge", "the engine gives 1.8";
+ * - in centipawns: "150 cp", "90 centipawns";
+ * - a mate: "mate in 3", "mated in 3", "M3", "#3".
+ * Not evaluation-like: a whole number of pawns without a sign ("up 2 pawns in material", "down
+ * 1 pawn": material counts), any other whole number ("3 moves", "move 12"), clock and score
+ * phrases ("10.5 seconds", "1:30", "0.5 points", "2.5/3", "1-0", "1/2-1/2"), percentages, and
+ * numbers in words. There are no word lists beyond these units: whether a side is "better" or
+ * "worse" is not read from the prose, only the number.
+ *
+ * `tolerance` is the rounding of the written number: half its last digit ("+1.5" covers 145 to
+ * 155 cp, "+2" covers 150 to 250, "150 cp" is exact).
  */
-const NUMBER = /(?<![\w.])([+\-−]?)(\d+(?:\.\d+)?)(\s*(?:cp|centipawns?)\b|\s*pawns?(?:\s+(?:up|down|ahead|behind|better|worse))?\b)?(?![\d%]|\.\d)/g;
-const MATE_IN = /\bmate in (\d+)\b/gi;
-const MATE_M = /(?<![\w])[+\-−]?M(\d+)\b/g;
+const NUMBER = /(?<![\w.\/:+\-−])([+\-−])?(\d+(?:\.(\d+))?)(?!\d|\.\d|%|\/|:\d)/g;
+const EVAL_UNIT = /^\s*(?:-\s*)?(cp|centipawns?|pawns?)\b/i;
+const OTHER_UNIT = /^\s*(?:-\s*)?(?:s|secs?|seconds?|mins?|minutes?|hours?|hrs?|ms|points?|pts|percent)\b/i;
+const MATE_QUOTES = [/\bmated? in (\d+)\b/gi, /(?<![\w#])[+\-−]?M(\d+)\b/g, /(?<![\w#])#(\d+)\b/g];
 
 export function extractEvals(text: string): EvalMention[] {
-  const found: (EvalMention & { start: number })[] = [];
+  const found: (EvalMention & { start: number; end: number })[] = [];
+  for (const re of MATE_QUOTES) {
+    for (const m of text.matchAll(re)) found.push({ raw: m[0], start: m.index, end: m.index + m[0].length, quote: { kind: "mate", n: Number(m[1]) } });
+  }
   for (const m of text.matchAll(NUMBER)) {
-    const [raw, sign, digits, unit] = m as unknown as [string, string, string, string | undefined];
-    const value = Number(digits);
-    const signed = sign !== "";
-    if (unit && /c/.test(unit)) {
-      found.push({ raw, start: m.index, quote: { cp: value } });
-    } else if (unit) {
-      if (signed || digits.includes(".") || /(up|down|ahead|behind|better|worse)$/.test(unit)) {
-        found.push({ raw, start: m.index, quote: { cp: value * 100 } });
-      }
-    } else if (signed) {
-      found.push({ raw, start: m.index, quote: { cp: value * 100 } });
-    }
+    const [num, sign, digits, decimals] = m as unknown as [string, string | undefined, string, string | undefined];
+    const after = text.slice(m.index + num.length);
+    if (OTHER_UNIT.test(after)) continue;
+    const unitMatch = EVAL_UNIT.exec(after);
+    const unit = unitMatch?.[1]?.toLowerCase() ?? "";
+    const centipawns = unit.startsWith("c");
+    if (!sign && !decimals && !centipawns) continue; // a whole number of pawns, or a plain count
+    const raw = unitMatch ? num + unitMatch[0] : num;
+    const cp = centipawns ? Number(digits) : Math.round(Number(digits) * 100);
+    const tolerance = centipawns ? 0.5 : 50 / 10 ** (decimals?.length ?? 0);
+    const quote = sign
+      ? { kind: "signed" as const, cp: (sign === "+" ? 1 : -1) * cp, tolerance }
+      : { kind: "size" as const, cp, tolerance };
+    found.push({ raw, start: m.index, end: m.index + raw.length, quote });
   }
-  for (const re of [MATE_IN, MATE_M]) {
-    for (const m of text.matchAll(re)) found.push({ raw: m[0], start: m.index, quote: { mate: Number(m[1]) } });
+  found.sort((a, b) => a.start - b.start || b.end - a.end);
+  const kept: EvalMention[] = [];
+  let lastEnd = -1;
+  for (const f of found) {
+    if (f.start < lastEnd) continue;
+    kept.push({ raw: f.raw, quote: f.quote });
+    lastEnd = f.end;
   }
-  return found.sort((a, b) => a.start - b.start).map(({ raw, quote }) => ({ raw, quote }));
+  return kept;
 }
+
+/** Whether a prose quote is backed by one of the listed entries (#26). */
+function listed(quote: EvalMention["quote"], evals: EvalEntry[]): boolean {
+  const near = (a: number, b: number, tol: number) => Math.abs(a - b) <= tol + 1e-9;
+  return evals.some((e) => {
+    const white = e.side === "white" ? 1 : -1;
+    if (quote.kind === "mate") return e.mate !== null && Math.abs(e.mate) === quote.n;
+    if (e.cp === null) return false;
+    if (quote.kind === "signed") return near(quote.cp, white * e.cp, quote.tolerance);
+    return near(quote.cp, Math.abs(e.cp), quote.tolerance);
+  });
+}
+
+function describeEntry(e: EvalEntry): string {
+  return e.cp !== null ? `{side: "${e.side}", cp: ${e.cp}}` : `{side: "${e.side}", mate: ${e.mate}}`;
+}
+
+const SIDE_WORD = "white|black|your opponent|the opponent|opponent|you";
+
+/** The text of the clause that ends at `index`: after the last sentence break (". ", "; ", "! ", "? ", newline). */
+function clauseBefore(text: string, index: number): string {
+  const before = text.slice(0, index);
+  let cut = 0;
+  for (const m of before.matchAll(/[.!?;](?=\s)|\n/g)) cut = m.index + 1;
+  return before.slice(cut);
+}
+
+function sideOf(word: string | undefined, playerColor: Color | undefined): Color | null {
+  if (!word) return null;
+  const w = word.toLowerCase();
+  if (w === "white") return "w";
+  if (w === "black") return "b";
+  if (!playerColor) return null;
+  if (w === "you") return playerColor;
+  return playerColor === "w" ? "b" : "w"; // the opponent
+}
+
+/** "3.", "3. ", "3...", "3... " right before a move: groups 1 (+2 for Black's dots) or 3 ("3 ..."). */
+const MOVE_NUMBER_BEFORE = /(?<![\w.])(?:(\d+)\.(\.\.)?|(\d+)\s+\.\.\.)\s*$/;
+/** A side right before a move as its mover: "White castled with ", "your opponent's ", "Black ". */
+const MOVER_BEFORE = new RegExp(
+  `\\b(${SIDE_WORD}|your)(?:['’]s)?\\s+(?:(?!(?:is|are|was|were|be|been|and|but|or|so|if|then|now)\\b)[a-z]+\\s+){0,3}$`,
+  "i",
+);
+
+function moverOf(before: string, playerColor: Color | undefined): Color | null {
+  const clause = clauseBefore(before, before.length);
+  const m = MOVER_BEFORE.exec(clause.slice(clause.lastIndexOf(",") + 1));
+  if (!m) return null;
+  return sideOf(m[1]!.toLowerCase() === "your" ? "you" : m[1], playerColor);
+}
+
+const PIECE_NAME: Record<string, string> = { p: "pawn", n: "knight", b: "bishop", r: "rook", q: "queen", k: "king" };
+/** A check named as a thing to find or give (the same phrases the eval grader uses, evals/src/graders.ts). */
+const CHECK_NOUN =
+  /\b(?:a|give|gives|giving|gave|with|deliver|delivers|delivering)\s+check\b|\b(?:king|queen|rook|bishop|knight|pawn)\s+checks?\b|\bcheck(?:s|ed|ing)?\s+(?:with|from|by)\b|\bchecks?\s+(?:the|black's|white's|your opponent's)\s+king\b/i;
 
 /**
  * Returns the problems with a schema-valid reply; empty means it passes FR-10 and the FR-8 rule
  * that neither message nor arrows give the answer away. `revealFen` is where revealMove must be
  * legal (attemptFen for a key moment, fen for a hint); it counts as a focus position.
  *
- * A move mention passes when, in some shown position where it is legal, that (position, move)
+ * Moves: a mention passes when, in some shown position where it is legal, that (position, move)
  * is backed by a tool result or the key-moment data. Failing that, a move of the game's history
  * may be mentioned, but only if the mention is not also a legal move in a focus position: there
- * the tutor is talking about what to play now, and the history does not back that.
+ * the tutor is talking about what to play now, and the history does not back that. Two readings
+ * narrow that (#26):
+ * - A move number before the mention ("3.Bf4", "3...Bg7") points at that ply of the game: if
+ *   the mention is the move played there, it passes, even when it is also legal now.
+ * - A side named as the mover just before it ("White castled with O-O", "your opponent's O-O")
+ *   limits the positions to those where that side moves (when it is legal in any of them).
+ *   "you"/"your opponent" need `playerColor`. A copula or a comma in between breaks the link
+ *   ("White is fine, so O-O" names no mover).
+ *
+ * Evaluations (#26): every `evals` entry must be exactly an engine score of this turn for its
+ * side (Evidence.backsEntry), and every evaluation-like number in message or reveal (see
+ * extractEvals) must match a listed entry: a signed number read from White's point of view
+ * against the entry converted to White's view, an unsigned one against an entry's size, "mate
+ * in N" against a mate entry with |mate| = N.
+ *
+ * Give-aways (FR-8, #28), when revealMove is set: the message names the move; an arrow is the
+ * move or starts on its from-square (it shows the piece); or the answer gives check and the
+ * message names its piece together with a check ("can your queen give a check?").
  */
-export function checkClaims(reply: TutorReply, evidence: Evidence, revealFen: string): string[] {
+export function checkClaims(reply: TutorDraft, evidence: Evidence, revealFen: string, playerColor?: Color): string[] {
   const problems: string[] = [];
   const positions = evidence.positionList();
   if (boardOf(revealFen) && !positions.some((p) => positionKey(p) === positionKey(revealFen))) positions.push(revealFen);
   const isFocus = (fen: string) => evidence.isFocus(fen) || positionKey(fen) === positionKey(revealFen);
   const seen = new Set<string>();
 
+  for (const entry of reply.evals) {
+    if (evidence.backsEntry(entry)) continue;
+    const size = entry.cp ?? 0;
+    const delta = entry.cp !== null && evidence.isDelta(size)
+      ? ` ${Math.abs(size)} is a change (cp_loss or gain_cp), not an evaluation: describe a change in words and leave it out of evals.`
+      : "";
+    problems.push(
+      `evals quotes the evaluation ${describeEntry(entry)}, which matches no engine score for ${entry.side === "white" ? "White" : "Black"} in this turn's tool results. ` +
+        `Copy the number exactly as a tool gave it, from that side's point of view (positive = good for that side).${delta}`,
+    );
+  }
+
   for (const [field, text] of [
     ["message", reply.message],
     ["reveal", reply.reveal ?? ""],
   ] as const) {
     for (const mention of findMentions(text)) {
-      const key = `${field}:${mention.raw}`;
+      const before = text.slice(0, mention.start);
+      const numbered = MOVE_NUMBER_BEFORE.exec(before);
+      if (numbered) {
+        const ply = evidence.historyPly(Number(numbered[1] ?? numbered[3]), numbered[1] && !numbered[2] ? "w" : "b");
+        const board = ply ? boardOf(ply.fen) : null;
+        if (ply && board && mention.resolve(board).includes(ply.uci)) continue; // the game's move at that number
+      }
+      const mover = moverOf(before, playerColor);
+      const key = `${field}:${mover ?? ""}:${mention.raw}`;
       if (seen.has(key)) continue;
       seen.add(key);
-      const legal: { fen: string; uci: string }[] = [];
+      let legal: { fen: string; uci: string }[] = [];
       for (const fen of positions) {
         const chess = boardOf(fen);
         if (chess) for (const uci of mention.resolve(chess)) legal.push({ fen, uci });
+      }
+      if (mover) {
+        const own = legal.filter((l) => sideToMove(l.fen) === mover);
+        if (own.length > 0) legal = own;
       }
       if (legal.length === 0) {
         if (!mention.soft) problems.push(`${field} mentions ${mention.raw}, which is not legal in any position you were shown.`);
@@ -204,9 +329,14 @@ export function checkClaims(reply: TutorReply, evidence: Evidence, revealFen: st
       }
     }
     for (const e of extractEvals(text)) {
-      if (!evidence.backsEval(e.quote)) {
-        problems.push(`${field} quotes the evaluation "${e.raw}", which matches no score in this turn's tool results or the key-moment data.`);
-      }
+      if (listed(e.quote, reply.evals)) continue;
+      const delta = e.quote.kind !== "mate" && evidence.isDelta(e.quote.cp)
+        ? " It looks like a cp_loss or gain_cp: that is a change, not an evaluation, so describe it in words instead of as a number."
+        : "";
+      problems.push(
+        `${field} quotes the evaluation "${e.raw}", which no entry in evals backs. List every evaluation you quote in evals; ` +
+          `in the text a signed number (+1.5, -0.4) is read from White's point of view.${delta}`,
+      );
     }
   }
 
@@ -227,8 +357,22 @@ export function checkClaims(reply: TutorReply, evidence: Evidence, revealFen: st
         return board !== null && m.resolve(board).includes(uci);
       });
       if (named) problems.push(`message names ${normalizeSan(move.san)}, which gives the answer away: keep it for reveal.`);
-      const arrow = reply.arrows.find((a) => a.from + a.to === uci.slice(0, 4));
-      if (arrow) problems.push(`arrow ${arrow.from}-${arrow.to} is the answer move, which gives the answer away before "Show me".`);
+      if (/[+#]$/.test(move.san)) {
+        const piece = PIECE_NAME[move.piece]!;
+        if (new RegExp(`\\b${piece}s?\\b`, "i").test(reply.message) && CHECK_NOUN.test(reply.message)) {
+          problems.push(
+            `message names your ${piece} together with the check it gives (${move.san}), which gives the answer away: ask about the idea (the king, a loose piece) instead.`,
+          );
+        }
+      }
+      const from = uci.slice(0, 2);
+      for (const a of reply.arrows) {
+        if (a.from + a.to === uci.slice(0, 4)) {
+          problems.push(`arrow ${a.from}-${a.to} is the answer move, which gives the answer away before "Show me".`);
+        } else if (a.from === from) {
+          problems.push(`arrow ${a.from}-${a.to} starts on ${from}, the square of the piece the answer moves, which gives the answer away before "Show me".`);
+        }
+      }
     }
   }
 

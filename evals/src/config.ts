@@ -14,7 +14,7 @@ import type { TutorConfig, TutorUsage } from "@chess-tutor/tutor";
 export const REPO_ROOT = fileURLToPath(new URL("../../", import.meta.url));
 export const CASES_DIR = join(REPO_ROOT, "evals", "cases");
 export const RESULTS_DIR = join(REPO_ROOT, "evals", "results");
-export const DEFAULT_PROMPT = join(REPO_ROOT, "prompts", "tutor-system.v1.md");
+export const DEFAULT_PROMPT = join(REPO_ROOT, "prompts", "tutor-system.v2.md");
 
 /** Same as apps/server/src/tutor-setup.ts PLAYER_PROFILE. */
 export const PLAYER_PROFILE =
