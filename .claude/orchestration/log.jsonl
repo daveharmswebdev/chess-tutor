@@ -160,3 +160,17 @@
 {"ts":"2026-11-08T18:48:48.547Z","event":"return_valid","agent_id":"a3e2be25159669d13","agent_type":"reviewer","via":"handback"}
 {"ts":"2026-11-08T18:49:25.887Z","event":"coordinator_verdict","brief_id":"044-factcheck-r3","agent":"reviewer","verdict":"review","reason":"no-ship: 2 blocking from r3 rules; #26 parked after 3 rounds (Needs you)","tokens":119340,"duration_ms":150766}
 {"ts":"2026-11-08T18:49:25.888Z","event":"parked","issue":26,"branch":"issue-26-factcheck-wip","reason":"3 rounds, r3 review blocking"}
+{"ts":"2026-11-10T12:30:31.506Z","event":"dispatch","subagent_type":"tutor-agent","brief_id":"045-evals-field-prompt-v2-r1","base_sha":"921278e","spoke":true}
+{"ts":"2026-11-10T12:30:31.746Z","event":"agent_complete","subagent_type":"tutor-agent","brief_id":"045-evals-field-prompt-v2-r1","agent_id":"a99738e6737fe9764","status":"async_launched","contract":"pending"}
+{"ts":"2026-11-10T12:44:05.869Z","event":"return_valid","agent_id":"a99738e6737fe9764","agent_type":"tutor-agent","via":"handback"}
+{"ts":"2026-11-10T12:45:00.200Z","event":"coordinator_verdict","brief_id":"045-evals-field-prompt-v2-r1","agent":"tutor-agent","verdict":"re-delegated","reason":"gate green (723, tc 0), files match; round 2 for brief defects: allow key-moment delta quotes; drop to-square arrow ban from v2 (user: nudge)","tokens":169100,"duration_ms":814549}
+{"ts":"2026-11-10T12:48:02.175Z","event":"return_valid","agent_id":"a99738e6737fe9764","agent_type":"tutor-agent","via":"handback"}
+{"ts":"2026-11-10T12:48:58.074Z","event":"coordinator_verdict","brief_id":"046-evals-field-prompt-v2-r2","agent":"tutor-agent","verdict":"accepted","reason":"gate green (727, tc 0), files match; next live evals","tokens":184756,"duration_ms":138686}
+{"ts":"2026-11-10T12:54:58.188Z","event":"dispatch","subagent_type":"reviewer","brief_id":"047-review-evals-field-v2-r1","base_sha":"cedb70e","spoke":true}
+{"ts":"2026-11-10T12:54:58.591Z","event":"agent_complete","subagent_type":"reviewer","brief_id":"047-review-evals-field-v2-r1","agent_id":"a0231fbb0108c69ce","status":"async_launched","contract":"pending"}
+{"ts":"2026-11-10T13:00:33.263Z","event":"return_valid","agent_id":"a0231fbb0108c69ce","agent_type":"reviewer","via":"handback"}
+{"ts":"2026-11-10T13:01:02.035Z","event":"coordinator_verdict","brief_id":"047-review-evals-field-v2-r1","agent":"reviewer","verdict":"review","reason":"ship with 2 majors (give-away ignores mover; mate sign dropped) -> round 3","tokens":89072,"duration_ms":335020}
+{"ts":"2026-11-10T13:03:41.948Z","event":"return_valid","agent_id":"a99738e6737fe9764","agent_type":"tutor-agent","via":"handback"}
+{"ts":"2026-11-10T13:04:19.248Z","event":"coordinator_verdict","brief_id":"048-evals-field-prompt-v2-r3","agent":"tutor-agent","verdict":"accepted","reason":"gate green (733, tc 0), files match; both 047 majors fixed with probe tests; ship","tokens":202576,"duration_ms":132952}
+{"ts":"2026-11-10T13:19:08.104Z","event":"shipped","issue":26,"pr":33}
+{"ts":"2026-11-10T13:19:08.105Z","event":"shipped","issue":28,"pr":33}

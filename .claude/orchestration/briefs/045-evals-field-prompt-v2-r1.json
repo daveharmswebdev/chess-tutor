@@ -1,0 +1,47 @@
+{
+  "brief_id": "045-evals-field-prompt-v2-r1",
+  "agent": "tutor-agent",
+  "issue": 26,
+  "base_sha": "921278e",
+  "scratch_dir": "/private/tmp/claude-501/-Users-daveharms-personal-workspace-chess-tutor/2099a48c-cb2d-4bc5-aac5-8eee0a7fc0fa/scratchpad/045-evals-field-prompt-v2-r1",
+  "objective": "One change covering #26 and #28 (they share prompt v2). (A) #26: the tutor lists every evaluation it quotes in a new structured field on the MODEL-FACING reply, `evals: [{ side: \"white\"|\"black\", cp: integer|null, mate: integer|null }]` (exactly one of cp/mate non-null; values are from that side's point of view, positive = good for that side). Code checks each entry exactly against the engine scores in this turn's evidence (tool results or key-moment data) for that side, and the claims check rejects any evaluation-like number in `message` or `reveal` that no entry backs. The prose word rules for evaluations from #26 rounds 1-3 are NOT brought over. Round 1's move-check fixes ARE brought over from origin/issue-26-factcheck-wip commit 3df6a35 (move-number history ply, side-named mover, the 'a move or evaluation' correction text); port only those parts. (B) #28: write prompts/tutor-system.v2.md (copy v1, then change it) that (1) tells the tutor to list every quoted evaluation in `evals` and to quote none it didn't list, and (2) cuts give-aways: no naming the answer move or its piece-plus-target, no arrow that starts on the answer's from-square or ends on its to-square, no 'can your <piece> give a check?' style hints. Add a CHANGELOG entry. Extend the claims check (FR-8) to also reject the two patterns that get past it today: an arrow whose `from` is the answer move's from-square, and a message naming the answer move's piece together with the check it gives (e.g. answer Qb5+ and message 'can your queen give a check?'). Point every v1 default (evals/src/config.ts DEFAULT_PROMPT, evals/README.md, packages/tutor/test/prompt.test.ts) at v2; keep v1 on disk unchanged. Do not run live evals: the coordinator runs them after your return.",
+  "requirements": [
+    "FR-8",
+    "FR-10",
+    "NFR-6",
+    "NFR-7",
+    "NFR-8",
+    "NFR-10"
+  ],
+  "contract": "Decisions (user, 2026-11-10, on #26 and #28):\n- #26 option 2: structured field, exact check, any unlisted evaluation-like number in message/reveal is rejected. No prose word lists for evaluations. Keep round 1's move-check fixes from branch origin/issue-26-factcheck-wip (commits: 3df6a35 r1, ecb2c6f r2, da24979 r3; read with `git show 3df6a35 -- packages/tutor/`). Reviews 037/041/044 probe sentences are in .claude/orchestration/ (grep review-037 etc.) if useful as tests of the new design (e.g. 'You are up 2 pawns (+2.0)' as Black at -200 must now be rejected because the listed entry, side black cp 200, doesn't match the engine; 'Black is down 1 pawn but the engine has White at only +0.2' passes when `evals` lists {white, cp 20} — '1 pawn' material counts: decide and document whether whole-number 'N pawn(s)' counts as evaluation-like; reasonable choice: a number counts as evaluation-like when it is signed (+0.4, -1.5), has a decimal with 'pawn(s)' or no unit, is 'M3'/'#3'/'mate in N'/'mated in N'; whole 'N pawn(s)' material counts and clock/score phrases do not).\n- Coordinator's contract decision for this round: the PUBLIC `TutorReply` in contract.ts stays exactly as it is (schemaVersion 1, no `evals`), because apps/server/test/helpers.ts and evals/src/types.ts build it and are outside this round. Add the field to the model-facing draft only: TUTOR_REPLY_JSON_SCHEMA (schema.ts) gets a required `evals` array (closed objects, every property required, nullable as anyOf [T,null], per spike 003), parseReply validates a draft type (e.g. `TutorDraft = TutorReply.extend({ evals })`), the claims check uses `evals`, and session.ts strips `evals` before the reply leaves the package. schema.test.ts must keep checking the JSON schema against the zod draft type.\n- Prose sign convention: a signed number in prose ('+1.5', '-0.4') is read White-relative (the engine convention shown to the player); it must match a listed entry after converting that entry to White's view. An unsigned magnitude ('1.5 pawns better') must match a listed entry's magnitude. Mate: 'mate in N'/'M3' must match a listed mate entry with |mate| = N.\n- #28 evidence (docs/evals/2026-11-08-q3-model-choice.md): Sonnet 5.5 medium confirming run on v1: retries give_away 31, unbacked_move 17, illegal_move 4; 4 failed asks (all unsupported_claim, shown as 'couldn't analyze'); NFR-7 88.7%. Missed patterns (packages/tutor/src/claims.ts): arrow from the answer's from-square (Opus hint-london-move2 c1->h6, Sonnet po-london-bg6-trap h4->g5); piece plus check (Opus po-london-nb4, mw-london-nb4-qd1/qe2 for Qb5+). Done when (#28): v2 cuts give-away retries; the claims check rejects both patterns; NFR-7 >= 90% on two consecutive Sonnet runs; failed asks no more than 4. Live runs are the coordinator's job (budget ~$4.70, about $1 per full Sonnet run).\n- The server's DEFAULT_PROMPT_PATH (apps/server/src/main.ts:42) and docs/architecture.md:51 still name v1: outside your scope; the coordinator changes them at ship. Report them under contract_gaps only if something else needs to move.\n- Release artifacts (CLAUDE.md): prompt is a new version file plus a CHANGELOG line. The CHANGELOG line should name #26 and #28, the `evals` field, and the give-away rules.\n\nCoordinator gate at 921278e: pnpm test 701 passed (41 files); pnpm typecheck exit 0.",
+  "contract_files": [
+    "packages/tutor/src/contract.ts",
+    "packages/tutor/src/schema.ts",
+    "prompts/tutor-system.v1.md",
+    "prompts/CHANGELOG.md"
+  ],
+  "scope": [
+    "packages/tutor/**",
+    "prompts/**",
+    "evals/**"
+  ],
+  "negative": [
+    "Do not edit files outside scope, docs, config, .github, root files or the lockfile.",
+    "No new dependencies.",
+    "Do not change the public TutorReply type or its schemaVersion.",
+    "Do not edit prompts/tutor-system.v1.md.",
+    "Do not change the regrade bucket phrases or the correction-turn prefix.",
+    "Never call the real Anthropic API (no live evals; fakes only)."
+  ],
+  "rubric": [
+    "Tests first (red then green) for: an `evals` entry that matches the engine for its side passes; wrong side, wrong value, wrong cp/mate kind, or an entry with no backing evidence is rejected (FR-10, NFR-6); a signed or decimal evaluation or a mate quote in message or reveal with no matching entry is rejected; a material count ('up 2 pawns in material', 'down 1 pawn') and clock phrases pass; an empty `evals` with no numbers in prose passes.",
+    "Tests for the two FR-8 patterns: arrow from the answer's from-square rejected (c1->h6 for Bh6, h4->g5 for the h4 piece's answer); piece-plus-check naming rejected (answer Qb5+, 'can your queen give a check?'); a non-answer arrow and a general question still pass.",
+    "Round 1's move-check tests from 3df6a35 ported and green; rounds 2-3 evaluation word-rule tests are not ported.",
+    "schema.test.ts proves TUTOR_REPLY_JSON_SCHEMA matches the zod draft type, and a test proves session output has no `evals` key.",
+    "prompt.test.ts reads v2 and checks it mentions the `evals` field and the arrow/give-away rules; prompts/CHANGELOG.md has a v2 entry.",
+    "pnpm test and pnpm typecheck clean from the repo root.",
+    "files_changed lists every file changed in 921278e..your head. Commit message references FR-8, FR-10, NFR-6, NFR-7, #26 and #28."
+  ],
+  "concurrency": "No other spoke is in flight. The coordinator is meanwhile committing #12 deploy prep to main (docs/, root package.json/lockfile, render.yaml); none of it touches your scope.",
+  "round": 1
+}

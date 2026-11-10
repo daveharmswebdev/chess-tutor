@@ -1,0 +1,30 @@
+{
+  "brief_id": "047-review-evals-field-v2-r1",
+  "agent": "reviewer",
+  "issue": 26,
+  "base_sha": "cedb70e",
+  "scratch_dir": "/private/tmp/claude-501/-Users-daveharms-personal-workspace-chess-tutor/2099a48c-cb2d-4bc5-aac5-8eee0a7fc0fa/scratchpad/047-review-evals-field-v2-r1",
+  "objective": "Review #26 + #28 on the branch at cedb70e: `git diff 857ecc1..cedb70e` (two commits: 7028def round 1, cedb70e round 2). Severities blocking / major / minor. Focus: (1) FR-10 / NFR-6 exactness of the new `evals` check: can a wrong-side or wrong-value evaluation reach the player (in an entry, or in message/reveal prose: signed, unsigned, mate, 'M3', '#3', centipawns)? Can a correct quote be rejected? Probe sign conversion for Black and for evaluate_move's mover's-view scores, the written-rounding tolerance, and unsigned size quotes backed by key-moment or evaluate_move changes (round 2). (2) FR-8 give-away rules: arrow from the answer's from-square; piece-plus-check naming; false rejections of general questions. (3) NFR-8: TUTOR_REPLY_JSON_SCHEMA vs zod TutorDraft (spike 003 rules: closed objects, all properties required, nullable as anyOf), and the public TutorReply unchanged with `evals` stripped from session output. (4) The ported round-1 move-check fixes from 3df6a35 (move-number history ply, side-named mover). (5) prompts/tutor-system.v2.md consistent with the code (including: to-square arrows are an allowed nudge; cp_loss/gain_cp quotable only as unsigned sizes), CHANGELOG entry. Ship / no-ship.",
+  "requirements": [
+    "FR-8",
+    "FR-10",
+    "NFR-6",
+    "NFR-7",
+    "NFR-8",
+    "NFR-10"
+  ],
+  "contract": "User decisions: #26 option 2 (structured evals field, exact check, unlisted eval-like prose numbers rejected, no prose word lists); #10: an arrow ending on the answer's to-square is a nudge, not a give-away. Coordinator decisions: public TutorReply unchanged (schemaVersion 1); evals only on the model-facing draft; signed prose numbers read White-relative; unsigned key-moment/tool deltas may be quoted as sizes (FR-10 amendment A2). Coordinator gate at cedb70e: 727 passed, typecheck 0. Live Sonnet eval run 1 on v2: ok 95%, NFR-7 100%, evals matched 100%, retries give_away 8 / unbacked_move 21 / illegal_move 6 / reveal_move 4, 3 failed asks (2 unsupported_claim: lb-kid-e4, po-kid-e5-push; 1 tool_rounds_exceeded). Report under evals/results/2026-11-10T12-49-12-claude-sonnet-5-5-medium/ in the main checkout (gitignored; read it with its absolute path /Users/daveharms/personal-workspace/chess-tutor/evals/results/...). If the two unsupported_claim failures look like false rejections by the new checks, say so with the case's recorded text.",
+  "scope": [],
+  "negative": [
+    "Read-only: do not edit, commit, or run anything that writes to the repo.",
+    "Never call the Anthropic API.",
+    "Read code with git diff / git show <sha>:<path>; vitest probes in your own scratch dir are fine."
+  ],
+  "rubric": [
+    "Probe each focus area with concrete sentences and report each verdict.",
+    "Classify every finding blocking / major / minor with evidence.",
+    "Ship / no-ship."
+  ],
+  "concurrency": "Coordinator is running live eval run 2 in the main checkout (writes only evals/results/, gitignored).",
+  "round": 1
+}

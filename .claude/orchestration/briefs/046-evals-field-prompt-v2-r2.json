@@ -1,0 +1,36 @@
+{
+  "brief_id": "046-evals-field-prompt-v2-r2",
+  "agent": "tutor-agent",
+  "issue": 26,
+  "base_sha": "b733cce",
+  "scratch_dir": "/private/tmp/claude-501/-Users-daveharms-personal-workspace-chess-tutor/2099a48c-cb2d-4bc5-aac5-8eee0a7fc0fa/scratchpad/046-evals-field-prompt-v2-r2",
+  "objective": "Round 2 on your branch (base b733cce): two coordinator decisions on your round-1 brief_defects and findings, nothing else. (1) Allow quoted changes: an UNSIGNED evaluation-like number in message or reveal ('That cost you 1.6 pawns', 'a 2.5-pawn chance missed', '150 centipawns') passes when it matches, within the same written-rounding rule you already use, the magnitude of a change in this turn's evidence: the key moment's cpLoss / gainCp, or a change a tool result reports (evaluate_move's loss, if it reports one). Changes still never go in `evals` and never back an `evals` entry; a SIGNED number ('-1.6') is still read as a White-view evaluation and must match an entry. (2) prompts/tutor-system.v2.md: drop the ban on arrows ending on the answer's to-square (the user decided on #10 that such an arrow is a nudge, not a give-away; the grader agrees). Keep the from-square ban. Replace the 'describe them in words rather than as a number' line for cp_loss/gain_cp with: they are changes, not evaluations; never list them in `evals`; you may quote one as an unsigned size ('that cost about 1.6 pawns'), never with a + or - sign. Keep the CHANGELOG v2 line accurate (still one v2 entry).",
+  "requirements": [
+    "FR-8",
+    "FR-10",
+    "NFR-6"
+  ],
+  "contract": "Coordinator decisions on round 1's return (brief 045, head b733cce):\n- Your brief_defect is right that key-moment data holds only deltas. FR-10 (amendment A2) makes key-moment data a valid source, so a delta quoted as a size is backed. Restore the old 'That cost you 1.6 pawns.' passing test (with cpLoss 160) and add: cpLoss 160, 'That cost you 2.5 pawns.' rejected; gainCp 250, 'You missed a 2.5-pawn chance.' passes; cpLoss 160 and no entries, 'You are -1.6.' rejected (signed means evaluation).\n- To-square arrows: user decision on #10 (2026-11-08): an arrow ending on the answer's to-square is a nudge, not a give-away. evals/src/graders.ts gradeGiveAway already counts it as a nudge. Only the prompt line changes; the claims check stays as it is.\n- Coordinator gate at b733cce: pnpm test 723 passed (41 files); typecheck exit 0.",
+  "scope": [
+    "packages/tutor/**",
+    "prompts/**",
+    "evals/**"
+  ],
+  "negative": [
+    "Do not edit files outside scope, docs, config, .github, root files or the lockfile.",
+    "No new dependencies.",
+    "Do not change the public TutorReply type or its schemaVersion.",
+    "Do not edit prompts/tutor-system.v1.md.",
+    "Never call the real Anthropic API.",
+    "No changes beyond the two items."
+  ],
+  "rubric": [
+    "Tests first (red then green) for the four delta probes in the contract.",
+    "All round-1 tests still pass, except the deliberate change back for 'That cost you 1.6 pawns.'.",
+    "prompt.test.ts checks v2 no longer bans to-square arrows and still bans from-square arrows.",
+    "pnpm test and pnpm typecheck clean from the repo root.",
+    "files_changed lists every file changed in b733cce..your head. Commit message references FR-8, FR-10, #26 and #28."
+  ],
+  "concurrency": "No other spoke is in flight.",
+  "round": 2
+}

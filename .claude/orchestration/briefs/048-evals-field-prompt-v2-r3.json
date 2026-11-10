@@ -1,0 +1,35 @@
+{
+  "brief_id": "048-evals-field-prompt-v2-r3",
+  "agent": "tutor-agent",
+  "issue": 26,
+  "base_sha": "cedb70e",
+  "scratch_dir": "/private/tmp/claude-501/-Users-daveharms-personal-workspace-chess-tutor/2099a48c-cb2d-4bc5-aac5-8eee0a7fc0fa/scratchpad/048-evals-field-prompt-v2-r3",
+  "objective": "Round 3 (final under the 3-round limit) on your branch, now rebased: base cedb70e (your r1/r2 rebased onto main 857ecc1 as 7028def, cedb70e). Fix review 047's two majors and two cheap minors, nothing else. (1) MAJOR claims.ts:359: the give-away loop ignores the named mover. Apply the same moverOf the FR-10 move loop uses: a message mention whose named mover is the side NOT to move in revealFen is a description of the opponent's move, not the answer, and does not count as a give-away. (2) MAJOR claims.ts:198: mate quotes keep their sign. A signed mate quote ('+M3', '-M4', '\u2212M2') is read White-relative like signed numbers: +M3 = White mates in 3, -M3 = Black mates in 3; it must match a listed mate entry after converting to White's view. Unsigned 'mate in N' / 'mated in N' / 'M3' / '#3' keep matching |mate| = N against any listed mate entry (the entry itself is already checked exactly against the engine). (3) minor claims.ts:156: treat the en dash '\u2013' (U+2013) as a minus sign, like '-' and '\u2212'. (4) minor tools.ts:210: when the evaluated move ends the game, record the played_eval shown to the model (eval_cp playedCp) as a score in evidence, so a correct copy of it can be listed.",
+  "requirements": [
+    "FR-8",
+    "FR-10",
+    "NFR-6"
+  ],
+  "contract": "Review 047 at cedb70e: SHIP with two majors. Probes (make each a test):\n- Major 1 (po-kid-e5-push live failure): after 1.d4 Nf6 2.c4 g6 3.Nc3 Bg7 4.e4 d6 5.e5, revealMove d6e5, playerColor b: message \"White pushed a pawn to e5, deep into your side of the board. Look at that pawn. Who defends it, and can one of your pawns challenge it?\" currently -> [\"message names dxe5, which gives the answer away: keep it for reveal.\"]; must PASS. A mention with no side named, or naming the player's side ('your pawn to e5' / 'Black takes on e5' here), must still be rejected as a give-away.\n- Major 2: evals [{side:'black', cp:null, mate:3}] backed by engine mate -3 (Black mates): 'White is +M3 here.' currently PASSES -> must REJECT; 'Black mates: -M3.' -> PASS; 'Black has mate in 3.' -> PASS. extractEvals('-M4') must keep the sign.\n- Minor 3: evals [{side:'white', cp:150}], score +150: 'White is \u20131.5.' (en dash) currently PASSES -> must REJECT; 'White is +1.5.' passes.\n- Minor 4: evaluate_move where the move mates or stalemates: the played_eval shown ({eval_cp: playedCp}) must back a matching evals entry (e.g. stalemate, entry {white, cp 0}, with no other 0 score this turn).\nNot in scope (go to PR notes / triage): ':' and '/' adjacency, '55.5 %', '1.2k', '#1' false positives, moverOf on 'prevent/stop' verbs, the piece-plus-check side-blindness, piece-plus-target not enforced in code, whole-number unsigned pawns exempt, the rounding note.\nLive evals on r2 (v2, Sonnet medium), two runs: NFR-7 100% / 100%, give_away retries 8 / 10 (v1: 31), failed asks 3 / 3. CI's eval job will re-run on the PR.\nCoordinator gate at cedb70e: 727 passed (41 files), typecheck 0.",
+  "scope": [
+    "packages/tutor/**",
+    "prompts/**",
+    "evals/**"
+  ],
+  "negative": [
+    "Do not edit files outside scope, docs, config, .github, root files or the lockfile.",
+    "No new dependencies.",
+    "Do not change the public TutorReply type or its schemaVersion.",
+    "Do not edit prompts/ unless the mate-sign rule needs one wording fix in v2 (then keep the single v2 CHANGELOG line accurate).",
+    "Never call the real Anthropic API.",
+    "No changes beyond the four items."
+  ],
+  "rubric": [
+    "Tests first (red then green): every probe above with its expected verdict.",
+    "All earlier tests still pass.",
+    "pnpm test and pnpm typecheck clean from the repo root.",
+    "files_changed lists every file changed in cedb70e..your head. Commit message references FR-8, FR-10, NFR-6, #26 and #28."
+  ],
+  "concurrency": "No other spoke is in flight.",
+  "round": 3
+}
