@@ -48,7 +48,7 @@ chess-tutor/
 │   ├── chess-core/          shared types, KeyMomentDetector, Repertoire (pure, no I/O)
 │   ├── explorer/            Lichess explorer client + cache
 │   └── tutor/               TutorAgent, tools, schemas (zod), prompt loader, ledger
-├── prompts/                 tutor-system.v1.md, chat-system.v1.md (+ CHANGELOG.md)
+├── prompts/                 tutor-system.v2.md, chat-system.v1.md (+ CHANGELOG.md)
 ├── repertoire/              london.pgn, kid.pgn                     (Q-4)
 ├── config/                  models.json (model ID pinned per env), tutor.json (thresholds)
 ├── evals/                   cases/*.json, graders/, run.ts
