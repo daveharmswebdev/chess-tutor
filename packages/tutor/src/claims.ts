@@ -267,7 +267,10 @@ const CHECK_NOUN =
  * side (Evidence.backsEntry), and every evaluation-like number in message or reveal (see
  * extractEvals) must match a listed entry: a signed number read from White's point of view
  * against the entry converted to White's view, an unsigned one against an entry's size, "mate
- * in N" against a mate entry with |mate| = N.
+ * in N" against a mate entry with |mate| = N. An unsigned number may instead be a change of this
+ * turn (the key moment's cpLoss / gainCp, evaluate_move's cp_loss) quoted as a size, within the
+ * same rounding (FR-10 A2): "That cost you 1.6 pawns". A change never backs an entry or a signed
+ * number ("You are -1.6" is an evaluation).
  *
  * Give-aways (FR-8, #28), when revealMove is set: the message names the move; an arrow is the
  * move or starts on its from-square (it shows the piece); or the answer gives check and the
@@ -284,7 +287,7 @@ export function checkClaims(reply: TutorDraft, evidence: Evidence, revealFen: st
     if (evidence.backsEntry(entry)) continue;
     const size = entry.cp ?? 0;
     const delta = entry.cp !== null && evidence.isDelta(size)
-      ? ` ${Math.abs(size)} is a change (cp_loss or gain_cp), not an evaluation: describe a change in words and leave it out of evals.`
+      ? ` ${Math.abs(size)} is a change (cp_loss or gain_cp), not an evaluation: never list a change in evals; quote it in the text as an unsigned size ("about 1.6 pawns").`
       : "";
     problems.push(
       `evals quotes the evaluation ${describeEntry(entry)}, which matches no engine score for ${entry.side === "white" ? "White" : "Black"} in this turn's tool results. ` +
@@ -330,8 +333,9 @@ export function checkClaims(reply: TutorDraft, evidence: Evidence, revealFen: st
     }
     for (const e of extractEvals(text)) {
       if (listed(e.quote, reply.evals)) continue;
-      const delta = e.quote.kind !== "mate" && evidence.isDelta(e.quote.cp)
-        ? " It looks like a cp_loss or gain_cp: that is a change, not an evaluation, so describe it in words instead of as a number."
+      if (e.quote.kind === "size" && evidence.backsChange(e.quote.cp, e.quote.tolerance)) continue; // a quoted change (FR-10 A2)
+      const delta = e.quote.kind === "signed" && evidence.backsChange(e.quote.cp, e.quote.tolerance)
+        ? " If it is a cp_loss or gain_cp, that is a change, not an evaluation: quote it without a + or - sign."
         : "";
       problems.push(
         `${field} quotes the evaluation "${e.raw}", which no entry in evals backs. List every evaluation you quote in evals; ` +

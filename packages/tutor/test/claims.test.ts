@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { checkClaims, extractEvals, extractMoveTokens } from "../src/claims.ts";
-import type { Score } from "@chess-tutor/chess-core";
+import type { KeyMoment, Score } from "@chess-tutor/chess-core";
 import type { TutorDraft } from "../src/schema.ts";
 import { Evidence } from "../src/evidence.ts";
 import { buildEvidence } from "../src/request.ts";
@@ -195,7 +195,7 @@ describe("checkClaims: a move is backed only in the position it was played from 
     });
     expect(e.backsMove(attemptFen, "c2c3")).toBe(true);
     expect(e.backsMove(attemptFen, "b1c3")).toBe(true);
-    expect(checkClaims(reply({ kind: "player_blunder", revealMove: "c2c3", message: "That cost you a lot of ground." }), e, attemptFen)).toEqual([]);
+    expect(checkClaims(reply({ kind: "player_blunder", revealMove: "c2c3", message: "That cost you 1.6 pawns." }), e, attemptFen)).toEqual([]);
   });
 });
 
@@ -321,19 +321,36 @@ describe("evaluations: every quoted evaluation is listed in evals and backed (FR
     expect(checkClaims(reply("What is your opponent threatening?", [], "Your bishop is loose."), scored(), fen)).toEqual([]);
   });
 
-  it("says when a quoted number is a centipawn change, not an evaluation (cp_loss, gain_cp)", () => {
+  describe("quoted changes: cpLoss, gainCp, cp_loss as unsigned sizes (FR-10 A2, round 2)", () => {
     const h = ["d2d4", "d7d5", "c1f4", "g8f6", "e2e3", "c7c5", "b1c3"];
-    const e = buildEvidence({
-      kind: "key_moment",
-      moment: { kind: "missed_win", played: "Nc3", best: "c3", gainCp: 250 },
-      fen: fenAfter(h),
-      attemptFen: fenAfter(h.slice(0, -1)),
-      history: h,
+    const moment = (m: KeyMoment) =>
+      buildEvidence({ kind: "key_moment", moment: m, fen: fenAfter(h), attemptFen: fenAfter(h.slice(0, -1)), history: h });
+    const blunder = () => moment({ kind: "player_blunder", played: "Nc3", cpLoss: 160, best: "c3" });
+    const missed = () => moment({ kind: "missed_win", played: "Nc3", best: "c3", gainCp: 250 });
+
+    it("passes an unsigned quote of the key moment's change, within its rounding", () => {
+      expect(checkClaims(reply("That cost you 1.6 pawns."), blunder(), fenAfter(h))).toEqual([]);
+      expect(checkClaims(reply("You missed a 2.5-pawn chance."), missed(), fenAfter(h))).toEqual([]);
+      expect(checkClaims(reply("That cost you 160 centipawns."), blunder(), fenAfter(h))).toEqual([]);
     });
-    const problems = checkClaims(reply("You missed 2.5 pawns."), e, fenAfter(h));
-    expect(problems.join(" ")).toMatch(/quotes the evaluation "2\.5 pawns".*change/);
-    // A delta backs no entry either: it is not a standing.
-    expect(checkClaims(reply("You missed 2.5 pawns.", [W(250)]), e, fenAfter(h)).join(" ")).toMatch(/evals quotes the evaluation/);
+
+    it("rejects a size that matches no change", () => {
+      expect(checkClaims(reply("That cost you 2.5 pawns."), blunder(), fenAfter(h)).join(" ")).toMatch(/quotes the evaluation "2\.5 pawns"/);
+    });
+
+    it("reads a signed number as an evaluation, which a change never backs", () => {
+      expect(checkClaims(reply("You are -1.6."), blunder(), fenAfter(h)).join(" ")).toMatch(/quotes the evaluation "-1\.6"/);
+    });
+
+    it("never lets a change back an evals entry", () => {
+      expect(checkClaims(reply("You missed 2.5 pawns.", [W(250)]), missed(), fenAfter(h)).join(" ")).toMatch(/evals quotes the evaluation/);
+    });
+
+    it("passes a size quote of evaluate_move's cp_loss", () => {
+      const e = buildEvidence({ kind: "hint", fen, history });
+      e.addDelta(70);
+      expect(checkClaims(reply("Nothing like the 0.7 pawns you lost before."), e, fen)).toEqual([]);
+    });
   });
 });
 

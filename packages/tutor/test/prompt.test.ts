@@ -26,11 +26,17 @@ describe("prompts/tutor-system.v2.md (release artifact)", () => {
     expect(prompt).toContain("`evals`");
     for (const phrase of ["side", "cp", "mate", "White's point of view", "cp_loss", "gain_cp"]) expect(prompt).toContain(phrase);
     expect(prompt).toMatch(/quote no evaluation you did not list/i);
+    // Changes may be quoted as unsigned sizes, never listed and never signed (round 2).
+    expect(prompt).toMatch(/never list them in `evals`/);
+    expect(prompt).toMatch(/unsigned size/);
+    expect(prompt).not.toMatch(/rather than as a number/);
   });
 
   it("states the give-away rules for message and arrows (FR-8, #28)", () => {
-    expect(prompt).toMatch(/from-square/);
-    expect(prompt).toMatch(/to-square/);
+    expect(prompt).toMatch(/No arrow that starts on the answer's from-square/);
+    // An arrow ending on the answer's to-square is a nudge, not a give-away (user, #10).
+    expect(prompt).not.toMatch(/ends on its to-square/);
+    expect(prompt).toMatch(/to-square is fine/);
     expect(prompt).toMatch(/give a check/);
     expect(prompt).toMatch(/piece/);
   });

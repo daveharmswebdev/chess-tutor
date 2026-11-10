@@ -21,7 +21,8 @@ export function positionKey(fen: string): string {
  *   gives them (centipawns, or mate in N with positive = White mates). They back the reply's
  *   `evals` entries, exactly.
  * - deltas: centipawn changes, not standings (evaluate_move's cp_loss, the key moment's cpLoss
- *   and gainCp). They back nothing; the claims check only uses them to explain a rejection.
+ *   and gainCp). They never back an evals entry or a signed number; an unsigned size quoted in
+ *   prose may match one (FR-10 A2, "That cost you 1.6 pawns").
  */
 export class Evidence {
   private readonly positions = new Map<string, string>(); // key -> full FEN
@@ -95,13 +96,18 @@ export class Evidence {
     (score.kind === "mate" ? this.mates : this.cps).add(score.value + 0); // + 0 turns -0 into 0
   }
 
-  /** A centipawn change (a move's loss or gain), not a standing: it backs no evals entry. */
+  /** A centipawn change (a move's loss or gain), not a standing: it backs no evals entry (see backsChange). */
   addDelta(cp: number): void {
     if (Number.isFinite(cp)) this.deltas.add(Math.abs(cp));
   }
 
   isDelta(cp: number): boolean {
     return this.deltas.has(Math.abs(cp));
+  }
+
+  /** Whether an unsigned size quoted in prose is a change of this turn, within `tolerance` (FR-10 A2). */
+  backsChange(cp: number, tolerance: number): boolean {
+    return [...this.deltas].some((d) => Math.abs(d - Math.abs(cp)) <= tolerance + 1e-9);
   }
 
   /**

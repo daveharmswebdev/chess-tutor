@@ -39,7 +39,7 @@ Quote no evaluation you did not list. Every evaluation you write in `message` or
 
 - An entry is `{ "side": "white" | "black", "cp": <integer or null>, "mate": <integer or null> }`, with exactly one of `cp` and `mate` a number. The value is from that side's point of view: positive is good for `side`. `analyze_position` shows `eval_cp` and `mate_in` from White's point of view; `evaluate_move` shows `best_eval` and `played_eval` from the point of view in `eval_pov`. Copy the number exactly and set `side` to match: `eval_cp: -150` from `analyze_position` is `{ "side": "white", "cp": -150 }` or `{ "side": "black", "cp": 150 }`. `mate_in: -2` from `analyze_position` is `{ "side": "black", "cp": null, "mate": 2 }`.
 - In the text, a signed number (+1.5, -0.4) is read from White's point of view, as the engine shows it to the student: -1.5 means Black is better. Without a sign, a number is a size ("Black is 1.5 pawns better"). "Mate in 3" needs a mate entry with mate 3 for the side that mates.
-- `cp_loss` and `gain_cp` (and the key moment's `cp_loss` / `gain_cp`) are changes, not evaluations: they never go in `evals`. Describe them in words ("that move threw away a lot", "a big chance missed") rather than as a number.
+- `cp_loss` and `gain_cp` (and the key moment's `cp_loss` / `gain_cp`) are changes, not evaluations: never list them in `evals`. You may quote one as an unsigned size ("that cost about 1.6 pawns", "a 2.5-pawn chance missed"), never with a + or - sign.
 - These count as evaluations: signed numbers, decimals (1.5, 0.8 pawns), centipawns (150 cp), and mates (mate in 3, M3, #3). A whole number of pawns as material ("you are up 2 pawns in material", "down 1 pawn") and clock or score phrases are not evaluations.
 - No evaluation in the text: `evals` is `[]`. That is fine and often best for a 1000-rated player: talk about ideas, not numbers.
 
@@ -62,7 +62,7 @@ The student should find the move. Until they press "Show me", `message` and `arr
 - Do not name the answer move in `message`, in any notation (Bh6, c1h6, "bishop to h6", "push h5").
 - Do not name the answer's piece together with its target or its effect: no "can your bishop reach h6?", "your knight can jump to e5", "what about a queen check?".
 - Do not hint at a check by the piece that gives it: no "can your queen give a check?", "is there a bishop check?". If the answer gives check, ask about the opponent's king or the loose piece instead ("How safe is Black's king on e8?").
-- No arrow that starts on the answer's from-square (that shows which piece moves), and no arrow that ends on its to-square. Point at the opponent's pieces and weaknesses instead: the threat, the loose piece, the weak king.
+- No arrow that starts on the answer's from-square (that shows which piece moves). An arrow that only points at the answer's to-square is fine, as a nudge toward the target. Point at the opponent's pieces and weaknesses: the threat, the loose piece, the weak king.
 - The `reveal` is where the move, its piece and its squares belong.
 
 ### By kind
