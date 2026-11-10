@@ -8,6 +8,12 @@
  * LICHESS_TOKEN (empty => engine-only bot), REPERTOIRE_DIR (default <repo>/repertoire),
  * HOST (default localhost: IPv4 and IPv6 loopback), LOG_LEVEL (default info).
  *
+ * Deploy (#12, NFR-13, architecture §6.1):
+ *   WEB_DIST  unset or empty => API only (local dev uses the Vite proxy). Otherwise the built
+ *             apps/web served at / with an SPA fallback; a relative path resolves against the
+ *             repository root. A missing directory or index.html stops the server at startup.
+ *   GET /api/health  200 once Stockfish answers a depth-1 search (5 s cap) and the store is open.
+ *
  * Coaching (#7, NFR-9):
  *   ANTHROPIC_API_KEY  unset or empty => coaching off ("Coaching is off: no API key is set."), the
  *                      game still works. Read by the Anthropic SDK; never logged.
@@ -33,7 +39,9 @@ import {
   loadTutorConfig,
 } from "./config.ts";
 import { createBotExplorer, type BotExplorerSetup } from "./explorer-env.ts";
+import { createHealthProbe } from "./health.ts";
 import { createShutdown } from "./shutdown.ts";
+import { resolveWebDist } from "./static.ts";
 import { defaultRepertoireFiles, loadRepertoire, RepertoireLoadError } from "./repertoire.ts";
 import { createSqliteGameStore, resolveDbPath, type GameStore } from "./store.ts";
 import { NO_KEY_REASON, setupTutor, type TutorSetup } from "./tutor-setup.ts";
@@ -59,6 +67,8 @@ async function main(): Promise<void> {
   const analysis = loadAnalysisSettings();
   const thresholds = loadKeyMomentThresholds();
   const attemptToleranceCp = loadAttemptToleranceCp();
+  // Before the engine starts: a deploy without its web build fails here.
+  const webDist = resolveWebDist(env["WEB_DIST"]);
 
   const dbPath = resolveDbPath(env);
   let store: GameStore | undefined;
@@ -84,6 +94,8 @@ async function main(): Promise<void> {
       store,
       // engine: tool calls go through a per-game wrapper that yields to the bot (NFR-3).
       coaching: { analyzer, engine, ...tutor, thresholds, attemptToleranceCp, repertoire },
+      health: createHealthProbe({ engine, store }),
+      ...(webDist ? { webDist } : {}),
       logger: { level: env["LOG_LEVEL"] || "info" },
     });
     for (const w of warnings) app.log.warn(w);
@@ -104,7 +116,7 @@ async function main(): Promise<void> {
     process.on("SIGTERM", () => void shutdown("SIGTERM"));
 
     await app.listen({ port, host: env["HOST"] || "localhost" });
-    app.log.info({ dbPath, engineOnly: explorer.engineOnly, coaching: tutor.tutor !== null }, "game server ready");
+    app.log.info({ dbPath, engineOnly: explorer.engineOnly, coaching: tutor.tutor !== null, webDist }, "game server ready");
   } catch (err) {
     await engine?.quit();
     explorer?.close();
