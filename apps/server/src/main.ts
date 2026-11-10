@@ -12,7 +12,7 @@
  *   ANTHROPIC_API_KEY  unset or empty => coaching off ("Coaching is off: no API key is set."), the
  *                      game still works. Read by the Anthropic SDK; never logged.
  *   APP_ENV            default "development": picks the tutor model in config/models.json.
- *   TUTOR_PROMPT_PATH  default <repo>/prompts/tutor-system.v1.md; a missing file turns coaching
+ *   TUTOR_PROMPT_PATH  default <repo>/prompts/tutor-system.v2.md; a missing file turns coaching
  *                      off with a reason, never a crash.
  * Detection, attempt grading, the bot and the tutor's tools share the one Stockfish process
  * (one search at a time, queued). The server's analysis waits for the bot's search, and the
@@ -39,7 +39,7 @@ import { createSqliteGameStore, resolveDbPath, type GameStore } from "./store.ts
 import { NO_KEY_REASON, setupTutor, type TutorSetup } from "./tutor-setup.ts";
 
 export const DEFAULT_PORT = 3001;
-export const DEFAULT_PROMPT_PATH = fileURLToPath(new URL("../../../prompts/tutor-system.v1.md", import.meta.url));
+export const DEFAULT_PROMPT_PATH = fileURLToPath(new URL("../../../prompts/tutor-system.v2.md", import.meta.url));
 
 function parsePort(value: string | undefined): number {
   if (value === undefined || value === "") return DEFAULT_PORT;

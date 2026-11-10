@@ -85,6 +85,7 @@ export function fakeClient(opts: FakeClientOptions = {}) {
                 reveal: "The engine's move.",
                 revealMove: result.lines[0]?.moves[0]?.uci ?? null,
                 arrows: [],
+                evals: [], // the model-facing draft field (#26); the session strips it
               };
               return msg([{ type: "text", text: JSON.stringify(reply), citations: null }], "end_turn", usage);
             } finally {

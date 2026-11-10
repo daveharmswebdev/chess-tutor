@@ -209,7 +209,10 @@ async function evaluateMove(input: z.infer<typeof EvaluateInput>, ctx: ToolConte
   const cpLoss = played.uci === best?.uci ? 0 : Math.min(9999, Math.max(0, bestCp - playedCp));
   if (before.lines[0]) ctx.evidence.addScore(before.lines[0].score);
   if (after.lines[0]) ctx.evidence.addScore(after.lines[0].score);
-  ctx.evidence.addCp(cpLoss);
+  // No line after the move (the game ended): played_eval shows playedCp from the mover's view,
+  // so back that number, White-relative (review 047).
+  else ctx.evidence.addScore({ kind: "cp", value: (mover === "w" ? playedCp : -playedCp) + 0 });
+  ctx.evidence.addDelta(cpLoss); // a change, not a standing (#26)
 
   return {
     move: played,

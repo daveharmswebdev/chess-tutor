@@ -49,7 +49,7 @@ pnpm eval -- --model claude-opus-5-5 --effort medium --cases hint --max-usd 0.5
 | `--concurrency` | 2 | cases running at the same time (they share one Stockfish, which queues searches) |
 | `--repeat` | 1 | runs every case N times (ids get `#1`, `#2`, ...) |
 | `--out` | `evals/results/<timestamp>-<model>-<effort>` | output directory (gitignored) |
-| `--prompt` | `prompts/tutor-system.v1.md` | system prompt file to test |
+| `--prompt` | `prompts/tutor-system.v2.md` | system prompt file to test |
 | `--live-explorer` | off | uses the real Lichess explorer (needs `LICHESS_TOKEN`). By default the explorer always answers "unavailable", so runs need no network and are repeatable. |
 
 `ANTHROPIC_API_KEY` comes from the environment or the repository's `.env`.

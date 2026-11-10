@@ -129,7 +129,7 @@ export function buildEvidence(request: TutorRequest): Evidence {
         }
       }
     }
-    for (const cp of momentScores(request.moment)) evidence.addCp(cp);
+    for (const cp of momentScores(request.moment)) evidence.addDelta(cp); // cpLoss / gainCp are changes, not standings (#26)
   }
   return evidence;
 }

@@ -139,8 +139,13 @@ export function toolUseMsg(blocks: { name: string; input: Record<string, unknown
   );
 }
 
+/**
+ * The model's final reply. An object without an `evals` key gets `evals: []` (the model-facing
+ * draft requires it, #26); pass `evals: undefined` to send a reply with the field missing.
+ */
 export function endTurnMsg(reply: unknown, u?: ReturnType<typeof usage>) {
-  const text = typeof reply === "string" ? reply : JSON.stringify(reply);
+  const body = reply && typeof reply === "object" && !Array.isArray(reply) && !("evals" in reply) ? { ...reply, evals: [] } : reply;
+  const text = typeof body === "string" ? body : JSON.stringify(body);
   return message([{ type: "text", text, citations: null }], "end_turn", u);
 }
 
