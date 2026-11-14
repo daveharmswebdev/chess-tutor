@@ -8,7 +8,15 @@ services:
     runtime: node
     plan: starter # free instances can't attach a disk
     numInstances: 1 # a disk allows only one instance
-    buildCommand: pnpm install --frozen-lockfile && pnpm --filter @chess-tutor/web build
+    # The full WASM Stockfish peaks at ~760-850 MB, over Starter's 512 MB, so the deploy runs the
+    # official native Stockfish 19 (same version as the pinned npm package), pinned by checksum.
+    buildCommand: >-
+      pnpm install --frozen-lockfile &&
+      pnpm --filter @chess-tutor/web build &&
+      curl -fsSL -o /tmp/stockfish.tar.gz https://github.com/official-stockfish/Stockfish/releases/download/sf_19/stockfish-linux-x86-64-universal.tar.gz &&
+      echo "9defc0d4e55d49c65a6d042f3e571a39fcea499ade6dbe741b53b8c65e03611f  /tmp/stockfish.tar.gz" | sha256sum -c - &&
+      mkdir -p .stockfish &&
+      tar -xzf /tmp/stockfish.tar.gz -C .stockfish --strip-components=1 stockfish/stockfish-linux-x86-64-universal
     startCommand: pnpm --filter @chess-tutor/server start
     healthCheckPath: /api/health
     autoDeployTrigger: checksPass
@@ -25,6 +33,8 @@ services:
         value: /var/data/chess-tutor.sqlite
       - key: WEB_DIST
         value: apps/web/dist
+      - key: STOCKFISH_PATH
+        value: /opt/render/project/src/.stockfish/stockfish-linux-x86-64-universal
       # Secrets: set in the Render dashboard, never in this file (NFR-12).
       - key: ANTHROPIC_API_KEY
         sync: false
