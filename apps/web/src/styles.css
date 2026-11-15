@@ -64,6 +64,38 @@ main {
   aspect-ratio: 1 / 1;
 }
 
+.board-column {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.board-side {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 1.6rem;
+}
+
+.board-side .side-name {
+  font-weight: 600;
+}
+
+.board-side .captured {
+  font-size: 1.15rem;
+  line-height: 1;
+  color: var(--muted);
+}
+
+.board-side .captured-group + .captured-group {
+  margin-left: 0.3em;
+}
+
+.board-side .material-lead {
+  font-size: 0.9rem;
+  color: var(--muted);
+}
+
 .side {
   display: flex;
   flex-direction: column;
