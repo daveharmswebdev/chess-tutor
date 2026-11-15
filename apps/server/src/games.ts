@@ -12,10 +12,12 @@ import {
   type KeyMomentThresholds,
   type MoveView,
   type SparringBot,
+  type TutorNote,
 } from "@chess-tutor/chess-core";
 import type { TutorEngine, TutorOutcome, TutorRequest, TutorSession } from "@chess-tutor/tutor";
 import {
   AUTH_REASON,
+  bestMoveOf,
   buildReveal,
   cleanArrows,
   failureMessage,
@@ -128,11 +130,14 @@ interface Game {
   /** At most one open question per game; the reveal stays here until "Show me" or a wrong try. */
   question: HeldQuestion | null;
   /**
-   * The question whose reveal was shown ("Show me" or a wrong try), kept for GameView.tutor
-   * (#47) until the next player move, takeback, tutor ask or the end of the game. It is no
-   * longer open: no second "Show me", no grading.
+   * The question whose reveal was shown by "Show me" while its position is still on the board,
+   * kept for GameView.tutor (#47) until the next player move, takeback, tutor ask or the end of
+   * the game. It is no longer open: no second "Show me", no grading. `source` (from #53) is the
+   * held question, for its note. A wrong try does not set this: its question becomes a note.
    */
-  shown: { question: TutorQuestion; reveal: TutorReveal } | null;
+  shown: { question: TutorQuestion; reveal: TutorReveal; source?: HeldQuestion } | null;
+  /** Closed questions kept on the move they were about, in the order they closed (#53, FR-25). */
+  notes: TutorNote[];
   /** The last row written for this game (without updatedAt), so unchanged saves are skipped. */
   lastSaved: string | null;
   /**
@@ -223,7 +228,8 @@ interface MovePlayed {
  * own columns (colour, status, result, endReason, createdAt) it rebuilds the Game exactly:
  * the board is replayed from `moves` through chess.js (FR-10), the bot is asked again if it
  * is its turn, and a pending tutor ask is started again from `tutor.ask.request`. The held
- * reveal is stored here too; it reaches the browser only once shown (architecture §3.5).
+ * reveal (and best move) is stored here too; it reaches the browser only once shown or once the
+ * question becomes a note (architecture §3.5). `notes` (#53) is absent in older rows: loaded as [].
  */
 interface LiveState {
   v: 1;
@@ -233,8 +239,10 @@ interface LiveState {
   tutor: {
     ask: { kind: TutorKind; attemptFen: string; request: TutorRequest } | null;
     question: HeldQuestion | null;
-    shown: { question: TutorQuestion; reveal: TutorReveal } | null;
+    shown: { question: TutorQuestion; reveal: TutorReveal; source?: HeldQuestion } | null;
   };
+  /** Tutor notes (#53). Absent in rows saved before #53: loaded as []. */
+  notes?: TutorNote[];
 }
 
 function liveStateOf(g: Game): LiveState {
@@ -247,7 +255,22 @@ function liveStateOf(g: Game): LiveState {
       question: g.question,
       shown: g.shown,
     },
+    notes: g.notes,
   };
+}
+
+function copyNote(n: TutorNote): TutorNote {
+  return {
+    ...n,
+    bestMove: n.bestMove ? { ...n.bestMove } : null,
+    attempt: n.attempt ? { ...n.attempt, move: { ...n.attempt.move } } : null,
+  };
+}
+
+/** The saved notes that still sit on a move of the game (or after its last move). */
+function savedNotes(state: LiveState | null, moves: number): TutorNote[] {
+  const notes = state && Array.isArray(state.notes) ? state.notes : [];
+  return notes.filter((n) => n && typeof n === "object" && Number.isInteger(n.ply) && n.ply >= 0 && n.ply <= moves).map(copyNote);
 }
 
 /** The saved state, or null for a schema v1 row (or one that cannot be read). */
@@ -301,9 +324,18 @@ function movesFromPgn(pgn: string, playerColor: Color): { uci: string; by: "play
  * question's attemptFen (directly for punish_opponent, opponent_left_book and hints; after a
  * takeback for player_blunder and missed_win), the engine grades it: correct when its loss
  * against the best move is at most attemptToleranceCp; "tutor_attempt" is sent, and on a wrong
- * try also "tutor_reveal". A move from any other position (the player moved on without taking
- * back) closes the question silently. A graded move is not itself coached again as a key
- * moment (its reveal already explains it); the bot's reply still is.
+ * try also "tutor_reveal", then a "state" carrying the try's note. A move from any other
+ * position (the player moved on without taking back) closes the question with no grading. A
+ * graded move is not itself coached again as a key moment (its reveal already explains it); the
+ * bot's reply still is.
+ *
+ * Notes (#53: FR-25, FR-8, FR-10): a question that closes because its position is left becomes
+ * a TutorNote on the move played from attemptFen: when the try is graded (attempt filled), when
+ * the player moves on (attempt null; also for a question shown by "Show me"), at the end of the
+ * game, and when a new ask replaces it. The note releases the held reveal and the engine's best
+ * move for attemptFen (from the analysis grading uses, checked legal; kept on HeldQuestion until
+ * then). A wrong try no longer keeps its question in GameView.tutor: only the note has it. A
+ * takeback drops the notes on the moves it removes and never reopens a closed question.
  *
  * Takebacks keep a reachable question (that is how the player gets back to attemptFen).
  * Detection and grading for a taken-back move are dropped. Coaching turned off (no key, no prompt, an "auth" outcome) skips analysis
@@ -354,6 +386,7 @@ export function createGameManager(opts: GameManagerOptions): GameManager {
       endReason: g.endReason,
       botThinking: g.botThinking,
       tutor: tutorStatus(g),
+      notes: g.notes.map(copyNote),
     };
   }
 
@@ -428,6 +461,7 @@ export function createGameManager(opts: GameManagerOptions): GameManager {
       ask: null,
       question: null,
       shown: null,
+      notes: [],
       lastSaved: null,
       readOnly: false,
     };
@@ -468,6 +502,7 @@ export function createGameManager(opts: GameManagerOptions): GameManager {
     g.status = row.status;
     g.result = row.result;
     g.endReason = row.endReason;
+    g.notes = savedNotes(state, g.moves.length);
     if (g.readOnly) return { game: g, ask: null };
     if (row.status === "playing" && state) {
       g.question = state.tutor.question;
@@ -484,6 +519,11 @@ export function createGameManager(opts: GameManagerOptions): GameManager {
   function resume(g: Game, ask: LiveState["tutor"]["ask"]): void {
     enforceReachable(g);
     if (g.chess.turn() !== g.playerColor) startBot(g);
+    // A best move not yet known at the save is looked up again (#53).
+    if (coaching) {
+      if (g.question) fillBestMove(g, g.question);
+      if (g.shown?.source) fillBestMove(g, g.shown.source);
+    }
     if (ask) {
       if (coachingOn() && reachable(g, ask.kind, ask.attemptFen)) {
         log.info({ gameId: g.id, kind: ask.kind }, "tutor ask started again after a restart");
@@ -535,10 +575,9 @@ export function createGameManager(opts: GameManagerOptions): GameManager {
     g.endReason = endReason;
     g.botThinking = false;
     g.version++;
-    // A finished game has no attempt to make: abort the ask, close the question.
+    // A finished game has no attempt to make: abort the ask, close the question (as a note, #53).
     cancelAsk(g);
-    g.question = null;
-    g.shown = null;
+    closeAsNotes(g, "the game ended");
     save(g);
     log.info({ gameId: g.id, status, result, endReason }, "game over");
   }
@@ -576,6 +615,94 @@ export function createGameManager(opts: GameManagerOptions): GameManager {
 
   // ---------------------------------------------------------------------------------------
   // Coaching
+
+  // Tutor notes (#53: FR-25, FR-8, FR-10). A question becomes a note only once its position is
+  // left (or the game ends, or a new ask replaces it); until then its reveal and best move stay here.
+
+  /**
+   * Moves played before the latest occurrence of `attemptFen` on the board: moves.length when it
+   * is the current position, else the index of the move played from it. Null if it is gone.
+   */
+  function plyOf(g: Game, attemptFen: string): number | null {
+    if (samePosition(g.chess.fen(), attemptFen)) return g.moves.length;
+    for (let i = g.fensBefore.length - 1; i >= 0; i--) if (samePosition(g.fensBefore[i]!, attemptFen)) return i;
+    return null;
+  }
+
+  /** Records a note for `q` unless it has one already. The caller saves before announcing it. */
+  function addNote(
+    g: Game,
+    q: HeldQuestion,
+    ply: number | null,
+    attempt: TutorNote["attempt"],
+    bestMove: MoveView | null = q.bestMove ?? null,
+  ): void {
+    if (ply === null) {
+      log.info({ gameId: g.id, questionId: q.view.id }, "tutor note not kept: its position is no longer on the board");
+      return;
+    }
+    if (g.notes.some((n) => n.questionId === q.view.id)) return;
+    g.notes.push({
+      questionId: q.view.id,
+      kind: q.view.kind,
+      ply,
+      message: q.view.message,
+      reveal: q.reveal,
+      bestMove: bestMove ? { ...bestMove } : null,
+      attempt: attempt ? { ...attempt, move: { ...attempt.move } } : null,
+    });
+    log.info({ gameId: g.id, questionId: q.view.id, ply, graded: attempt !== null }, "tutor note");
+  }
+
+  /** The shown question as a HeldQuestion (rows saved before #53 have no source). */
+  function shownSource(shown: NonNullable<Game["shown"]>): HeldQuestion {
+    return (
+      shown.source ?? {
+        view: shown.question,
+        reveal: shown.reveal.text,
+        revealMove: shown.reveal.move?.uci ?? null,
+        bestMove: null,
+      }
+    );
+  }
+
+  /** Closes the open and the shown question into notes on their positions (end of game, new ask). */
+  function closeAsNotes(g: Game, why: string): void {
+    if (g.question) {
+      log.info({ gameId: g.id, questionId: g.question.view.id }, `tutor question closed: ${why}`);
+      addNote(g, g.question, plyOf(g, g.question.view.attemptFen), null);
+    }
+    if (g.shown) {
+      const q = shownSource(g.shown);
+      addNote(g, q, plyOf(g, q.view.attemptFen), null);
+    }
+    g.question = null;
+    g.shown = null;
+  }
+
+  /**
+   * Fills the question's best move from the server's analysis of attemptFen (the one grading
+   * uses), normally already cached by detection. Kept on the server until the note (FR-8).
+   */
+  function fillBestMove(g: Game, q: HeldQuestion): void {
+    if (q.bestMove !== undefined) return;
+    const fen = q.view.attemptFen;
+    const p = afterBot(g)
+      .then(() => analysisOf(g, fen))
+      .then(
+        (a) => {
+          if (q.bestMove === undefined) q.bestMove = bestMoveOf(fen, a);
+        },
+        (err: unknown) => {
+          log.warn({ gameId: g.id, questionId: q.view.id, err }, "no best move for the tutor question: analysis failed");
+          if (q.bestMove === undefined) q.bestMove = null;
+        },
+      )
+      .then(() => {
+        if (g.question === q || g.shown?.source === q) save(g);
+      });
+    track(g, p);
+  }
 
   function track(g: Game, p: Promise<void>): void {
     g.work.add(p);
@@ -743,15 +870,17 @@ export function createGameManager(opts: GameManagerOptions): GameManager {
       return;
     }
     cancelAsk(g);
-    if (g.question) log.info({ gameId: g.id, questionId: g.question.view.id }, "tutor question replaced");
-    g.question = null;
-    g.shown = null;
+    // A replaced question whose position is still on the board becomes a note (#53).
+    const notesBefore = g.notes.length;
+    closeAsNotes(g, "replaced by a new ask");
     const token = ++nextAskToken;
     const controller = new AbortController();
     g.ask = { token, kind, attemptFen, request, controller };
     log.info({ gameId: g.id, kind }, "tutor asked");
     // tutor_thinking at once; the session sends the first progress label itself (NFR-1).
     emit(g, { type: "tutor_thinking", kind });
+    // Notes reach the client only inside a GameView.
+    if (g.notes.length !== notesBefore) emit(g, { type: "state", game: viewOf(g) });
 
     const onProgress = (p: { label: string }) => {
       if (g.ask?.token === token) emit(g, { type: "tutor_progress", label: String(p.label) });
@@ -801,6 +930,7 @@ export function createGameManager(opts: GameManagerOptions): GameManager {
         reveal: reply.reveal,
         revealMove: reply.revealMove,
       };
+      fillBestMove(g, g.question);
       log.info({ ...meta, questionId: g.question.view.id }, "tutor reply");
       emit(g, { type: "tutor_reply", question: { ...g.question.view, arrows: g.question.view.arrows.map((a) => ({ ...a })) } });
       return;
@@ -822,28 +952,42 @@ export function createGameManager(opts: GameManagerOptions): GameManager {
 
   function gradeAttempt(g: Game, q: HeldQuestion, m: MovePlayed, move: MoveView): void {
     const botTurn = afterBot(g);
+    const ply = m.history.length;
+    /** The try closed the question: it becomes a note on the try (#53), announced in a "state". */
+    const ungraded = (why: string, bestMove?: MoveView | null) => {
+      if (closed || !stillPlayed(g, m)) return;
+      log.warn({ gameId: g.id, questionId: q.view.id, uci: m.uci }, `attempt not graded: ${why}`);
+      addNote(g, q, ply, null, bestMove ?? q.bestMove ?? null);
+      emit(g, { type: "state", game: viewOf(g) });
+    };
     const p = (async () => {
       await botTurn;
       const [before, after] = await Promise.all([analysisOf(g, m.fenBefore), analysisOf(g, m.fenAfter)]);
+      if (closed) return;
       if (!stillPlayed(g, m)) {
         log.info({ gameId: g.id, questionId: q.view.id, uci: m.uci }, "attempt not graded: the move was taken back");
         return;
       }
+      // The best move from the analysis the try is graded against (FR-10).
+      const bestMove = bestMoveOf(m.fenBefore, before);
       const cpLoss = moveLoss(m.fenBefore, m.uci, before, after);
       if (cpLoss === null) {
-        log.warn({ gameId: g.id, questionId: q.view.id, uci: m.uci }, "attempt not graded: no evaluation");
+        ungraded("no evaluation", bestMove);
         return;
       }
       const correct = cpLoss <= toleranceCp;
       log.info({ gameId: g.id, questionId: q.view.id, uci: m.uci, cpLoss, correct }, "attempt graded");
       const reveal = correct ? null : buildReveal(q);
-      // Kept for GameView.tutor.reveal (#47) unless the game has moved on to another question.
-      if (reveal && g.status === "playing" && !g.ask && !g.question && !closed) {
-        g.shown = { question: copyQuestion(q.view), reveal: copyReveal(reveal) };
-      }
+      // The question is closed by the try: its content now lives in the note, not in
+      // GameView.tutor (FR-24, FR-8 as amended by A6).
+      addNote(g, q, ply, { move: { ...move }, correct, cpLoss }, bestMove);
       emit(g, { type: "tutor_attempt", questionId: q.view.id, move: { ...move }, correct, cpLoss });
       if (reveal) emit(g, { type: "tutor_reveal", reveal });
-    })().catch((err: unknown) => log.warn({ gameId: g.id, err }, "attempt grading failed"));
+      emit(g, { type: "state", game: viewOf(g) });
+    })().catch((err: unknown) => {
+      log.warn({ gameId: g.id, err }, "attempt grading failed");
+      ungraded("grading failed");
+    });
     track(g, p);
   }
 
@@ -949,9 +1093,12 @@ export function createGameManager(opts: GameManagerOptions): GameManager {
       g.version++;
       // The player's next move closes the open question; from attemptFen it is an attempt.
       const attempt = g.question && samePosition(g.question.view.attemptFen, fenBefore) ? g.question : null;
-      if (g.question && !attempt) log.info({ gameId: g.id, questionId: g.question.view.id }, "tutor question closed: the player moved on");
-      g.question = null;
-      g.shown = null;
+      if (attempt) {
+        // Graded below; its note is made when the grade is known.
+        g.question = null;
+      }
+      // Moved on (a question not tried, or one shown by "Show me"): a note now, attempt null (#53).
+      closeAsNotes(g, "the player moved on");
       enforceReachable(g); // e.g. a Hint for the position just left: aborted, thinking false
       if (checkOutcome(g)) {
         emit(g, { type: "game_over", game: viewOf(g) });
@@ -978,6 +1125,8 @@ export function createGameManager(opts: GameManagerOptions): GameManager {
       }
       g.version++;
       g.shown = null;
+      // The moves the notes sat on are gone (#53); a closed question is never reopened.
+      g.notes = g.notes.filter((n) => n.ply < g.moves.length);
       enforceReachable(g); // a takeback past attemptFen closes the question
       emit(g, { type: "state", game: viewOf(g) });
       return viewOf(g);
@@ -1021,7 +1170,7 @@ export function createGameManager(opts: GameManagerOptions): GameManager {
       g.question = null;
       const reveal = buildReveal(q);
       // Shown now: GameView.tutor carries it (#47) until the position moves on.
-      g.shown = { question: copyQuestion(q.view), reveal: copyReveal(reveal) };
+      g.shown = { question: copyQuestion(q.view), reveal: copyReveal(reveal), source: q };
       log.info({ gameId: g.id, questionId: q.view.id, move: reveal.move?.uci ?? null }, "tutor reveal");
       emit(g, { type: "tutor_reveal", reveal });
       return reveal;

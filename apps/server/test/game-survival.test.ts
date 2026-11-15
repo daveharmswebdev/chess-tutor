@@ -346,20 +346,35 @@ describe("tutor.reveal (#47)", () => {
     expect((await get(b, id)).view.tutor).toMatchObject({ question: null, reveal: null });
   });
 
-  it("after a wrong try: the reveal is set until the player's next move", async () => {
+  it("after a wrong try: the question is closed into a note, not kept in tutor (#53, FR-24, FR-8)", async () => {
     const a = boot("a", ["e7e5", "e7e5", "b8c6"]);
     const { id, events, question } = await openQuestion(a);
     expect((await post(a, `/api/games/${id}/takeback`)).status).toBe(200);
     await play(a, id, "e2e4"); // the same mistake again: -300
     const revealed = await events.next("tutor_reveal");
     if (revealed.type !== "tutor_reveal") throw new Error("unreachable");
-    expect((await get(a, id)).view.tutor).toMatchObject({ question: { id: question.id }, reveal: revealed.reveal });
+    await a.games.idle(id);
+    // The try left attemptFen: the next GameView has no question, and the note holds the reveal.
+    const afterTry = events.events.slice(events.events.indexOf(revealed)).find((e) => e.type === "state");
+    if (afterTry?.type !== "state") throw new Error("no state after the try");
+    for (const v of [afterTry.game, (await get(a, id)).view]) {
+      expect(v.tutor).toMatchObject({ question: null, reveal: null });
+      expect(v.notes!.at(-1)).toMatchObject({
+        questionId: question.id,
+        reveal: "d4 holds the centre.",
+        bestMove: { uci: "d2d4", san: "d4", by: "player" },
+        attempt: { correct: false, cpLoss: 300, move: { uci: "e2e4" } },
+      });
+    }
+    const note = (await get(a, id)).view.notes;
     await a.close();
 
     const b = boot("b", ["b8c6"]);
-    expect((await get(b, id)).view.tutor.reveal).toEqual(revealed.reveal);
+    const restored = (await get(b, id)).view;
+    expect(restored.tutor).toMatchObject({ question: null, reveal: null });
+    expect(restored.notes).toEqual(note);
     await play(b, id, "g1f3");
-    expect((await get(b, id)).view.tutor).toMatchObject({ question: null, reveal: null });
+    expect((await get(b, id)).view.notes).toEqual(note);
   });
 });
 

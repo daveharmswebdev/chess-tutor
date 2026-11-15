@@ -100,6 +100,16 @@ export interface HeldQuestion {
   view: TutorQuestion;
   reveal: string | null;
   revealMove: string | null;
+  /**
+   * The engine's best move in attemptFen, from the server's own analysis (FR-10), kept for the
+   * question's note (#53). Undefined until that analysis is known; null when it had none.
+   */
+  bestMove?: MoveView | null;
+}
+
+/** The analysis's best move as a legal MoveView by the player in `fen` (FR-10), else null. */
+export function bestMoveOf(fen: string, analysis: Analysis): MoveView | null {
+  return legalPlayerMove(fen, analysis.lines[0]?.moves[0] ?? null);
 }
 
 export function buildReveal(q: HeldQuestion): TutorReveal {

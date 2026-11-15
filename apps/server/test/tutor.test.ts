@@ -635,7 +635,7 @@ describe("trying again: the engine grades the attempt (no Claude call)", () => {
       cpLoss: 300,
       move: { uci: "e2e4", by: "player" },
     });
-    expect(events.events.at(-1)).toEqual({
+    expect(events.events.find((e) => e.type === "tutor_reveal")).toEqual({
       type: "tutor_reveal",
       reveal: {
         questionId: question.id,
@@ -644,12 +644,9 @@ describe("trying again: the engine grades the attempt (no Claude call)", () => {
         arrows: [{ from: "d2", to: "d4" }],
       },
     });
-    // Closed for grading and Show me; GameView shows it with its reveal until the next move (#47).
-    const last = events.events.at(-1);
-    expect(games.view(id)!.tutor).toMatchObject({
-      question: { id: question.id },
-      reveal: last?.type === "tutor_reveal" ? last.reveal : "unreachable",
-    });
+    // Closed for grading and Show me; the try left its position, so it lives on as a note (#53).
+    expect(games.view(id)!.tutor).toMatchObject({ question: null, reveal: null });
+    expect(games.view(id)!.notes).toMatchObject([{ questionId: question.id, reveal: "d4 was better." }]);
     expect((await post(`/api/games/${id}/tutor/reveal`)).status).toBe(409);
     await games.idle(id);
     expect(tutor.asks).toHaveLength(1);
