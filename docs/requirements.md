@@ -2,7 +2,7 @@
 
 | | |
 |---|---|
-| Status | Accepted v0.2 (amendments A1 and A2 applied 2026-11-07, A3 and A4 2026-11-15) |
+| Status | Accepted v0.2 (amendments A1 and A2 applied 2026-11-07, A3, A4 and A5 2026-11-15) |
 | Date | 2026-11-04 |
 | Owner | Dave Harms |
 
@@ -93,6 +93,7 @@ The project has three goals: get better at chess, build a portfolio-quality piec
 | NFR-11 **Fair play** | The app does not read positions from other sites, offers no browser extension or overlay, and makes no attempt to import a game in progress. | BR-5 |
 | NFR-12 **Secrets** | The API key is never committed. It comes only from a runtime environment variable or a credential helper. | BR-3 |
 | NFR-13 **Portability** | Runs locally with a single command. All configuration (model ID, thresholds, rating band) comes from versioned config plus environment variables, so the app can be deployed later without code changes. | BR-3 |
+| NFR-14 **Game survival** | A game in progress, with the tutor's messages and chat, survives a page refresh, a server restart and a redeploy. Every move and tutor message is saved before it is acknowledged; on startup the server resumes games still in progress instead of abandoning them. The game's address (`/games/<id>`) reopens it. While the server can't be reached, the UI says it is reconnecting and keeps retrying, and it offers a new game only when the server says the game doesn't exist. *Added by A5, 2026-11-15.* | BR-1 |
 
 ## 5. Infrastructure requirements
 
@@ -141,7 +142,7 @@ These follow from the functional requirements plus the proposed architecture: a 
 
 | Business | Functional | Non-functional | Infrastructure |
 |---|---|---|---|
-| BR-1 Handle deviations | FR-1–6, 9, 11, 13, 14, 18, 19, 20 | NFR-1, 2, 3, 9 | IR-2, 3, 5, 7, 8 |
+| BR-1 Handle deviations | FR-1–6, 9, 11, 13, 14, 18, 19, 20 | NFR-1, 2, 3, 9, 14 | IR-2, 3, 5, 7, 8 |
 | BR-2 Build understanding | FR-4, 7, 8, 12, 21–23 | NFR-7 | — |
 | BR-3 Claude + engine, exam prep | FR-10, 15–19, 21, 23 | NFR-6, 8, 10, 12, 13 | IR-1, 2, 6, 9 |
 | BR-4 Cost | FR-6, 7 | NFR-4, 5, 9 | IR-4, 6 |

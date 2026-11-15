@@ -20,6 +20,16 @@ services:
     startCommand: pnpm --filter @chess-tutor/server start
     healthCheckPath: /api/health
     autoDeployTrigger: checksPass
+    # Skip deploys for commits that touch only files the running app never reads, so docs and
+    # agent-log commits don't restart the server and drop games in progress (NFR-14).
+    # Never ignore prompts/ (the prompt is Markdown) or config/ (read at startup).
+    buildFilter:
+      ignoredPaths:
+        - docs/**
+        - .claude/**
+        - evals/**
+        - README.md
+        - CLAUDE.md
     disk:
       name: chess-tutor-data
       mountPath: /var/data
