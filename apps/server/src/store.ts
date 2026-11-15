@@ -58,7 +58,8 @@ export const SCHEMA_VERSION = 2;
  *   2  adds `state` (JSON: the live game state) and an index on status; games in progress are
  *      saved too (#47, NFR-14). Migrated from 1 by ALTER TABLE, so v1 rows keep working with
  *      state NULL and are rebuilt from their PGN.
- * Tutor comments (#7, FR-5) are planned as a separate `game_comments` table in a later version.
+ * Tutor notes (#53, FR-25, FR-5) live in `state` (its `notes` array, [] when absent) and in the
+ * PGN as {...} comments; no separate table and no schema change.
  * A database with a newer version than this code knows is refused.
  */
 export function createSqliteGameStore(path: string): GameStore {
