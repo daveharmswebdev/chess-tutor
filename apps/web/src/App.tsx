@@ -1,10 +1,12 @@
 // Board UI: choose a color, play the sparring bot, take back, resign, retry a failed bot move,
 // and the tutor panel with its board arrows. FR-1, FR-4, IR-5, #23; #7: FR-8, FR-11, FR-12, NFR-9.
+// #47 (NFR-14): the address is the game (/games/<id>); popstate and the first render navigate.
 import type { Color, MoveView } from "@chess-tutor/chess-core";
 import { useEffect, useMemo, useState, useSyncExternalStore, type CSSProperties } from "react";
 import { Chessboard, type ChessboardOptions } from "react-chessboard";
 import { createApiClient } from "./api.ts";
 import { isOwnPiece, legalTargets, moveToUci } from "./chess-rules.ts";
+import { ConnectionNotice } from "./ConnectionNotice.tsx";
 import { createGameController } from "./controller.ts";
 import { GameActions } from "./GameActions.tsx";
 import { boardFen, gameReducer, initialGameState, isPlayersTurn, statusText } from "./game-state.ts";
@@ -56,10 +58,19 @@ export function App() {
         openEvents: (url) => new EventSource(url),
         dispatch: store.dispatch,
         getState: store.getState,
+        pushPath: (path) => window.history.pushState(null, "", path),
       }),
     [store],
   );
-  useEffect(() => () => controller.dispose(), [controller]);
+  useEffect(() => {
+    const onPopState = () => void controller.navigate(window.location.pathname);
+    window.addEventListener("popstate", onPopState);
+    onPopState();
+    return () => {
+      window.removeEventListener("popstate", onPopState);
+      controller.dispose();
+    };
+  }, [controller]);
 
   const state = useSyncExternalStore(store.subscribe, store.getState);
   const [color, setColor] = useState<Color>("w");
@@ -156,6 +167,7 @@ export function App() {
                 {error}
               </p>
             )}
+            <ConnectionNotice state={state} onNewGame={() => void controller.newGame(color)} />
           </div>
 
           <div className="panel">
