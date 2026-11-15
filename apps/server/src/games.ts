@@ -68,7 +68,10 @@ export interface GameManagerOptions {
 export interface GameManager {
   /** Abandons (and saves) any game still playing, then starts a new one. */
   create(playerColor: Color): GameView;
-  /** Any game ever created: from memory, or rebuilt from the store (finished, abandoned). */
+  /**
+   * Any game ever created: from memory, or rebuilt from the store (finished, abandoned).
+   * Undefined only when the store has no such game; a store read error is thrown (a 500).
+   */
   view(id: string): GameView | undefined;
   play(id: string, uci: string): GameView;
   takeback(id: string): GameView;
@@ -381,8 +384,10 @@ export function createGameManager(opts: GameManagerOptions): GameManager {
     try {
       row = store.get(id);
     } catch (err) {
+      // Not a 404: the web treats that as "game not found" for good (review 068). This
+      // reaches the error handler as a 500 ApiError.
       log.error({ gameId: id, err }, "could not read game from the store");
-      return undefined;
+      throw err;
     }
     if (!row) return undefined;
     const { game, ask } = hydrate(row);
@@ -912,20 +917,16 @@ export function createGameManager(opts: GameManagerOptions): GameManager {
 
   return {
     create(playerColor) {
-      for (const g of games.values()) if (g.status === "playing") abandon(g);
       const g = newGameRecord(newId(), playerColor, now());
+      // In the store before anything else changes (#47). If that fails, nothing has: the
+      // reply is 500 and the old game stays playing, with no event (reviews 065, 068).
+      save(g, { required: true });
+      for (const other of games.values()) if (other.status === "playing") abandon(other);
       games.set(g.id, g);
       log.info({ gameId: g.id, playerColor }, "new game");
-      if (playerColor === "b") startBot(g);
-      try {
-        save(g, { required: true }); // in the store before the 201 (#47)
-      } catch (err) {
-        // A game that would not survive a restart is not acknowledged: 500 (review 065).
-        g.status = "abandoned";
-        g.version++; // a bot search already started is discarded
-        g.botThinking = false;
-        games.delete(g.id);
-        throw err;
+      if (playerColor === "b") {
+        startBot(g);
+        save(g); // botThinking (informational: on load the bot is asked whenever it is its turn)
       }
       return viewOf(g);
     },

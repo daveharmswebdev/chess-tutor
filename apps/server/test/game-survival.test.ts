@@ -508,3 +508,63 @@ describe("review 065 (round 2)", () => {
     }
   });
 });
+
+describe("review 068 (round 3)", () => {
+  it("(A) a failed save of the new game leaves the old one playing: no game_over, moves still accepted", async () => {
+    const real = createSqliteGameStore(dbPath);
+    const store: GameStore = {
+      save(g) {
+        if (g.id === "g2") throw new Error("disk full");
+        real.save(g);
+      },
+      get: (id) => real.get(id),
+      listPlaying: () => real.listPlaying(),
+      close: () => real.close(),
+    };
+    let n = 0;
+    const { app, games } = buildServer({ bot: createFakeBot(["e7e5", "b8c6"]), store, newId: () => `g${++n}`, logger: false });
+    try {
+      const first = await app.inject({ method: "POST", url: "/api/games", payload: { playerColor: "w" } });
+      expect(first.statusCode).toBe(201);
+      expect((await app.inject({ method: "POST", url: "/api/games/g1/moves", payload: { uci: "e2e4" } })).statusCode).toBe(200);
+      await games.idle("g1");
+      const events = eventCollector();
+      games.subscribe("g1", events.push);
+
+      const second = await app.inject({ method: "POST", url: "/api/games", payload: { playerColor: "w" } });
+      expect(second.statusCode).toBe(500);
+      expect(second.json()).toEqual({ error: expect.any(String) });
+      expect(games.view("g1")!.status).toBe("playing");
+      expect(onDisk("g1")).toMatchObject({ status: "playing", endReason: null });
+      expect(events.events.map((e) => e.type)).not.toContain("game_over");
+      expect((await app.inject({ method: "POST", url: "/api/games/g1/moves", payload: { uci: "g1f3" } })).statusCode).toBe(200);
+    } finally {
+      await app.close();
+      real.close();
+    }
+  });
+
+  it("(B) a store read error is a 500 on GET and on the event stream, not a 404", async () => {
+    const real = createSqliteGameStore(dbPath);
+    const store: GameStore = {
+      save: (g) => real.save(g),
+      get() {
+        throw new Error("database is locked");
+      },
+      listPlaying: () => real.listPlaying(),
+      close: () => real.close(),
+    };
+    const { app } = buildServer({ bot: createFakeBot(), store, logger: false });
+    try {
+      const res = await app.inject({ method: "GET", url: "/api/games/old1" });
+      expect(res.statusCode).toBe(500);
+      expect(res.json()).toEqual({ error: expect.any(String) });
+      const sse = await app.inject({ method: "GET", url: "/api/games/old1/events" });
+      expect(sse.statusCode).toBe(500);
+      expect(sse.json()).toEqual({ error: expect.any(String) });
+    } finally {
+      await app.close();
+      real.close();
+    }
+  });
+});
