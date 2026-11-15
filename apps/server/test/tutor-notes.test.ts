@@ -264,7 +264,7 @@ describe("a note is created when the question's position is left (FR-25)", () =>
     expect(old.notes).toMatchObject([{ questionId: question.id, ply: 0, attempt: null, reveal: SECRET }]);
   });
 
-  it("a new ask replacing an open question turns it into a note", async () => {
+  it("a new ask replacing a question whose position was already left (one takeback away) turns it into a note", async () => {
     freshStore();
     const s = boot();
     const { id, question } = await blunderQuestion(s);
@@ -560,5 +560,246 @@ describe("PGN (FR-5)", () => {
     await post(s, `/api/games/${id}/resign`);
     const saved = store.get(id)!.pgn;
     expect(movetextOf(saved)).toMatch(/^1\. e4 \{Tutor: [^}]*\} e5 0-1$/);
+  });
+});
+
+// ---------------------------------------------------------------------------------------
+// Round 2 (review 074): pending notes, bot error after state, Show me across a takeback,
+// grading across a restart, a late best move.
+
+const P1 = fenAfter(["d2d4", "d7d5"]);
+const NF3 = { uci: "g1f3", san: "Nf3", by: "player" } as const;
+
+/** 1. d4 d5 2. e4? (Nf3 best, -300) e6, with the player_blunder question open at P1 (ply 2). */
+async function blunderAtPly2(s: Server) {
+  s.analyzer.set(P1, 0, "g1f3");
+  s.analyzer.set(fenAfter(["d2d4", "d7d5", "e2e4"]), -300);
+  s.analyzer.set(fenAfter(["d2d4", "d7d5", "e2e4", "e7e6"]), -300);
+  const { id, events } = await newGame(s);
+  await play(s, id, "d2d4");
+  await play(s, id, "e2e4");
+  (await s.tutor.ask(0)).resolve(okOutcome({ reveal: SECRET, revealMove: "g1f3" }));
+  const reply = await events.next("tutor_reply");
+  if (reply.type !== "tutor_reply") throw new Error("unreachable");
+  await s.games.idle(id);
+  return { id, events, question: reply.question };
+}
+
+/** Takes back to the blunder's attemptFen and asks for a Hint there. */
+async function hintAtAttemptFen(s: Server, id: string, events: ReturnType<typeof eventCollector>, n: number) {
+  expect((await post(s, `/api/games/${id}/takeback`)).status).toBe(200);
+  expect((await post(s, `/api/games/${id}/tutor/hint`)).status).toBe(202);
+  (await s.tutor.ask(n)).resolve(okOutcome({ kind: "hint", message: "Which piece is idle?", reveal: "HINT-ANSWER", revealMove: "g1f3" }));
+  const reply = await events.next("tutor_reply", 1);
+  if (reply.type !== "tutor_reply") throw new Error("unreachable");
+  await s.games.idle(id);
+  return reply.question;
+}
+
+describe("a Hint replacing a question at its own position keeps it pending (FR-8, review 074)", () => {
+  it("nothing of the replaced question reaches GameView, SSE or the PGN while at that position", async () => {
+    freshStore();
+    const s = boot({ script: ["d7d5", "e7e6", "e7e6", "b8c6"] });
+    const { id, events } = await blunderAtPly2(s);
+    await hintAtAttemptFen(s, id, events, 1);
+    const view = (await get(s, id)).raw;
+    expect(view).not.toContain("SECRET");
+    expect(JSON.stringify(events.events)).not.toContain("SECRET");
+    expect(store.get(id)!.pgn).not.toContain("SECRET");
+    expect(s.games.view(id)!.notes).toEqual([]);
+    for (const v of views(events.events)) expect(v.notes).toEqual([]);
+  });
+
+  it("the move that leaves the position releases it (attempt null), then the hint's own note", async () => {
+    freshStore();
+    const s = boot({ script: ["d7d5", "e7e6", "e7e6", "b8c6"] });
+    const { id, events, question } = await blunderAtPly2(s);
+    const hint = await hintAtAttemptFen(s, id, events, 1);
+    const res = await post(s, `/api/games/${id}/moves`, { uci: "g1f3" });
+    expect(res.status).toBe(200);
+    const blunderNote = {
+      questionId: question.id,
+      kind: "player_blunder",
+      ply: 2,
+      message: question.message,
+      reveal: SECRET,
+      bestMove: NF3,
+      attempt: null,
+    };
+    expect((res.body as unknown as GameView).notes).toEqual([blunderNote]);
+    await s.games.idle(id);
+    expect(s.games.view(id)!.notes).toEqual([
+      blunderNote,
+      {
+        questionId: hint.id,
+        kind: "hint",
+        ply: 2,
+        message: "Which piece is idle?",
+        reveal: "HINT-ANSWER",
+        bestMove: NF3,
+        attempt: { move: NF3, correct: true, cpLoss: 0 },
+      },
+    ]);
+  });
+
+  it("a takeback past its position drops it for good", async () => {
+    freshStore();
+    const s = boot({ script: ["d7d5", "e7e6", "d7d5", "b8c6"] });
+    const { id, events, question } = await blunderAtPly2(s);
+    await hintAtAttemptFen(s, id, events, 1);
+    expect((await post(s, `/api/games/${id}/takeback`)).status).toBe(200);
+    expect(s.games.view(id)!.moves).toEqual([]);
+    await play(s, id, "d2d4");
+    await play(s, id, "g1f3");
+    const res = await post(s, `/api/games/${id}/resign`);
+    const notes = (res.body as unknown as GameView).notes!;
+    expect(notes.map((n) => n.questionId)).not.toContain(question.id);
+    expect(store.get(id)!.state).not.toContain("SECRET");
+  });
+
+  it("the end of the game releases it", async () => {
+    freshStore();
+    const s = boot({ script: ["d7d5", "e7e6", "e7e6", "b8c6"] });
+    const { id, events, question } = await blunderAtPly2(s);
+    const hint = await hintAtAttemptFen(s, id, events, 1);
+    const res = await post(s, `/api/games/${id}/resign`);
+    expect((res.body as unknown as GameView).notes).toMatchObject([
+      { questionId: question.id, ply: 2, reveal: SECRET, bestMove: NF3, attempt: null },
+      { questionId: hint.id, ply: 2, reveal: "HINT-ANSWER", attempt: null },
+    ]);
+  });
+
+  it("survives a restart while pending, and is released by the move after it", async () => {
+    freshStore();
+    const a = boot({ script: ["d7d5", "e7e6"] });
+    const { id, events, question } = await blunderAtPly2(a);
+    await hintAtAttemptFen(a, id, events, 1);
+    await a.app.close();
+    const b = boot({ prefix: "b", script: ["b8c6"] });
+    const restored = await get(b, id);
+    expect(restored.raw).not.toContain("SECRET");
+    expect(restored.view.notes).toEqual([]);
+    const view = await play(b, id, "c2c4");
+    expect(view.notes).toMatchObject([
+      { questionId: question.id, ply: 2, reveal: SECRET, bestMove: NF3, attempt: null },
+      { kind: "hint", ply: 2 },
+    ]);
+  });
+});
+
+describe("a bot failure stays announced after later states (review 074)", () => {
+  it("bot fails, then the try is graded: its state is followed by the error again; a retry clears it", async () => {
+    freshStore();
+    const s = boot();
+    const { id, events } = await blunderQuestion(s);
+    expect((await post(s, `/api/games/${id}/takeback`)).status).toBe(200);
+    s.bot.failNext("engine crashed");
+    s.analyzer.set(fenAfter(["g1f3"]), -40);
+    const from = events.events.length;
+    expect((await post(s, `/api/games/${id}/moves`, { uci: "g1f3" })).status).toBe(200);
+    await s.games.idle(id);
+    const seq = events.events.slice(from);
+    expect(seq.map((e) => e.type)).toContain("tutor_attempt");
+    expect(seq.at(-1)).toMatchObject({ type: "error", message: expect.stringContaining("engine crashed") });
+    // Every "state" after the failure (the bot still due, not thinking) is followed by the error.
+    const failedAt = seq.findIndex((e) => e.type === "error");
+    seq.forEach((e, i) => {
+      if (i > failedAt && e.type === "state") expect(seq[i + 1]?.type).toBe("error");
+    });
+
+    const retryFrom = events.events.length;
+    expect((await post(s, `/api/games/${id}/bot-retry`)).status).toBe(200);
+    await s.games.idle(id);
+    const after = events.events.slice(retryFrom).map((e) => e.type);
+    expect(after).toContain("bot_move");
+    expect(after).not.toContain("error");
+  });
+});
+
+describe("Show me across a takeback (review 074)", () => {
+  it("a takeback landing on its attemptFen keeps question and reveal; moving on then makes the note", async () => {
+    freshStore();
+    const s = boot();
+    const { id, question } = await blunderQuestion(s);
+    const shown = await post(s, `/api/games/${id}/tutor/reveal`);
+    expect(shown.status).toBe(200);
+    const res = await post(s, `/api/games/${id}/takeback`);
+    const view = res.body as unknown as GameView;
+    expect(view.fen).toBe(START);
+    expect(view.tutor).toMatchObject({ question: { id: question.id }, reveal: shown.body });
+    expect(view.notes).toEqual([]);
+    const moved = await play(s, id, "d2d4");
+    expect(moved.tutor).toMatchObject({ question: null, reveal: null });
+    expect(moved.notes).toEqual([
+      { questionId: question.id, kind: "player_blunder", ply: 0, message: question.message, reveal: SECRET, bestMove: D4, attempt: null },
+    ]);
+  });
+
+  it("any other takeback drops it", async () => {
+    freshStore();
+    const s = boot({ script: ["e7e5", "b8c6", "b8c6"] });
+    s.analyzer.set(fenAfter(["e2e4", "e7e5"]), 0, "g1f3");
+    const { id, events } = await newGame(s);
+    await play(s, id, "e2e4");
+    expect((await post(s, `/api/games/${id}/tutor/hint`)).status).toBe(202);
+    (await s.tutor.ask(0)).resolve(okOutcome({ kind: "hint", reveal: "Nf3 develops.", revealMove: "g1f3" }));
+    await events.next("tutor_reply");
+    expect((await post(s, `/api/games/${id}/tutor/reveal`)).status).toBe(200);
+    const res = await post(s, `/api/games/${id}/takeback`);
+    expect((res.body as unknown as GameView).tutor).toMatchObject({ question: null, reveal: null });
+    const view = await play(s, id, "d2d4");
+    expect(view.notes).toEqual([]);
+  });
+});
+
+describe("grading in flight across a restart (NFR-14, review 074)", () => {
+  it("an acknowledged try graded after the restart still gets its note with the attempt", async () => {
+    freshStore();
+    const a = boot();
+    const { id, events, question } = await blunderQuestion(a);
+    expect((await post(a, `/api/games/${id}/takeback`)).status).toBe(200);
+    a.analyzer.hold(); // the analysis after Nf3 never arrives on server A
+    expect((await post(a, `/api/games/${id}/moves`, { uci: "g1f3" })).status).toBe(200);
+    await events.next("bot_move", 1);
+    await a.app.close();
+
+    const b = boot({ prefix: "b" });
+    scriptPlayerBlunder(b.analyzer);
+    b.analyzer.set(fenAfter(["g1f3"]), -40);
+    expect((await get(b, id)).status).toBe(200);
+    await b.games.idle(id);
+    expect(b.games.view(id)!.notes).toEqual([
+      {
+        questionId: question.id,
+        kind: "player_blunder",
+        ply: 0,
+        message: question.message,
+        reveal: SECRET,
+        bestMove: D4,
+        attempt: { move: NF3, correct: true, cpLoss: 40 },
+      },
+    ]);
+    expect(savedNotes(id)).toHaveLength(1);
+  });
+});
+
+describe("a late best move (review 074)", () => {
+  it("a note made before the analysis arrived gets its bestMove filled in and saved", async () => {
+    freshStore();
+    const s = boot();
+    s.analyzer.set(fenAfter(["e2e4", "e7e5"]), 0, "g1f3");
+    const { id, events } = await newGame(s);
+    s.analyzer.hold(); // detection waits, so nothing is cached for the hint's position
+    expect((await post(s, `/api/games/${id}/moves`, { uci: "e2e4" })).status).toBe(200);
+    await events.next("bot_move");
+    expect((await post(s, `/api/games/${id}/tutor/hint`)).status).toBe(202);
+    (await s.tutor.ask(0)).resolve(okOutcome({ kind: "hint", reveal: "Nf3.", revealMove: "g1f3" }));
+    await events.next("tutor_reply");
+    const res = await post(s, `/api/games/${id}/resign`);
+    expect((res.body as unknown as GameView).notes).toMatchObject([{ kind: "hint", bestMove: null }]);
+    s.analyzer.release();
+    await new Promise((r) => setTimeout(r, 20));
+    expect(s.games.view(id)!.notes).toMatchObject([{ kind: "hint", bestMove: NF3 }]);
+    expect(savedNotes(id)).toMatchObject([{ bestMove: NF3 }]);
   });
 });

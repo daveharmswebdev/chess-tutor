@@ -341,9 +341,13 @@ describe("tutor.reveal (#47)", () => {
     expect(restored.question).toEqual(question);
     // Shown already: the question is closed for "Show me".
     expect((await post(b, `/api/games/${id}/tutor/reveal`)).status).toBe(409);
-    // The next change of position clears it.
+    // A takeback landing on its attemptFen keeps it (#53); the move that leaves it clears it into a note.
     expect((await post(b, `/api/games/${id}/takeback`)).status).toBe(200);
-    expect((await get(b, id)).view.tutor).toMatchObject({ question: null, reveal: null });
+    expect((await get(b, id)).view.tutor).toMatchObject({ question, reveal: res.body });
+    await play(b, id, "d2d4");
+    const after = (await get(b, id)).view;
+    expect(after.tutor).toMatchObject({ question: null, reveal: null });
+    expect(after.notes).toMatchObject([{ questionId: question.id, reveal: "d4 holds the centre.", attempt: null }]);
   });
 
   it("after a wrong try: the question is closed into a note, not kept in tutor (#53, FR-24, FR-8)", async () => {
