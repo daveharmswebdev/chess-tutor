@@ -1,9 +1,11 @@
 // Board UI: choose a color, play the sparring bot, take back, resign, retry a failed bot move,
 // and the tutor panel with its board arrows. FR-1, FR-4, IR-5, #23; #7: FR-8, FR-11, FR-12, NFR-9.
 // #47 (NFR-14): the address is the game (/games/<id>); popstate and the first render navigate.
+// #42 (FR-20): 'Bot' / 'You' rows above and below the board, with captured pieces and material.
 import type { Color, MoveView } from "@chess-tutor/chess-core";
 import { useEffect, useMemo, useState, useSyncExternalStore, type CSSProperties } from "react";
 import { Chessboard, type ChessboardOptions } from "react-chessboard";
+import { BoardSide } from "./BoardSide.tsx";
 import { createApiClient } from "./api.ts";
 import { isOwnPiece, legalTargets, moveToUci } from "./chess-rules.ts";
 import { ConnectionNotice } from "./ConnectionNotice.tsx";
@@ -127,9 +129,13 @@ export function App() {
         <h1>Chess Tutor</h1>
       </header>
       <main>
-        <section className="board" data-testid="board" data-locked={myTurn ? "false" : "true"}>
-          <Chessboard options={options} />
-        </section>
+        <div className="board-column">
+          <BoardSide fen={fen} playerColor={playerColor} side="top" />
+          <section className="board" data-testid="board" data-locked={myTurn ? "false" : "true"} data-fen={fen}>
+            <Chessboard options={options} />
+          </section>
+          <BoardSide fen={fen} playerColor={playerColor} side="bottom" />
+        </div>
         <aside className="side">
           <div className="panel controls">
             <fieldset disabled={state.busy}>
