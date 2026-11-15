@@ -1,0 +1,23 @@
+{
+  "brief_id": "075-review-panel-clears-r2",
+  "agent": "reviewer",
+  "issue": 51,
+  "base_sha": "9b6980d",
+  "scratch_dir": "/private/tmp/claude-501/-Users-daveharms-personal-workspace-chess-tutor/15d34974-0c49-4e5f-9ca0-3edca9d68816/scratchpad/075-review-panel-clears-r2",
+  "objective": "Final review of #51 round 2: `git diff 0ab7b7e..9b6980d` (web-agent fixes for review 072), with the whole `1e382ac..9b6980d` as context. Confirm the three 072 findings are fixed and nothing regressed. Findings blocking/major/minor; summary ends SHIP or NO-SHIP.",
+  "requirements": [
+    "FR-24",
+    "FR-8"
+  ],
+  "contract": "Review 072 findings: MAJOR tutor_reply/tutor_failed arriving after move_attempted and before the server applies the move stayed in the panel (repro: game_started -> tutor_thinking -> move_attempted c1f4 -> tutor_reply qX -> state{moves:[d4,d5,Bf4], tutor.question:null} -> move_accepted left panelQuestion qX); syncTutor's no-question branch kept closed text. minor: panelAfterRejection dropped live tutor_failed/progress; its mid-request branch was untested.\nSpoke's r2 account: TutorPanelState.tentative + settleTentative on the move's GameView (state/bot_move/game_over with more moves, or move_accepted) keep the question only if GameView.tutor.question has the same id; syncTutor's no-question branch clears question/reveal/attempt; Show me on the current position still shows; panelAfterRejection keeps live progress/failed/notice; two older tests changed expectations (try result no longer kept after a question-null state \u2014 intended under FR-24, since #52 will toast it).\nProbe: a legitimate key-moment reply for the bot's NEXT move wrongly dropped as tentative; tutorBeforeMove left set after a bot_move so later replies are misclassified; #23 SSE-before-reply ordering; Show me reveal on current position surviving bot_move/state; reconnect paths (#47).\nAlso judge (from the parallel #53 server round): the server will now send an extra 'state' after grading a try and after a replacing ask; the reducer clears `error` on every 'state' \u2014 can that wipe a bot-failure error? Say whether it's a web problem worth fixing in this branch.\nCoordinator gate at 9b6980d: 50 files / 1161 passed, typecheck clean.",
+  "scope": [],
+  "negative": [
+    "Read-only: do not edit, commit, or run anything that writes to the repo."
+  ],
+  "rubric": [
+    "Each finding cites file:line and evidence; reproduce majors with the real reducer.",
+    "Summary ends SHIP or NO-SHIP."
+  ],
+  "concurrency": "#53 review runs separately. Don't run git in other worktrees.",
+  "round": 2
+}

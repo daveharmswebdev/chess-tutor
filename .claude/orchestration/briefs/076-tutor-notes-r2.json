@@ -1,0 +1,37 @@
+{
+  "brief_id": "076-tutor-notes-r2",
+  "agent": "server-agent",
+  "issue": 53,
+  "base_sha": "01fb897",
+  "scratch_dir": "/private/tmp/claude-501/-Users-daveharms-personal-workspace-chess-tutor/15d34974-0c49-4e5f-9ca0-3edca9d68816/scratchpad/076-tutor-notes-r2",
+  "objective": "Round 2 of #53 on your branch (head 01fb897): implement the contract fixes the coordinator made on main in 5f0b09e (api.ts comments only, quoted below; your branch doesn't have them, the coordinator rebases at ship) and fix review 074's findings. (1) BLOCKING FR-8 leak: a new ask (Hint after a player_blunder takeback, or Hint replacing any question whose attemptFen is the current position) must not release the replaced question. Keep it as a pending note (saved in state, not in GameView) and release it, attempt null, on the move that leaves that position or at game end; drop it on a takeback past its position. (2) MAJOR: while the game is bot-failed (playing, !botThinking, bot's turn), every later 'state' is followed by the same 'error' again (keep the last bot-failure message on the game; clear it when the bot is retried or moves). (3) A question shown by Show me survives a takeback that lands exactly on its attemptFen (still TutorStatus.question with reveal), then becomes a note when the position is left; any other takeback drops it. (4) An acknowledged try whose grading hasn't finished is saved (held question + the move) and graded again in resume() after a restart, so its note isn't lost (NFR-14). (5) A note made before fillBestMove settles gets its bestMove filled in (and saved) when the analysis arrives.",
+  "requirements": [
+    "FR-25",
+    "FR-8",
+    "FR-5",
+    "NFR-14",
+    "FR-10"
+  ],
+  "contract": "Coordinator's api.ts changes in 5f0b09e (verbatim new text):\n *   Created: on the player's move that leaves the question's attemptFen (a graded try, or a move from another position after the player moved on), and at the end of the game (finished, resigned or abandoned) for a question still open or shown. Never while its position is still on the board: until then its reveal and best move stay on the server (FR-8).\n *   Replaced: a new tutor ask (e.g. Hint after a player_blunder takeback) that replaces a question whose attemptFen is the current position does not release it. The server keeps it as a pending note (saved, not in GameView) and releases it, attempt null, by the same rules: the move that leaves that position, or the end of the game. A takeback past its position drops it.\n *   Takebacks: ... A question shown by \"Show me\" (TutorStatus.question with reveal set) also survives a takeback that lands exactly on its attemptFen, and becomes a note when that position is left; any other takeback drops it.\n *   Grading in flight: an acknowledged try whose grading has not finished is saved with the game and graded again after a restart (NFR-14), so its note is not lost. A note's bestMove is filled in if the engine's analysis arrives after the note was made.\n (SSE section) While the game stays in that bot-failed state (playing, botThinking false, the bot's turn), every later \"state\" (e.g. after a try is graded) is followed by the same \"error\" again (#53).\n (TutorStatus.question) A shown question stays here until the next player move, a takeback (except one landing on its attemptFen, #53), a new tutor ask or the end of the game (#47).\nReview 074 evidence: games.ts:873-883 startAsk calls closeAsNotes('replaced by a new ask') and emits state with the note; probe after blunder\u2192takeback\u2192Hint printed notes [{kind:player_blunder, ply:0, reveal:'SECRET: d4 was better.', bestMove d4}] while the hint at the same FEN was open. Existing test tutor-notes.test.ts:267 asserts the old (now wrong) release; change it. Bot-failure probe after a graded try: events state,state,error,tutor_attempt,state (gradeAttempt awaits afterBot; web clears error on every 'state', apps/web/src/game-state.ts:298). Takeback: `g.shown = null; g.notes = g.notes.filter((n) => n.ply < g.moves.length)`. play(): `if (attempt) { g.question = null; } closeAsNotes(...)` then emit('state') saves before gradeAttempt \u2014 no pending attempt in LiveState. fillBestMove only saves when q is still g.question/g.shown.source and never updates an existing note.\nGate at 01fb897: 51 files / 1158 passed, typecheck clean.",
+  "scope": [
+    "apps/server/**"
+  ],
+  "negative": [
+    "Do not edit files outside scope, docs, config, .github, root files or the lockfile.",
+    "No new dependencies.",
+    "Do not edit packages/** (the contract is already on main), apps/web/**, docs or config.",
+    "No new SSE event type; no schema version bump.",
+    "Don't change attempt grading thresholds, detection or prompts."
+  ],
+  "rubric": [
+    "Tests first (red then green): blunder \u2192 takeback \u2192 Hint: no GameView/SSE/PGN of the playing game carries the player_blunder reveal or bestMove while at that FEN; moving on releases it (attempt null) and the hint's own note; takeback past it drops it; game end releases it; it survives a restart while pending.",
+    "Test: bot failure after a graded try \u2192 the last event of the sequence is 'error' (or every 'state' while bot-failed is followed by 'error'); retry clears it.",
+    "Tests: Show me \u2192 takeback landing on attemptFen keeps tutor.question+reveal; moving on makes the note; other takebacks drop it.",
+    "Test: restart between an acknowledged try and its grading \u2192 after resume the note appears with its attempt.",
+    "Test: a note made before fillBestMove settles has bestMove filled and saved after.",
+    "pnpm test and pnpm typecheck clean from the repo root.",
+    "files_changed lists every file changed in 01fb897..your head. Commit message references FR-8, FR-25, NFR-14 and #53."
+  ],
+  "concurrency": "#51 web-agent (apps/web/**) is in final review in its own worktree. No overlap. Don't rebase.",
+  "round": 2
+}

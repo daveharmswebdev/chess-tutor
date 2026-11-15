@@ -1,0 +1,40 @@
+{
+  "brief_id": "071-tutor-notes-r1",
+  "agent": "server-agent",
+  "issue": 53,
+  "base_sha": "1e382ac",
+  "scratch_dir": "/private/tmp/claude-501/-Users-daveharms-personal-workspace-chess-tutor/15d34974-0c49-4e5f-9ca0-3edca9d68816/scratchpad/071-tutor-notes-r1",
+  "objective": "Issue #53, server only: implement the 'Tutor notes' section of packages/chess-core/src/api.ts (committed at 1e382ac, read it in full \u2014 it is the spec). When a tutor question closes because its position is left, record a TutorNote in the game and send it in every GameView (GameView.notes, always present, [] when none): on the player's move from attemptFen (graded try: attempt filled) or from another position (moved on: attempt null), at game end (finished, resigned, abandoned) for a question still open or shown, and when a new tutor ask replaces a question. The note carries the question message, the reveal text (HeldQuestion.reveal, null if none), bestMove = the engine's best move in the note's position from the analysis the server already has for that position (the one moveLoss grades against), as a legal MoveView (by 'player'), never from the model; null if no evaluation, and the attempt. A takeback removes every note with ply >= the new moves.length and never reopens a closed question. Notes are saved in the v2 state JSON before the reply/event that carries them, come back after a restart (old state rows without notes load as []), and the saved PGN writes each note as a {...} comment after the move moves[ply] (or after the last move when ply === moves.length). The open question's reveal still never reaches the browser before the question closes (FR-8).",
+  "requirements": [
+    "FR-25",
+    "FR-8",
+    "FR-5",
+    "NFR-14",
+    "FR-10"
+  ],
+  "contract": "Issue #53 Done when: each move the tutor stopped on (key moments and hints) gets one note: question, answer if shown, try result, and the best move once the player has moved on (FR-25); the answer and best move reach the browser only once the question can no longer be tried (FR-8 as amended, architecture 'Socratic hint and reveal'); notes are saved before they're announced and come back after a restart (NFR-14); the saved PGN has them as {...} comments (FR-5); after a refresh, the result of a try is shown again (it is in the note's attempt, served by GET /api/games/:id); tests pass in CI.\nOwner decision 2026-11-15: best move only on moves the tutor stopped on, released once the player has moved on (even if never asked).\nFR-25 (A6): 'Tutor text that leaves the panel is kept as a note on the move it was about: the question, the answer if shown, the attempt result, and, once the player has moved on, the engine's best move (from Stockfish, checked legal; FR-10), even if the player never asked for it. Notes appear only on moves the tutor stopped on (key moments and hints). Saved with the game (NFR-14) and written into the saved PGN as comments (FR-5).'\narchitecture.md \u00a73.5 (A6): once the player moves on from the position, the reveal and revealMove become part of that move's tutor note; before that, they never reach the browser.\nServer facts at base 1e382ac: apps/server/src/games.ts header 'Attempts' (player's next move closes the open question; graded when from attemptFen; a move from another position closes it silently; takebacks keep a reachable question); coaching.ts HeldQuestion {view, reveal, revealMove}, buildReveal, moveLoss(fenBefore, uci, before, after), samePosition; store.ts schema v2 `state` JSON (its comment line 61 about a future game_comments table is now superseded: notes live in `state`; update that comment); pgn.ts toPgn(game, date) has a placeholder comment for tutor comments.\nPGN comment text: plain, one line, from the note fields only, e.g. '{Tutor: <message> Answer: <reveal> Best was h3. Your try Nf3: correct (0.1 off).}' \u2014 exact wording yours, but escape or strip '}' and newlines so the PGN stays valid and round-trips through chess.js loadPgn.\nPremise checked at base 1e382ac: pnpm test 50 files / 1136 passed, pnpm typecheck clean; GameView.notes is optional in the type (for older servers) but this server must always send it.",
+  "contract_files": [
+    "packages/chess-core/src/api.ts"
+  ],
+  "scope": [
+    "apps/server/**"
+  ],
+  "negative": [
+    "Do not edit files outside scope, docs, config, .github, root files or the lockfile.",
+    "No new dependencies.",
+    "Do not edit packages/** (api.ts is the coordinator's; report a contract gap instead), apps/web/**, docs or config.",
+    "No new SSE event type: notes ride only on GameView.",
+    "No database schema version bump; notes go in the existing v2 state JSON.",
+    "Don't change attempt grading, key-moment detection or the tutor prompt."
+  ],
+  "rubric": [
+    "Tests first (red then green) for each creation case: graded correct try, wrong try (reveal + bestMove + attempt), moved on without takeback (attempt null, reveal and bestMove released), Show me then move on, game end with a question still open (ply === moves.length allowed), a new ask replacing an open question.",
+    "Tests: the open question's reveal/bestMove are absent from every GameView until it closes; a takeback removes notes with ply >= the new length and doesn't reopen; a player_blunder takeback back to attemptFen keeps the open question and creates no note.",
+    "Tests: notes are saved before the HTTP reply (store write observed first) and survive a manager restart from the store; an old state row without notes loads as []; PGN has a {...} comment after the right move and loads back with chess.js.",
+    "bestMove comes from engine analysis and is legal in the note's position; a test where the engine has no evaluation gives null.",
+    "pnpm test and pnpm typecheck clean from the repo root.",
+    "files_changed lists every file changed in 1e382ac..your head. Commit message references FR-25, FR-8, FR-5, NFR-14, FR-10 and #53."
+  ],
+  "concurrency": "#51 runs at the same time in web-agent (apps/web/** only: the tutor panel clears on the player's move). No file overlap. Don't rebase; the coordinator does that at ship.",
+  "round": 1
+}

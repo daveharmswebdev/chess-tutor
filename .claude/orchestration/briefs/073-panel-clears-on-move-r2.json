@@ -1,0 +1,32 @@
+{
+  "brief_id": "073-panel-clears-on-move-r2",
+  "agent": "web-agent",
+  "issue": 51,
+  "base_sha": "0ab7b7e",
+  "scratch_dir": "/private/tmp/claude-501/-Users-daveharms-personal-workspace-chess-tutor/15d34974-0c49-4e5f-9ca0-3edca9d68816/scratchpad/073-panel-clears-on-move-r2",
+  "objective": "Round 2 of #51 on your branch (head 0ab7b7e): fix the review-072 findings. (1) MAJOR: a tutor_reply (or tutor_failed) for the ask about the position being left, arriving after move_attempted but before the server applies the move, must not stay in the panel. Keep it tentative while the move is in flight (pendingFen !== null or tutorBeforeMove set): keep it only if the next GameView for the move (state or move_accepted) still has that id in tutor.question; otherwise drop it from the panel (e.g. mark it left). Also, when a GameView arrives with tutor.question null, a closed question must not stay on screen as text about a gone position. (2) minor: panelAfterRejection must keep live tutor_failed and the live thinking/progress label that arrived during the rejected request, rather than the stale snapshot's. (3) minor: test the sseSinceRequest/tutorSinceRequest branch of panelAfterRejection (move rejected after an SSE or tutor event arrived mid-request).",
+  "requirements": [
+    "FR-24",
+    "FR-8"
+  ],
+  "contract": "Review 072 major, reproduced with the real reducer: game_started -> tutor_thinking -> move_attempted c1f4 -> tutor_reply qX (attemptFen = position before the move) -> state{moves:[d4,d5,Bf4], tutor.question:null} -> move_accepted gives {panelQuestion:'qX', open:false, serverQuestion:null}. Cause: syncTutor's no-question branch `if (!q) return panel.open || progress !== panel.progress ? { ...panel, open: false, progress } : panel;` keeps the text, and TutorPanel.tsx:56 renders t.question regardless of open. Server facts: play() always sets g.question = null (games.ts:950-953) and new questions get randomUUID ids, so a left id is never reopened.\nMinor (game-state.ts:164): `return syncTutor(before, state.game?.tutor);` drops a tutor_failed received mid-request and uses the snapshot's progress label.\nCareful: a closed question that is still legitimately shown on the CURRENT position (Show me before moving: GameView.tutor.question with reveal set) must still show. Base for this round: 0ab7b7e (your commit), gate there 1149 passed.",
+  "scope": [
+    "apps/web/**"
+  ],
+  "negative": [
+    "Do not edit files outside scope, docs, config, .github, root files or the lockfile.",
+    "No new dependencies.",
+    "Do not edit packages/** or apps/server/**.",
+    "No toast (#52), no notes column (#54).",
+    "Don't change #47 behaviour or captured pieces (#42)."
+  ],
+  "rubric": [
+    "Tests first (red then green): the exact major sequence above ends with an empty panel; same with tutor_failed instead of tutor_reply; a tentative reply that the move's GameView still holds open stays shown; Show me on the current position still shows after a state.",
+    "Tests for minor 2 and 3: rejection after a mid-request tutor_failed keeps the message; rejection after mid-request tutor_progress keeps the live label; rejection after a mid-request state syncs with the server.",
+    "Existing e2e specs still pass (say which command).",
+    "pnpm test and pnpm typecheck clean from the repo root.",
+    "files_changed lists every file changed in 0ab7b7e..your head. Commit message references FR-24, FR-8 and #51."
+  ],
+  "concurrency": "#53 server-agent works in apps/server/** in another worktree. No overlap. Don't rebase.",
+  "round": 2
+}

@@ -1,0 +1,35 @@
+{
+  "brief_id": "070-panel-clears-on-move-r1",
+  "agent": "web-agent",
+  "issue": 51,
+  "base_sha": "1e382ac",
+  "scratch_dir": "/private/tmp/claude-501/-Users-daveharms-personal-workspace-chess-tutor/15d34974-0c49-4e5f-9ca0-3edca9d68816/scratchpad/070-panel-clears-on-move-r1",
+  "objective": "Issue #51, web only: the tutor panel stops showing text about a position that is gone (FR-24). When the player makes a move, everything the panel showed leaves it at once (on move_attempted, the optimistic move): the question, its reveal, the try result, a tutor_failed message and a refused-Hint/Show-me notice. Late tutor_attempt / tutor_reveal events for the question that was just left (they arrive after the move that was the try) must not bring it back into the panel. The panel shows a question again only from the server: a takeback whose GameView.tutor.question is open (FR-8 retry) shows it as now, and a new tutor_reply shows the new one. A move the server rejects (move_rejected, request_failed) restores the panel exactly as it was before the attempt. Do NOT build the try-result pop-up (that is #52, next) or the move-list notes (#54); the try result simply stops appearing in the panel for now.",
+  "requirements": [
+    "FR-24",
+    "FR-8"
+  ],
+  "contract": "Issue #51 Done when: (1) when you make a move, everything the panel showed leaves it: the question, its answer, the try result, a failure message (FR-24); (2) a takeback that brings back a question that's still open shows it again, as now (FR-8); (3) tests pass in CI.\nFR-24 (docs/requirements.md, A6 2026-11-15): 'The tutor panel only shows text about the position on the board. When the player makes a move, whatever the panel showed leaves it. When the engine grades the player's attempt (FR-8), the result appears as a short notice near the board that closes after about 5 seconds or at the player's next move' \u2014 the notice part is #52, not this round.\nCause (found by the owner in the deployed app): apps/web/src/game-state.ts TutorPanelState keeps 'the last question (still shown after it closes)'; the server already closes the question when the player moves on, and after #47 keeps a shown (revealed) question in GameView.tutor.question only until the next player move, a takeback, a new ask or game end.\nReducer facts at base 1e382ac (apps/web/src/game-state.ts): move_attempted sets pendingFen/busy; move_accepted applies the reply via applyReplyGame/syncTutor; tutorEvent handles tutor_thinking/progress/reply/failed/reveal/attempt; tutor_attempt is ignored when tutor.question.id differs; applyReveal ignores a reveal for another question. Keep the tutor thinking/progress state as is on a move (the tutor may be working on the bot's last move; the server decides).\napi.ts at 1e382ac now also has optional GameView.notes: TutorNote[] (#53, server side, in flight). Ignore it this round; #54 will display it.\nPremise checked at base 1e382ac: pnpm test 50 files / 1136 passed, pnpm typecheck clean.",
+  "contract_files": [
+    "packages/chess-core/src/api.ts"
+  ],
+  "scope": [
+    "apps/web/**"
+  ],
+  "negative": [
+    "Do not edit files outside scope, docs, config, .github, root files or the lockfile.",
+    "No new dependencies.",
+    "Do not edit packages/** or apps/server/**.",
+    "No try-result pop-up/toast (#52) and no move-list notes column (#54).",
+    "Don't change #47 behaviour (routing, reconnect, late-reply guards) or the captured-pieces display (#42)."
+  ],
+  "rubric": [
+    "Tests first (red then green) in the reducer tests: after move_attempted the panel's question, reveal, attempt, failed and notice are all cleared; a late tutor_attempt and a late tutor_reveal for the left question leave the panel empty; move_rejected and request_failed after a move restore the previous panel; a takeback reply/state whose tutor.question is open shows that question again; a tutor_reply after the move shows the new question.",
+    "A TutorPanel/App-level test (existing test style) that the rendered panel is empty after a move.",
+    "Existing Playwright e2e specs still pass (pnpm --filter web e2e or the repo's e2e command; say which you ran).",
+    "pnpm test and pnpm typecheck clean from the repo root.",
+    "files_changed lists every file changed in 1e382ac..your head. Commit message references FR-24, FR-8 and #51."
+  ],
+  "concurrency": "#53 runs at the same time in server-agent (apps/server/** only: tutor notes recorded and saved). No file overlap. Don't rebase; the coordinator does that at ship.",
+  "round": 1
+}

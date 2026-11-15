@@ -1,0 +1,29 @@
+{
+  "brief_id": "078-review-tutor-notes-r2",
+  "agent": "reviewer",
+  "issue": 53,
+  "base_sha": "b1e9d10",
+  "scratch_dir": "/private/tmp/claude-501/-Users-daveharms-personal-workspace-chess-tutor/15d34974-0c49-4e5f-9ca0-3edca9d68816/scratchpad/078-review-tutor-notes-r2",
+  "objective": "Final review of #53 round 2: `git diff 7373296..b1e9d10` (server-agent fixes for review 074, rebased onto main 77f6f37), with `5f0b09e..b1e9d10 -- apps/server` as context, against the api.ts 'Tutor notes' section as amended in 5f0b09e (inlined). Confirm the 074 findings are fixed, nothing regressed, and FR-8 cannot leak. Findings blocking/major/minor; summary ends SHIP or NO-SHIP.",
+  "requirements": [
+    "FR-25",
+    "FR-8",
+    "FR-5",
+    "NFR-14",
+    "FR-10"
+  ],
+  "contract": "Review 074 findings: BLOCKING Hint after player_blunder takeback released the replaced question's reveal+bestMove at the current FEN; MAJOR grading 'state' after a bot failure wiped the error on web; minors: restart between acknowledged try and grading lost the note; Show me then takeback onto attemptFen dropped the text; a note made before fillBestMove settled kept bestMove null.\nSpoke's r2 account: Game.parked (pending notes for a replaced question at the current position), saved in LiveState.tutor.parked, never in GameView/SSE/PGN, released (attempt null) on leaving the position or game end, dropped by takeback past it, restored on restart; Game.botError + emitState re-sends 'error' after every 'state' while bot-failed, cleared by startBot/takeback; Show me survives takeback onto attemptFen; LiveState.tutor.grading + resumeGrading on restart; fillBestMove updates an existing note.\nSpoke's own minor: a NEW SSE connection to an already bot-failed game gets 'state' but not the error (app.ts initial state; botError not persisted). Judge severity.\nProbe: any path where parked/held reveal or bestMove reaches a playing game's GameView, SSE, log or PGN before its position is left (incl. abandoned/finished PGN, restart, takeback onto the parked FEN, double replacement, Hint\u2192Show me on the new question); event order with botError (no duplicate errors breaking the web; web reducer is apps/web/src/game-state.ts at b1e9d10, it clears error on every 'state'); resumeGrading idempotency (graded twice? note duplicated?); save-before-announce for every new emit.\nCoordinator gate at b1e9d10: 51 files / 1200 passed, typecheck clean, web e2e 4/4.",
+  "contract_files": [
+    "packages/chess-core/src/api.ts"
+  ],
+  "scope": [],
+  "negative": [
+    "Read-only: do not edit, commit, or run anything that writes to the repo."
+  ],
+  "rubric": [
+    "Each finding cites file:line and evidence; reproduce blocking/major with a scratch test outside the repo.",
+    "Summary ends SHIP or NO-SHIP."
+  ],
+  "concurrency": null,
+  "round": 2
+}

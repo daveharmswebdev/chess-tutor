@@ -1,0 +1,27 @@
+{
+  "brief_id": "072-review-panel-clears-r1",
+  "agent": "reviewer",
+  "issue": 51,
+  "base_sha": "0ab7b7e",
+  "scratch_dir": "/private/tmp/claude-501/-Users-daveharms-personal-workspace-chess-tutor/15d34974-0c49-4e5f-9ca0-3edca9d68816/scratchpad/072-review-panel-clears-r1",
+  "objective": "Review `git diff 1e382ac..0ab7b7e` (issue #51, web-agent: the tutor panel clears on the player's move) for correctness bugs, requirement coverage and contract violations. Return findings with severity blocking/major/minor and a ship recommendation in the summary.",
+  "requirements": [
+    "FR-24",
+    "FR-8"
+  ],
+  "contract": "Issue #51 Done when: when you make a move, everything the panel showed leaves it (question, answer, try result, failure message) (FR-24); a takeback that brings back a still-open question shows it again (FR-8); tests pass.\nBrief 070 asked: clear on move_attempted; late tutor_attempt/tutor_reveal for the left question must not bring it back; a question reappears only from the server (takeback with an open tutor.question, or a new tutor_reply); move_rejected/request_failed restore the panel exactly; tutor thinking/progress unchanged; no toast (#52) or notes (#54); #47 behaviour (routing, reconnect, late-reply guards, #23 SSE-over-reply ordering) unchanged.\nSpoke's account: new TutorPanelState.left (id of the left question) and GameState.tutorBeforeMove (restore snapshot, cleared on request_started/move_accepted/request_succeeded); reconnected with unconfirmedMove applied clears like a move.\nThings to probe: a Hint or key moment on the SAME question id after a takeback (does `left` wrongly suppress a legitimately reopened question?); ordering where SSE state arrives before the HTTP reply; a rejected move after an SSE event arrived mid-request; double moves; new game resets.\nKnown server-side issue (not this round, already sent to #53): after a wrong try the server keeps the left question in GameView.tutor until the next move.\nCoordinator gate at 0ab7b7e: pnpm test 50 files / 1149 passed, typecheck clean. Read with git diff / git show <sha>:<path>.",
+  "contract_files": [
+    "packages/chess-core/src/api.ts"
+  ],
+  "scope": [],
+  "negative": [
+    "Read-only: do not edit, commit, or run anything that writes to the repo."
+  ],
+  "rubric": [
+    "Each finding cites file:line and evidence (code quote or a command's output).",
+    "Check every brief-070 case above has a test that would fail without the change.",
+    "Summary ends with SHIP or NO-SHIP."
+  ],
+  "concurrency": "#53 server-agent works in apps/server/** in another worktree; don't read or run git in its worktree.",
+  "round": 1
+}

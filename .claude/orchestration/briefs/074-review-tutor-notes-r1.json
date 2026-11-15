@@ -1,0 +1,30 @@
+{
+  "brief_id": "074-review-tutor-notes-r1",
+  "agent": "reviewer",
+  "issue": 53,
+  "base_sha": "01fb897",
+  "scratch_dir": "/private/tmp/claude-501/-Users-daveharms-personal-workspace-chess-tutor/15d34974-0c49-4e5f-9ca0-3edca9d68816/scratchpad/074-review-tutor-notes-r1",
+  "objective": "Review `git diff 1e382ac..01fb897` (issue #53, server-agent: tutor notes recorded, saved and written to PGN) against the 'Tutor notes' section of api.ts (the spec) for correctness bugs, requirement coverage and contract violations. Findings with severity blocking/major/minor; summary ends SHIP or NO-SHIP.",
+  "requirements": [
+    "FR-25",
+    "FR-8",
+    "FR-5",
+    "NFR-14",
+    "FR-10"
+  ],
+  "contract": "Spec: api.ts 'Tutor notes' (inlined). Brief 071 plus a coordinator addendum: after any graded try or move-on, TutorStatus.question/reveal are null and the content is only in the note; g.shown only for Show me on a position still on the board.\nSpoke's account: notes created on graded try (attempt filled when grading finishes; then a 'state' follows tutor_attempt/tutor_reveal), on move-on (attempt null), at game end (ply === moves.length allowed), and on a replacing ask ('state' after tutor_thinking). bestMove from the server's own analysis of attemptFen via legalPlayerMove, stored on HeldQuestion.bestMove; saved in LiveState.notes (no schema bump); PGN '{Tutor: ... Answer: ... Best was d4. Your try Nf3: correct (40 cp off).}' with braces replaced.\nProbe in particular: (a) FR-8 leak: can reveal text or bestMove for a still-open question reach any GameView, SSE event, log or PGN of a playing game before it closes? (b) The new extra 'state' events: the contract says a bot failure sends 'state' then 'error' and the web clears error on every 'state' (apps/web/src/game-state.ts server_event). Can a grading/replacing-ask 'state' land after a bot failure's error and wipe it? If so, say whether the fix belongs server side (ordering) or web side, and its severity. (c) Notes 'saved before announced' for the async grading path. (d) Takeback rule ply >= new length, and the player_blunder retry keeping the open question. (e) PGN validity/round-trip, and that FR-5 saved PGN for finished games includes notes. (f) bestMove legality and never from the model (FR-10).\nSpoke's own minors (judge them, don't just repeat): restart between an acknowledged try and its grading loses that note; Show me then takeback to attemptFen clears the shown text with no note.\nCoordinator gate at 01fb897: 51 files / 1158 passed, typecheck clean. Read with git diff / git show.",
+  "contract_files": [
+    "packages/chess-core/src/api.ts"
+  ],
+  "scope": [],
+  "negative": [
+    "Read-only: do not edit, commit, or run anything that writes to the repo."
+  ],
+  "rubric": [
+    "Each finding cites file:line and evidence (code quote or command output); reproduce majors where you can.",
+    "Check each rubric case of brief 071 has a test that would fail without the change.",
+    "Summary ends SHIP or NO-SHIP."
+  ],
+  "concurrency": "#51 web-agent is in round 2 in its own worktree (apps/web/**). Don't run git in other worktrees.",
+  "round": 1
+}

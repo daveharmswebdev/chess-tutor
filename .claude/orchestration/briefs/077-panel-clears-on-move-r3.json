@@ -1,0 +1,31 @@
+{
+  "brief_id": "077-panel-clears-on-move-r3",
+  "agent": "web-agent",
+  "issue": 51,
+  "base_sha": "9b6980d",
+  "scratch_dir": "/private/tmp/claude-501/-Users-daveharms-personal-workspace-chess-tutor/15d34974-0c49-4e5f-9ca0-3edca9d68816/scratchpad/077-panel-clears-on-move-r3",
+  "objective": "Round 3 (last) of #51 on your branch (head 9b6980d), two small fixes from review 075. (1) Defensive FR-24 guard: in syncTutor (and wherever a GameView's tutor.question is put into the panel, incl. game_started on a page reload), a question whose attemptFen is not the board's current position (compare placement, side to move, castling, en passant; ignore the move counters) is treated as left: not shown, no reveal, no arrows. A Show me reveal on the current position and a question reopened by a takeback (attemptFen == board) still show. (2) Reset `tentative` in the reconnected path (and in syncTutor's no-question branch) so a stale tentative flag can't make a later settleTentative clear a legitimate tutor_failed. Do NOT change error clearing on 'state': the contract (main 5f0b09e) now makes the server re-send 'error' after every 'state' while the game is bot-failed (#53 server round).",
+  "requirements": [
+    "FR-24",
+    "FR-8"
+  ],
+  "contract": "Review 075 repro: game_started(view{fen:'rnbqkb1r/ppp1pppp/5n2/3p4/3P1B2/8/PPP1PPPP/RN1QKBNR w KQkq - 2 3', moves:[d4,d5,Bf4,Nf6], tutor:{question:q1 (attemptFen 'rnbqkbnr/ppp1pppp/8/3p4/3P4/8/PPP1PPPP/RNBQKBNR w KQkq - 0 2', canReveal:false), reveal:q1}}) currently gives {q:'q1', open:true, reveal:'q1', left:null, arrows:1}; it must give an empty panel. Cause: today's server keeps g.shown after a wrong try (fixed server-side in #53 too; this guard covers older servers and any other path).\nTentative: reconnected (game-state.ts ~357-378) sets tutorBeforeMove null but syncTutor keeps panel.tentative; settleTentative (~171-186) clears failed/notice whenever tentative is true.\nGate at 9b6980d: 50 files / 1161 passed, typecheck clean.",
+  "scope": [
+    "apps/web/**"
+  ],
+  "negative": [
+    "Do not edit files outside scope, docs, config, .github, root files or the lockfile.",
+    "No new dependencies.",
+    "Do not edit packages/** or apps/server/**.",
+    "No change to error clearing on 'state'.",
+    "No toast (#52), no notes column (#54)."
+  ],
+  "rubric": [
+    "Tests first (red then green): the reload repro above ends with an empty panel; a Show me reveal whose attemptFen equals the board still shows on reload; a takeback-reopened question (attemptFen == board) shows; a reconnect after a tentative reply resets tentative and a later tutor_failed survives a late move_accepted.",
+    "Existing e2e specs still pass (say which command).",
+    "pnpm test and pnpm typecheck clean from the repo root.",
+    "files_changed lists every file changed in 9b6980d..your head. Commit message references FR-24 and #51."
+  ],
+  "concurrency": "#53 server-agent (apps/server/**) round 2 in its own worktree. No overlap. Don't rebase.",
+  "round": 3
+}

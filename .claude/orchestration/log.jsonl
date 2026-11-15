@@ -254,3 +254,39 @@
 {"ts":"2026-11-15T16:17:19.636Z","event":"coordinator_verdict","brief_id":"069-game-survival-server-r3","agent":"server-agent","verdict":"accepted","reason":"files match (2), diff read; integrated, gate + e2e re-run","tokens":173488,"duration_ms":90683}
 {"ts":"2026-11-15T16:19:17.470Z","event":"shipped","issue":47,"pr":48}
 {"ts":"2026-11-15T16:22:08.337Z","event":"shipped","issue":42,"pr":49}
+{"ts":"2026-11-15T20:12:31.658Z","event":"dispatch","subagent_type":"web-agent","brief_id":"070-panel-clears-on-move-r1","base_sha":"1e382ac","spoke":true}
+{"ts":"2026-11-15T20:12:35.653Z","event":"dispatch","subagent_type":"server-agent","brief_id":"071-tutor-notes-r1","base_sha":"1e382ac","spoke":true}
+{"ts":"2026-11-15T20:12:35.803Z","event":"agent_complete","subagent_type":"web-agent","brief_id":"070-panel-clears-on-move-r1","agent_id":"a6fdfe84209f569e1","status":"async_launched","contract":"pending"}
+{"ts":"2026-11-15T20:12:35.920Z","event":"agent_complete","subagent_type":"server-agent","brief_id":"071-tutor-notes-r1","agent_id":"a6ba66568e7adf3cb","status":"async_launched","contract":"pending"}
+{"ts":"2026-11-15T20:17:41.583Z","event":"return_valid","agent_id":"a6fdfe84209f569e1","agent_type":"web-agent","via":"handback"}
+{"ts":"2026-11-15T20:18:33.342Z","event":"coordinator_verdict","brief_id":"070-panel-clears-on-move-r1","agent":"web-agent","verdict":"accepted","reason":"files match (3), gate re-run 1149 passed, typecheck clean; server finding forwarded to 071","tokens":71821,"duration_ms":306136}
+{"ts":"2026-11-15T20:18:51.105Z","event":"dispatch","subagent_type":"reviewer","brief_id":"072-review-panel-clears-r1","base_sha":"0ab7b7e","spoke":true}
+{"ts":"2026-11-15T20:18:51.372Z","event":"agent_complete","subagent_type":"reviewer","brief_id":"072-review-panel-clears-r1","agent_id":"a0385303e60535539","status":"async_launched","contract":"pending"}
+{"ts":"2026-11-15T20:20:52.802Z","event":"return_valid","agent_id":"a0385303e60535539","agent_type":"reviewer","via":"handback"}
+{"ts":"2026-11-15T20:21:09.120Z","event":"coordinator_verdict","brief_id":"072-review-panel-clears-r1","agent":"reviewer","verdict":"review","reason":"NO-SHIP: 1 major (tutor_reply in flight after move_attempted stays visible), 2 minor","tokens":51404,"duration_ms":121772}
+{"ts":"2026-11-15T20:23:59.615Z","event":"return_valid","agent_id":"a6ba66568e7adf3cb","agent_type":"server-agent","via":"handback"}
+{"ts":"2026-11-15T20:24:56.271Z","event":"coordinator_verdict","brief_id":"071-tutor-notes-r1","agent":"server-agent","verdict":"accepted","reason":"files match (8), gate re-run 51 files/1158 passed, typecheck clean; addendum (no g.shown after wrong try) done","tokens":130784,"duration_ms":684039}
+{"ts":"2026-11-15T20:25:06.536Z","event":"dispatch","subagent_type":"reviewer","brief_id":"074-review-tutor-notes-r1","base_sha":"01fb897","spoke":true}
+{"ts":"2026-11-15T20:25:06.971Z","event":"agent_complete","subagent_type":"reviewer","brief_id":"074-review-tutor-notes-r1","agent_id":"a45ed45790541bc6e","status":"async_launched","contract":"pending"}
+{"ts":"2026-11-15T20:25:37.204Z","event":"return_invalid","agent_id":"a6fdfe84209f569e1","agent_type":"web-agent","attempt":1,"errors":["/tests_run: a 'gate' check failed, so this is not a success"]}
+{"ts":"2026-11-15T20:25:50.849Z","event":"return_valid","agent_id":"a6fdfe84209f569e1","agent_type":"web-agent","via":"handback"}
+{"ts":"2026-11-15T20:26:46.228Z","event":"coordinator_verdict","brief_id":"073-panel-clears-on-move-r2","agent":"web-agent","verdict":"accepted","reason":"files match (2), gate re-run 1161 passed, typecheck clean, e2e 4/4 (spoke)","tokens":99969,"duration_ms":270482}
+{"ts":"2026-11-15T20:26:52.174Z","event":"dispatch","subagent_type":"reviewer","brief_id":"075-review-panel-clears-r2","base_sha":"9b6980d","spoke":true}
+{"ts":"2026-11-15T20:26:52.639Z","event":"agent_complete","subagent_type":"reviewer","brief_id":"075-review-panel-clears-r2","agent_id":"a2895ea84f06a4c21","status":"async_launched","contract":"pending"}
+{"ts":"2026-11-15T20:29:01.134Z","event":"return_valid","agent_id":"a45ed45790541bc6e","agent_type":"reviewer","via":"handback"}
+{"ts":"2026-11-15T20:29:26.546Z","event":"coordinator_verdict","brief_id":"074-review-tutor-notes-r1","agent":"reviewer","verdict":"review","reason":"NO-SHIP: blocking FR-8 leak via replacing-ask note (contract defect), major bot error wiped by grading state, 3 minor"}
+{"ts":"2026-11-15T20:29:55.555Z","event":"coordinator_verdict","brief_id":"074-review-tutor-notes-r1","agent":"reviewer","verdict":"review","reason":"cost","tokens":68841,"duration_ms":234512}
+{"ts":"2026-11-15T20:30:37.884Z","event":"return_valid","agent_id":"a2895ea84f06a4c21","agent_type":"reviewer","via":"handback"}
+{"ts":"2026-11-15T20:30:57.080Z","event":"coordinator_verdict","brief_id":"075-review-panel-clears-r2","agent":"reviewer","verdict":"review","reason":"072 fixed; major reload-after-wrong-try (server cause fixed in #53) + 2 minor; error-clearing handled server side per 5f0b09e"}
+{"ts":"2026-11-15T20:31:06.987Z","event":"coordinator_verdict","brief_id":"075-review-panel-clears-r2","agent":"reviewer","verdict":"review","reason":"cost","tokens":64706,"duration_ms":225582}
+{"ts":"2026-11-15T20:33:46.132Z","event":"return_valid","agent_id":"a6fdfe84209f569e1","agent_type":"web-agent","via":"handback"}
+{"ts":"2026-11-15T20:34:35.000Z","event":"coordinator_verdict","brief_id":"077-panel-clears-on-move-r3","agent":"web-agent","verdict":"accepted","reason":"files match (2), gate re-run 1168 passed, typecheck clean, e2e 4/4 (spoke); brief defect accepted (lesson retry one takeback away kept); coordinator read the diff instead of a 3rd review","tokens":120865,"duration_ms":159356}
+{"ts":"2026-11-15T20:37:10.681Z","event":"return_valid","agent_id":"a6ba66568e7adf3cb","agent_type":"server-agent","via":"handback"}
+{"ts":"2026-11-15T20:37:43.909Z","event":"shipped","issue":51,"pr":55}
+{"ts":"2026-11-15T20:38:49.289Z","event":"coordinator_verdict","brief_id":"076-tutor-notes-r2","agent":"server-agent","verdict":"accepted","reason":"files match (3); rebased onto 77f6f37 (b1e9d10): 51 files/1200 passed, typecheck clean, e2e 4/4","tokens":175217,"duration_ms":428457}
+{"ts":"2026-11-15T20:38:55.820Z","event":"dispatch","subagent_type":"reviewer","brief_id":"078-review-tutor-notes-r2","base_sha":"b1e9d10","spoke":true}
+{"ts":"2026-11-15T20:38:56.045Z","event":"agent_complete","subagent_type":"reviewer","brief_id":"078-review-tutor-notes-r2","agent_id":"ac757f668f4834bc5","status":"async_launched","contract":"pending"}
+{"ts":"2026-11-15T20:41:43.990Z","event":"return_valid","agent_id":"ac757f668f4834bc5","agent_type":"reviewer","via":"handback"}
+{"ts":"2026-11-15T20:42:02.398Z","event":"coordinator_verdict","brief_id":"078-review-tutor-notes-r2","agent":"reviewer","verdict":"review","reason":"SHIP: 074 fixed, no FR-8 leak; 3 minor (SSE reconnect no bot error; grading in flight at game end + restart; replaced blunder one takeback away released — accepted as intended)"}
+{"ts":"2026-11-15T20:43:18.028Z","event":"coordinator_verdict","brief_id":"078-review-tutor-notes-r2","agent":"reviewer","verdict":"review","reason":"cost","tokens":61057,"duration_ms":168261}
+{"ts":"2026-11-15T20:43:45.070Z","event":"shipped","issue":53,"pr":56}
