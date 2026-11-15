@@ -35,6 +35,23 @@ import type { Color } from "./types.ts";
  *
  * Finished and abandoned games are saved as PGN (FR-5). The bot replies within 2 s (NFR-3).
  *
+ * Game survival (#47: NFR-14, FR-5, IR-7, NFR-9). A game outlives a server restart and a page refresh.
+ *   Saving: every change to a game (a move by either side, a takeback, a tutor reply, reveal or
+ *        attempt, the end of the game) is written to SQLite before the HTTP reply or SSE event that
+ *        announces it. A restart therefore loses at most a request that was never acknowledged.
+ *   Restart: on startup the server loads every game still "playing" and serves it as before; it no
+ *        longer abandons live games on shutdown. If the bot was due to move, it is asked again; if
+ *        the tutor was mid-reply (tutor.thinking), the ask is started again from the saved request,
+ *        with the usual SSE ("tutor_thinking", then "tutor_reply" or "tutor_failed").
+ *   GET /api/games/:id returns the GameView of any saved game (playing, finished or abandoned), from
+ *        memory or the database; 404 only when no game with that id was ever created.
+ *   Web address: a game lives at /games/<id> (the SPA fallback serves it). Opening or refreshing that
+ *        address rebuilds the page from GET /api/games/:id plus the SSE stream; "/" starts or offers a
+ *        new game. The browser keeps no copy of the moves.
+ *   Unreachable server: a network error, a 5xx or a dropped event stream is not "game not found".
+ *        The web shows "Reconnecting…" and retries with backoff (GET, then a new EventSource); only a
+ *        404 from GET /api/games/:id offers a new game.
+ *
  * Tutor (#7: FR-7 to FR-12, NFR-1, NFR-8, NFR-9). The server runs the key-moment detector after
  * every move (the player's and the bot's), and calls the tutor only at a key moment or on Hint.
  * At most one tutor question is open per game; a new key moment or Hint replaces it.
@@ -99,6 +116,11 @@ export interface TutorStatus {
   thinking: boolean;
   /** The open question, if any. */
   question: TutorQuestion | null;
+  /**
+   * The reveal already shown for `question` ("Show me" or a wrong try), so a refreshed page can show it
+   * again (#47). Null or absent while the reveal is still held on the server.
+   */
+  reveal?: TutorReveal | null;
 }
 
 export type TutorKind = "opponent_left_book" | "player_blunder" | "missed_win" | "punish_opponent" | "hint";
