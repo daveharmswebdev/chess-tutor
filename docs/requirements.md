@@ -2,7 +2,7 @@
 
 | | |
 |---|---|
-| Status | Accepted v0.2 (amendments A1 and A2 applied 2026-11-07, A3, A4 and A5 2026-11-15) |
+| Status | Accepted v0.2 (amendments A1 and A2 applied 2026-11-07, A3, A4, A5 and A6 2026-11-15) |
 | Date | 2026-11-04 |
 | Owner | Dave Harms |
 
@@ -45,11 +45,13 @@ The project has three goals: get better at chess, build a portfolio-quality piec
 |---|---|---|
 | FR-6 | The app detects **key moments** with deterministic code, without calling the LLM. Key moments are: (a) the opponent leaves the player's repertoire line; (b) the player's move loses at least a configurable number of centipawns (default 150) compared with the engine's best move; (c) the player misses a winning opportunity (the best move gains at least the threshold and the player's move doesn't); (d) the opponent blunders and the player can punish it. | BR-1, BR-4 |
 | FR-7 | The tutor stays silent at every other moment. The tutor model is never called on a move that isn't a key moment. | BR-2, BR-4 |
-| FR-8 | At a key moment the tutor asks a **Socratic** question first (for example, "Their knight on e4 looks strong. What could challenge it?"). It gives the full answer only if the player asks or plays a wrong attempt. | BR-2 |
+| FR-8 | At a key moment the tutor asks a **Socratic** question first (for example, "Their knight on e4 looks strong. What could challenge it?"). It gives the full answer only if the player asks or plays a wrong attempt, or, in the move list, once the player has moved on from that position (FR-25). *Amended by A6, 2026-11-15.* | BR-2 |
 | FR-9 | When the opponent leaves the book (FR-6a), the tutor names the deviation and explains the plan that usually works against it in terms of pawn structure and piece placement, not just a move. | BR-1 |
 | FR-10 | Every move, evaluation, or line the tutor states must come from a Stockfish tool call made in that same turn, **or from the key-moment data the server built from engine output**. The tutor never states an engine evaluation that came from neither source. *Amended by A2, 2026-11-07.* | BR-3 |
 | FR-11 | The tutor's suggestions can be shown on the board as arrows or highlighted squares. | BR-1 |
 | FR-12 | The player can press "Hint" at any time for one Socratic hint, even when it isn't a key moment. | BR-2 |
+| FR-24 | The tutor panel only shows text about the position on the board. When the player makes a move, whatever the panel showed leaves it. When the engine grades the player's attempt (FR-8), the result ("correct", or "not quite, best was …") appears as a short notice near the board that closes after about 5 seconds or at the player's next move, whichever comes first. *Added by A6, 2026-11-15.* | BR-1, BR-2 |
+| FR-25 | Tutor text that leaves the panel is kept as a **note on the move it was about**: the question, the answer if shown, the attempt result, and, once the player has moved on, the engine's best move ("best was …", from Stockfish, checked legal; FR-10), even if the player never asked for it. Notes appear only on moves the tutor stopped on (key moments and hints), not on every move. They are saved with the game (NFR-14) and written into the saved PGN as comments (FR-5). On a wide screen the move list shows them in a third column, shortened with a "more" control; on a narrow screen a move with a note gets a quote button that opens the note under that move. *Added by A6, 2026-11-15.* | BR-1, BR-2 |
 
 ### 3.3 Ask-anything chat
 
@@ -142,8 +144,8 @@ These follow from the functional requirements plus the proposed architecture: a 
 
 | Business | Functional | Non-functional | Infrastructure |
 |---|---|---|---|
-| BR-1 Handle deviations | FR-1–6, 9, 11, 13, 14, 18, 19, 20 | NFR-1, 2, 3, 9, 14 | IR-2, 3, 5, 7, 8 |
-| BR-2 Build understanding | FR-4, 7, 8, 12, 21–23 | NFR-7 | — |
+| BR-1 Handle deviations | FR-1–6, 9, 11, 13, 14, 18, 19, 20, 24, 25 | NFR-1, 2, 3, 9, 14 | IR-2, 3, 5, 7, 8 |
+| BR-2 Build understanding | FR-4, 7, 8, 12, 21–25 | NFR-7 | — |
 | BR-3 Claude + engine, exam prep | FR-10, 15–19, 21, 23 | NFR-6, 8, 10, 12, 13 | IR-1, 2, 6, 9 |
 | BR-4 Cost | FR-6, 7 | NFR-4, 5, 9 | IR-4, 6 |
 | BR-5 Fair play | — | NFR-11 | — |

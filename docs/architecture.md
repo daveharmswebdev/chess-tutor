@@ -158,6 +158,7 @@ const TutorReply = z.object({
 **Socratic hint and reveal without a second LLM call.** The server sends only `message` and `arrows` to the browser. It keeps `reveal` and `revealMove` on the server. When the player:
 - asks "show me", the server sends the stored `reveal`, with no API call.
 - takes back and tries a different move, the *engine* grades the attempt. If it's within the threshold of `revealMove`, it's correct; if not, the stored reveal is shown. Again, no API call.
+- moves on from the position (the question can no longer be attempted), the reveal and `revealMove` become part of that move's tutor note (FR-25, amendment A6): the answer is released once it can no longer spoil the puzzle. Before that, they still never reach the browser.
 
 That makes FR-8 cheap and instant.
 
