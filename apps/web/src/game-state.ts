@@ -20,8 +20,10 @@
 // `reconnecting` while the server is unreachable (the board stays visible but locked), and
 // `notFound` only after a 404. The browser keeps no copy of the moves.
 import type { GameEvent, GameView, MoveView } from "@chess-tutor/chess-core";
-import { sideToMove } from "./chess-rules.ts";
+import { fenAfter, sideToMove } from "./chess-rules.ts";
 import type { TutorQuestion, TutorReveal, TutorStatus } from "./tutor-types.ts";
+
+type TutorKind = TutorQuestion["kind"];
 
 export const START_FEN = "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1";
 
@@ -139,17 +141,48 @@ export function tutorStatusOf(state: GameState): TutorStatus {
   return state.game?.tutor ?? NO_TUTOR;
 }
 
-/** Brings the browser-side panel in line with a TutorStatus from the server. */
-function syncTutor(panel: TutorPanelState, status: TutorStatus | undefined): TutorPanelState {
-  const t = status ?? NO_TUTOR;
+/** The player's own lessons: shown one takeback away, so the player can try again (FR-8). */
+const LESSON_KINDS: ReadonlySet<TutorKind> = new Set(["player_blunder", "missed_win"]);
+
+/** Same position: placement, side to move, castling and en passant; the move counters are ignored. */
+function samePosition(a: string, b: string): boolean {
+  return a.split(" ").slice(0, 4).join(" ") === b.split(" ").slice(0, 4).join(" ");
+}
+
+/** FEN before the player's last move (GameView.moves start at the start position), or null. */
+function fenBeforeLastPlayerMove(game: GameView): string | null {
+  const last = game.moves.findLastIndex((m) => m.by === "player");
+  if (last === -1) return null;
+  let fen: string | null = START_FEN;
+  for (let i = 0; i < last && fen !== null; i++) fen = fenAfter(fen, game.moves[i]!.uci);
+  return fen;
+}
+
+/**
+ * FR-24 guard (#51): a GameView question belongs on the panel only while it is about the board:
+ * its attemptFen is the current position, or, for an open lesson (no reveal shown yet), the
+ * position one takeback away, the offer to try again. Anything else (e.g. a page reloaded after a
+ * wrong try, on a server that still keeps the shown question) is treated as left.
+ */
+function onBoard(q: TutorQuestion, status: TutorStatus, game: GameView): boolean {
+  if (samePosition(q.attemptFen, game.fen)) return true;
+  if (!LESSON_KINDS.has(q.kind) || status.reveal?.questionId === q.id) return false;
+  const before = fenBeforeLastPlayerMove(game);
+  return before !== null && samePosition(q.attemptFen, before);
+}
+
+/** Brings the browser-side panel in line with a GameView's TutorStatus from the server. */
+function syncTutor(panel: TutorPanelState, game: GameView | null | undefined): TutorPanelState {
+  const t = game?.tutor ?? NO_TUTOR;
   const progress = t.thinking ? panel.progress : null;
-  // The question the player's move left stays out of the panel (#51), e.g. a wrong try's shown reveal.
-  const q = t.question && t.question.id !== panel.left ? t.question : null;
+  // The question the player's move left stays out of the panel (#51), e.g. a wrong try's shown reveal,
+  // and so does one about a position that is not on the board.
+  const q = t.question && t.question.id !== panel.left && game && onBoard(t.question, t, game) ? t.question : null;
   if (!q) {
     // Closed on the server: its text (question, reveal, try result) leaves the panel too (#51).
-    if (!panel.question && !panel.open && progress === panel.progress) return panel;
+    if (!panel.question && !panel.open && !panel.tentative && progress === panel.progress) return panel;
     const left = panel.question?.id ?? panel.left;
-    return { ...panel, question: null, open: false, reveal: null, attempt: null, progress, left };
+    return { ...panel, question: null, open: false, reveal: null, attempt: null, progress, left, tentative: false };
   }
   // A reveal already shown (#47): a refreshed page shows it again.
   const shown = t.reveal && t.reveal.questionId === q.id ? t.reveal : null;
@@ -204,13 +237,13 @@ function panelAfterRejection(state: GameState): TutorPanelState {
         notice: state.tutorSinceRequest ? live.notice : before.notice,
         tentative: false,
       };
-  return syncTutor(base, state.game?.tutor);
+  return syncTutor(base, state.game);
 }
 
 /** A GameView from an HTTP reply; keeps the newer tutor state when a tutor event came first. */
 function applyReplyGame(state: GameState, game: GameView): { game: GameView; tutor: TutorPanelState } {
   if (state.tutorSinceRequest && state.game) return { game: { ...game, tutor: state.game.tutor }, tutor: state.tutor };
-  return { game, tutor: syncTutor(state.tutor, game.tutor) };
+  return { game, tutor: syncTutor(state.tutor, game) };
 }
 
 function patchTutor(game: GameView, patch: Partial<TutorStatus>): GameView {
@@ -271,7 +304,7 @@ export function gameReducer(state: GameState, action: GameAction): GameState {
       return { ...state, busy: true, error: null, sseSinceRequest: false, tutorSinceRequest: false, tutorBeforeMove: null };
 
     case "game_started":
-      return { ...initialGameState, game: action.game, tutor: syncTutor(emptyTutorPanel, action.game.tutor) };
+      return { ...initialGameState, game: action.game, tutor: syncTutor(emptyTutorPanel, action.game) };
 
     case "move_attempted":
       return {
@@ -365,7 +398,8 @@ export function gameReducer(state: GameState, action: GameAction): GameState {
         unconfirmedMove: null,
         game: action.game,
         // A move that did arrive left the panel's question with its position (#51).
-        tutor: syncTutor(applied ? leavePanel(state) : state.tutor, action.game.tutor),
+        // A reconnect ends any move in flight, so nothing shown is tentative any more (#51).
+        tutor: syncTutor({ ...(applied ? leavePanel(state) : state.tutor), tentative: false }, action.game),
         tutorBeforeMove: null,
         loading: false,
         reconnecting: false,
@@ -404,7 +438,7 @@ export function gameReducer(state: GameState, action: GameAction): GameState {
       return {
         ...state,
         game: event.game,
-        tutor: syncTutor(panel, event.game.tutor),
+        tutor: syncTutor(panel, event.game),
         tutorBeforeMove: moveApplied ? null : state.tutorBeforeMove,
         error: null,
         pendingFen: overtakesPending ? null : state.pendingFen,

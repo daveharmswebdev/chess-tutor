@@ -463,9 +463,11 @@ describe("tutor state: the panel clears on the player's move (#51)", () => {
   });
 
   it("a tentative reply that the move's GameView still holds open stays shown", () => {
-    const holds = afterBf4({ tutor: tutorStatus({ question: qX }) });
+    // Held open by the server, so about the board after the move (round 3: the FR-24 guard).
+    const qNew = { ...qX, attemptFen: AFTER_BF4_FEN };
+    const holds = afterBf4({ tutor: tutorStatus({ question: qNew }) });
     for (const order of [[ev({ type: "state", game: holds }), { type: "move_accepted", game: holds } as GameAction], [{ type: "move_accepted", game: holds } as GameAction]]) {
-      const s = run(started(), ev({ type: "tutor_thinking", kind: "hint" }), tryBf4, ev({ type: "tutor_reply", question: qX }), ...order);
+      const s = run(started(), ev({ type: "tutor_thinking", kind: "hint" }), tryBf4, ev({ type: "tutor_reply", question: qNew }), ...order);
       expect(s.tutor.question?.id).toBe("qX");
       expect(s.tutor.open).toBe(true);
     }
@@ -531,5 +533,59 @@ describe("tutor state: the panel clears on the player's move (#51)", () => {
     expect(same.tutor.open).toBe(true);
     const closed = run(withQuestion(), tryBf4, ev({ type: "state", game: afterD5() }), { type: "move_rejected", message: "illegal move" });
     expect(closed.tutor.question).toBeNull();
+  });
+
+  // Round 3 (review 075): a GameView question about a position that is not on the board never shows.
+  const AFTER_NF6_FEN = "rnbqkb1r/ppp1pppp/5n2/3p4/3P1B2/8/PPP1PPPP/RN1QKBNR w KQkq - 2 3";
+  const afterNf6 = (overrides: Partial<GameView> = {}) => view({ fen: AFTER_NF6_FEN, moves: [D4, D5, BF4, NF6], ...overrides });
+
+  it("a reload after a wrong try (shown question about the position before the try) shows an empty panel", () => {
+    const shownQ1 = tutorStatus({ question: question({ canReveal: false }), reveal: reveal() });
+    empty(started(afterNf6({ tutor: shownQ1 })));
+    empty(run(started(afterNf6()), ev({ type: "state", game: afterNf6({ tutor: shownQ1 }) })));
+    empty(run(started(afterNf6()), { type: "reconnected", game: afterNf6({ tutor: shownQ1 }) }));
+  });
+
+  it("a Show me reveal whose attemptFen is the board still shows on reload (move counters ignored)", () => {
+    const q = question({ canReveal: false, attemptFen: AFTER_D4_D5_FEN.replace(/ 0 2$/, " 7 9") });
+    const s = started(afterD5({ tutor: tutorStatus({ question: q, reveal: reveal() }) }));
+    expect(s.tutor.question?.id).toBe("q1");
+    expect(s.tutor.reveal).toEqual(reveal());
+    expect(tutorArrows(s)).toEqual([{ from: "c1", to: "f4", kind: "reveal" }]);
+  });
+
+  it("a question whose attemptFen differs in castling or side to move is not on the board", () => {
+    for (const attemptFen of [AFTER_D4_D5_FEN.replace(" w KQkq ", " w Kkq "), AFTER_D4_D5_FEN.replace(" w ", " b ")]) {
+      empty(started(afterD5({ tutor: tutorStatus({ question: question({ attemptFen }) }) })));
+    }
+  });
+
+  it("a takeback that reopens a question on the board shows it", () => {
+    const blunder = question({ id: "q7", kind: "player_blunder", attemptFen: AFTER_D4_D5_FEN });
+    const s = run(started(afterNf6()), { type: "request_started" }, { type: "request_succeeded", game: afterD5({ tutor: tutorStatus({ question: blunder }) }) });
+    expect(s.tutor.question?.id).toBe("q7");
+    expect(s.tutor.open).toBe(true);
+  });
+
+  it("an open lesson question one takeback away (FR-8 retry offer) still shows, on reload too", () => {
+    const blunder = question({ id: "q7", kind: "player_blunder", attemptFen: AFTER_D4_D5_FEN });
+    const s = started(afterNf6({ tutor: tutorStatus({ question: blunder }) }));
+    expect(s.tutor.question?.id).toBe("q7");
+    expect(s.tutor.open).toBe(true);
+  });
+
+  it("a reconnect after a tentative reply resets tentative: a later tutor_failed survives a late move_accepted", () => {
+    const holds = afterBf4({ tutor: tutorStatus({ question: question({ id: "qX", attemptFen: AFTER_BF4_FEN }) }) });
+    let s = run(started(), ev({ type: "tutor_thinking", kind: "hint" }), tryBf4, ev({ type: "tutor_reply", question: qX }));
+    expect(s.tutor.tentative).toBe(true);
+    s = run(s, { type: "reconnecting", message: null }, { type: "reconnected", game: holds });
+    expect(s.tutor.tentative).toBe(false);
+    s = run(s, ev({ type: "tutor_failed", message: "The tutor could not answer." }), { type: "move_accepted", game: afterBf4() });
+    expect(s.tutor.failed).toBe("The tutor could not answer.");
+  });
+
+  it("a GameView without a question resets tentative", () => {
+    const s = run(started(), tryBf4, ev({ type: "tutor_failed", message: "x" }), ev({ type: "state", game: afterD5() }));
+    expect(s.tutor.tentative).toBe(false);
   });
 });
