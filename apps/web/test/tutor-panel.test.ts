@@ -124,6 +124,29 @@ describe("tutor panel", () => {
     expect(notice).toContain('data-testid="tutor-notice"');
     expect(notice).toContain("the tutor is busy");
   });
+
+  it("is empty after the player's move, also when the try result and reveal arrive late (#51, FR-24)", () => {
+    const fenAfterBf4 = "rnbqkbnr/ppp1pppp/8/3p4/3P1B2/8/PPP1PPPP/RN1QKBNR b KQkq - 1 2";
+    const before = at(
+      afterD5(),
+      ev({ type: "tutor_reply", question: question() }),
+      { type: "tutor_reveal_received", reveal: reveal() },
+      { type: "tutor_notice", message: "Not possible right now: the tutor is busy" },
+    );
+    expect(html(before)).toContain('data-testid="tutor-question"');
+    const moved = [
+      { type: "move_attempted", uci: "c1f4", fen: fenAfterBf4 } as GameAction,
+      { type: "move_accepted", game: view({ fen: fenAfterBf4, moves: [D4, D5, BF4], botThinking: true }) } as GameAction,
+      ev({ type: "tutor_attempt", questionId: "q1", move: BF4, correct: false, cpLoss: 85 }),
+      ev({ type: "tutor_reveal", reveal: reveal() }),
+    ].reduce(gameReducer, before);
+    const out = html(moved);
+    for (const id of ["tutor-question", "tutor-attempt", "tutor-reveal", "tutor-failed", "tutor-notice", "tutor-show-me"]) {
+      expect(out).not.toContain(`data-testid="${id}"`);
+    }
+    expect(out).not.toContain(question().message);
+    expect(out).toContain("The tutor will comment on key moments of your game here.");
+  });
 });
 
 describe("board arrows", () => {

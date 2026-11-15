@@ -6,8 +6,13 @@
 // clears busy and pendingFen and keeps the SSE-derived game and error.
 // Tutor (#7: FR-8, FR-11, FR-12, NFR-1, NFR-9): GameView.tutor is the truth. The tutor_* events
 // patch it between "state" events, and `tutor` keeps what only the browser holds: the progress
-// label, the last question (still shown after it closes), its reveal, the attempt result, a
-// failure message and a notice from a refused Hint or Show me.
+// label, the question, its reveal, the attempt result, a failure message and a notice from a
+// refused Hint or Show me.
+// Panel follows the board (#51: FR-24, FR-8): the player's move (move_attempted) clears the panel
+// at once, keeping only the tutor's progress. The question it left is never shown again (late
+// tutor_attempt / tutor_reveal, or a later GameView still carrying it as shown); the panel shows a
+// question again only from the server: a new tutor_reply, or a GameView (a takeback) with another
+// question. A move the server rejects restores the panel as it was before the attempt.
 // Survival (#47: NFR-14, NFR-9): `loading` while a game opened from /games/<id> is fetched,
 // `reconnecting` while the server is unreachable (the board stays visible but locked), and
 // `notFound` only after a 404. The browser keeps no copy of the moves.
@@ -25,7 +30,7 @@ export interface TutorAttemptResult {
 }
 
 export interface TutorPanelState {
-  /** The last question shown; kept after it closes so its result and reveal still make sense. */
+  /** The question shown for the position on the board; cleared by the player's move (#51). */
   question: TutorQuestion | null;
   /** The question is still open on the server (attempts count, Show me works, arrows drawn). */
   open: boolean;
@@ -38,6 +43,8 @@ export interface TutorPanelState {
   failed: string | null;
   /** A refused Hint or Show me (409, 503, network). */
   notice: string | null;
+  /** Id of the question the player's last move left (#51); the panel never shows it again. */
+  left: string | null;
 }
 
 export interface GameState {
@@ -63,6 +70,8 @@ export interface GameState {
   notFound: boolean;
   /** A move whose request failed unreachable: it may still have been applied (cleared on reconnect). */
   unconfirmedMove: { uci: string; ply: number } | null;
+  /** The panel as it was before the move in flight, restored if the server rejects it (#51). */
+  tutorBeforeMove: TutorPanelState | null;
 }
 
 export type GameAction =
@@ -97,6 +106,7 @@ export const emptyTutorPanel: TutorPanelState = {
   attempt: null,
   failed: null,
   notice: null,
+  left: null,
 };
 
 export const initialGameState: GameState = {
@@ -112,6 +122,7 @@ export const initialGameState: GameState = {
   reconnecting: false,
   notFound: false,
   unconfirmedMove: null,
+  tutorBeforeMove: null,
 };
 
 /** For a GameView without `tutor` (a server from before #7): no coaching, no reason given. */
@@ -126,12 +137,31 @@ export function tutorStatusOf(state: GameState): TutorStatus {
 function syncTutor(panel: TutorPanelState, status: TutorStatus | undefined): TutorPanelState {
   const t = status ?? NO_TUTOR;
   const progress = t.thinking ? panel.progress : null;
-  const q = t.question;
+  // The question the player's move left stays out of the panel (#51), e.g. a wrong try's shown reveal.
+  const q = t.question && t.question.id !== panel.left ? t.question : null;
   if (!q) return panel.open || progress !== panel.progress ? { ...panel, open: false, progress } : panel;
   // A reveal already shown (#47): a refreshed page shows it again.
   const shown = t.reveal && t.reveal.questionId === q.id ? t.reveal : null;
   if (panel.question?.id === q.id) return { ...panel, question: q, open: true, progress, reveal: panel.reveal ?? shown };
-  return { ...emptyTutorPanel, question: q, open: true, progress, reveal: shown };
+  return { ...emptyTutorPanel, question: q, open: true, progress, reveal: shown, left: panel.left };
+}
+
+/** The panel once the player moves (#51, FR-24): empty but for the progress; the question is left. */
+function leavePanel(state: GameState): TutorPanelState {
+  const t = state.tutor;
+  const left = t.question?.id ?? state.game?.tutor?.question?.id ?? t.left;
+  return { ...emptyTutorPanel, progress: t.progress, left };
+}
+
+/**
+ * A move the server rejected (or that was never sent): the panel as it was before the attempt,
+ * brought in line with the server if any event arrived meanwhile (#51).
+ */
+function panelAfterRejection(state: GameState): TutorPanelState {
+  const before = state.tutorBeforeMove;
+  if (!before) return state.tutor;
+  if (!state.sseSinceRequest && !state.tutorSinceRequest) return before;
+  return syncTutor(before, state.game?.tutor);
 }
 
 /** A GameView from an HTTP reply; keeps the newer tutor state when a tutor event came first. */
@@ -165,7 +195,9 @@ function tutorEvent(state: GameState, game: GameView, event: TutorEvent): GameSt
     case "tutor_reply": {
       const q = event.question;
       const tutor: TutorPanelState =
-        t.question?.id === q.id ? { ...t, question: q, open: true, progress: null } : { ...emptyTutorPanel, question: q, open: true };
+        t.question?.id === q.id
+          ? { ...t, question: q, open: true, progress: null }
+          : { ...emptyTutorPanel, question: q, open: true, left: t.left };
       return { ...live, game: patchTutor(game, { thinking: false, question: q }), tutor };
     }
     case "tutor_failed":
@@ -175,9 +207,10 @@ function tutorEvent(state: GameState, game: GameView, event: TutorEvent): GameSt
       return next === state ? state : { ...next, tutorSinceRequest: true };
     }
     case "tutor_attempt": {
-      if (!t.question || t.question.id !== event.questionId) return state;
       const { questionId, move, correct, cpLoss } = event;
       const closed = game.tutor?.question?.id === questionId ? patchTutor(game, { question: null }) : game;
+      // Not the panel's question (e.g. the one the player's move just left, #51): close it, show nothing.
+      if (!t.question || t.question.id !== questionId) return closed === game ? state : { ...live, game: closed };
       return { ...live, game: closed, tutor: { ...t, open: false, attempt: { questionId, move, correct, cpLoss }, notice: null } };
     }
   }
@@ -186,7 +219,7 @@ function tutorEvent(state: GameState, game: GameView, event: TutorEvent): GameSt
 export function gameReducer(state: GameState, action: GameAction): GameState {
   switch (action.type) {
     case "request_started":
-      return { ...state, busy: true, error: null, sseSinceRequest: false, tutorSinceRequest: false };
+      return { ...state, busy: true, error: null, sseSinceRequest: false, tutorSinceRequest: false, tutorBeforeMove: null };
 
     case "game_started":
       return { ...initialGameState, game: action.game, tutor: syncTutor(emptyTutorPanel, action.game.tutor) };
@@ -201,13 +234,16 @@ export function gameReducer(state: GameState, action: GameAction): GameState {
         unconfirmedMove: null,
         sseSinceRequest: false,
         tutorSinceRequest: false,
+        // FR-24: whatever the panel showed leaves it with the position (#51).
+        tutor: leavePanel(state),
+        tutorBeforeMove: state.tutor,
       };
 
     case "move_accepted": {
       if (!state.game || state.game.id !== action.game.id) return state; // late reply from an old game
       // SSE (a bot_move, or state + error from a bot failure) may overtake this response; keep it then.
-      if (state.sseSinceRequest) return { ...state, busy: false, pendingFen: null };
-      return { ...state, ...applyReplyGame(state, action.game), busy: false, pendingFen: null };
+      if (state.sseSinceRequest) return { ...state, busy: false, pendingFen: null, tutorBeforeMove: null };
+      return { ...state, ...applyReplyGame(state, action.game), busy: false, pendingFen: null, tutorBeforeMove: null };
     }
 
     case "move_rejected":
@@ -219,16 +255,26 @@ export function gameReducer(state: GameState, action: GameAction): GameState {
         selected: null,
         error: action.message,
         unconfirmedMove: action.unconfirmed ?? null,
+        tutor: panelAfterRejection(state),
+        tutorBeforeMove: null,
       };
 
     case "request_succeeded":
       // A late reply for a game no longer shown (#47) is dropped, also when no game is shown.
       if (!state.game || state.game.id !== action.game.id) return state;
-      if (state.sseSinceRequest) return { ...state, busy: false, pendingFen: null, selected: null };
-      return { ...state, ...applyReplyGame(state, action.game), busy: false, pendingFen: null, selected: null, error: null };
+      if (state.sseSinceRequest) return { ...state, busy: false, pendingFen: null, selected: null, tutorBeforeMove: null };
+      return {
+        ...state,
+        ...applyReplyGame(state, action.game),
+        busy: false,
+        pendingFen: null,
+        selected: null,
+        error: null,
+        tutorBeforeMove: null,
+      };
 
     case "request_failed":
-      return { ...state, busy: false, pendingFen: null, error: action.message };
+      return { ...state, busy: false, pendingFen: null, error: action.message, tutor: panelAfterRejection(state), tutorBeforeMove: null };
 
     case "game_opening":
       return { ...initialGameState, loading: true };
@@ -260,7 +306,9 @@ export function gameReducer(state: GameState, action: GameAction): GameState {
         error: applied ? null : state.error,
         unconfirmedMove: null,
         game: action.game,
-        tutor: syncTutor(state.tutor, action.game.tutor),
+        // A move that did arrive left the panel's question with its position (#51).
+        tutor: syncTutor(applied ? leavePanel(state) : state.tutor, action.game.tutor),
+        tutorBeforeMove: null,
         loading: false,
         reconnecting: false,
         busy: false,
