@@ -1,4 +1,5 @@
 import { afterAll, describe, expect, it } from "vitest";
+import { Chess } from "chess.js";
 import { createSparringBot } from "@chess-tutor/chess-core";
 import { createWasmEngine } from "@chess-tutor/engine";
 import { buildServer } from "../src/app.ts";
@@ -64,8 +65,12 @@ describe("bot latency with real WASM Stockfish (integration)", () => {
       const events = eventCollector();
       coached.games.subscribe(id, events.push);
       const latencies: number[] = [];
-      for (const [i, uci] of ["d2d4", "c1f4", "e2e3"].entries()) {
+      for (const [i, planned] of ["d2d4", "c1f4", "e2e3"].entries()) {
         await coached.games.idle(id); // the previous detection finished, as when a player thinks
+        // The engine's reply depends on timing (e.g. ...Qa5+ rules out e3): fall back to any legal move.
+        const board = new Chess(coached.games.view(id)!.fen);
+        const legal = board.moves({ verbose: true }).map((m) => m.from + m.to + (m.promotion ?? ""));
+        const uci = legal.includes(planned) ? planned : legal[0]!;
         const t0 = performance.now();
         const res = await coached.app.inject({ method: "POST", url: `/api/games/${id}/moves`, payload: { uci } });
         expect(res.statusCode, res.body).toBe(200);

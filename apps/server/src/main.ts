@@ -13,6 +13,9 @@
  *             apps/web served at / with an SPA fallback; a relative path resolves against the
  *             repository root. A missing directory or index.html stops the server at startup.
  *   GET /api/health  200 once Stockfish answers a depth-1 search (5 s cap) and the store is open.
+ *   Game survival (#47, NFR-14): a deploy restarts the process. Games in progress are saved on
+ *             every change and loaded again on startup (in buildServer); shutdown does not
+ *             abandon them. DB_PATH must therefore be on the persistent disk.
  *
  * Coaching (#7, NFR-9):
  *   ANTHROPIC_API_KEY  unset or empty => coaching off ("Coaching is off: no API key is set."), the

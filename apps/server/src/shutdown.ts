@@ -4,7 +4,7 @@ export interface ShutdownResource {
 }
 
 export interface ShutdownOptions {
-  /** Closed first: its preClose hook abandons and saves games still playing (FR-5). */
+  /** Closed first: its preClose hook ends open streams; games in progress stay saved (#47, NFR-14). */
   app: { close(): Promise<unknown> };
   /** Closed in order after the app, each independently of the others. */
   resources: ShutdownResource[];
@@ -22,7 +22,7 @@ export function createShutdown(opts: ShutdownOptions): (signal: string) => Promi
 
   async function run(signal: string): Promise<void> {
     let failed = false;
-    opts.log.info({ signal }, "shutting down: abandoning live games");
+    opts.log.info({ signal }, "shutting down: games in progress stay saved");
     const steps: ShutdownResource[] = [{ name: "server", close: () => opts.app.close() as Promise<void> }, ...opts.resources];
     for (const step of steps) {
       try {

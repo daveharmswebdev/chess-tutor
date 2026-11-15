@@ -121,12 +121,15 @@ describe("game controller", () => {
     const h = harness(fakeApi({ newGame: async () => view() }));
     await h.controller.newGame("w");
     const es = h.sources[0]!;
-    es.readyState = 0; // CONNECTING: the browser reconnects and the server resends "state"
+    // #47: any drop shows "Reconnecting…" (the controller GETs the game and reopens the
+    // stream itself; see survival.test.ts), never a game error or "game not found".
+    es.readyState = 0;
     es.emit("error");
     expect(h.state().error).toBeNull();
-    es.readyState = 2; // CLOSED: gave up
-    es.emit("error");
-    expect(h.state().error).toBe("Lost the connection to the game server.");
+    expect(h.state().reconnecting).toBe(true);
+    expect(h.state().notFound).toBe(false);
+    expect(es.closed).toBe(true);
+    h.controller.dispose();
   });
 
   it("ignores malformed event data", async () => {

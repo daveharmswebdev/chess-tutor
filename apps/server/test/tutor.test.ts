@@ -159,10 +159,11 @@ describe("key moments (FR-6, FR-7)", () => {
       canReveal: true,
     });
     const view = games.view(id)!;
-    expect(view.tutor).toEqual({ available: true, reason: null, thinking: false, question: reply.question });
+    expect(view.tutor).toEqual({ available: true, reason: null, thinking: false, question: reply.question, reveal: null });
     const everything = JSON.stringify(events.events) + JSON.stringify(view);
     expect(everything).not.toContain("SECRET-REVEAL");
-    expect(everything).not.toMatch(/revealMove|"reveal"/);
+    // GameView.tutor.reveal is null until a reveal is shown (#47).
+    expect(everything).not.toMatch(/revealMove|"reveal":(?!null)/);
   });
 
   it("the bot replies while the tutor is still working (NFR-3: the game never waits)", async () => {
@@ -245,7 +246,7 @@ describe("key moments (FR-6, FR-7)", () => {
       expect(failed).toEqual({ type: "tutor_failed", message: expect.any(String) });
       expect(JSON.stringify(failed)).not.toContain("RAW-MODEL-TEXT");
       expect(tutorTypes(events.events)).toEqual(["tutor_thinking", "tutor_progress", "tutor_failed"]);
-      expect(games.view(id)!.tutor).toEqual({ available: true, reason: null, thinking: false, question: null });
+      expect(games.view(id)!.tutor).toEqual({ available: true, reason: null, thinking: false, question: null, reveal: null });
     });
   }
 
@@ -555,7 +556,7 @@ describe("POST /api/games/:id/tutor/reveal (Show me)", () => {
     return { id, events, question: reply.question };
   }
 
-  it("200 TutorReveal and a tutor_reveal event, with no tutor call; the question closes", async () => {
+  it("200 TutorReveal and a tutor_reveal event, with no tutor call; the question closes, shown with its reveal", async () => {
     const { id, events, question } = await openQuestion("d2d4");
     const res = await post(`/api/games/${id}/tutor/reveal`);
     expect(res.status).toBe(200);
@@ -568,7 +569,8 @@ describe("POST /api/games/:id/tutor/reveal (Show me)", () => {
     expect(res.body).toEqual(reveal);
     expect(events.events.at(-1)).toEqual({ type: "tutor_reveal", reveal });
     expect(tutor.asks).toHaveLength(1);
-    expect(games.view(id)!.tutor.question).toBeNull();
+    // Closed (a second Show me is 409), but GameView keeps it with its reveal for a refresh (#47).
+    expect(games.view(id)!.tutor).toMatchObject({ question, reveal });
     expect((await post(`/api/games/${id}/tutor/reveal`)).status).toBe(409);
   });
 
@@ -642,7 +644,13 @@ describe("trying again: the engine grades the attempt (no Claude call)", () => {
         arrows: [{ from: "d2", to: "d4" }],
       },
     });
-    expect(games.view(id)!.tutor.question).toBeNull();
+    // Closed for grading and Show me; GameView shows it with its reveal until the next move (#47).
+    const last = events.events.at(-1);
+    expect(games.view(id)!.tutor).toMatchObject({
+      question: { id: question.id },
+      reveal: last?.type === "tutor_reveal" ? last.reveal : "unreachable",
+    });
+    expect((await post(`/api/games/${id}/tutor/reveal`)).status).toBe(409);
     await games.idle(id);
     expect(tutor.asks).toHaveLength(1);
   });
@@ -697,7 +705,7 @@ describe("availability (NFR-9)", () => {
   it("no tutor: available false with the reason everywhere; hint 503; the game still plays", async () => {
     setup({ coaching: { tutor: null, offReason: NO_KEY_REASON } });
     const { id, game, events } = await newGame();
-    const off = { available: false, reason: "Coaching is off: no API key is set.", thinking: false, question: null };
+    const off = { available: false, reason: "Coaching is off: no API key is set.", thinking: false, question: null, reveal: null };
     expect(game.tutor).toEqual(off);
     const hint = await post(`/api/games/${id}/tutor/hint`);
     expect(hint.status).toBe(503);

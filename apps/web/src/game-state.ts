@@ -8,6 +8,9 @@
 // patch it between "state" events, and `tutor` keeps what only the browser holds: the progress
 // label, the last question (still shown after it closes), its reveal, the attempt result, a
 // failure message and a notice from a refused Hint or Show me.
+// Survival (#47: NFR-14, NFR-9): `loading` while a game opened from /games/<id> is fetched,
+// `reconnecting` while the server is unreachable (the board stays visible but locked), and
+// `notFound` only after a 404. The browser keeps no copy of the moves.
 import type { GameEvent, GameView, MoveView } from "@chess-tutor/chess-core";
 import { sideToMove } from "./chess-rules.ts";
 import type { TutorQuestion, TutorReveal, TutorStatus } from "./tutor-types.ts";
@@ -52,6 +55,14 @@ export interface GameState {
   /** A tutor_* event arrived since the current request started, so the reply's tutor is older. */
   tutorSinceRequest: boolean;
   tutor: TutorPanelState;
+  /** GET /api/games/:id for a game opened from its address is in flight. */
+  loading: boolean;
+  /** The server cannot be reached (network error, 5xx or a dropped stream); retrying. */
+  reconnecting: boolean;
+  /** GET /api/games/:id (or a move or action) answered 404. */
+  notFound: boolean;
+  /** A move whose request failed unreachable: it may still have been applied (cleared on reconnect). */
+  unconfirmedMove: { uci: string; ply: number } | null;
 }
 
 export type GameAction =
@@ -59,11 +70,19 @@ export type GameAction =
   | { type: "game_started"; game: GameView }
   | { type: "move_attempted"; uci: string; fen: string }
   | { type: "move_accepted"; game: GameView }
-  | { type: "move_rejected"; message: string }
+  | { type: "move_rejected"; message: string; unconfirmed?: { uci: string; ply: number } }
   | { type: "request_succeeded"; game: GameView }
   | { type: "request_failed"; message: string }
   | { type: "server_event"; event: GameEvent }
-  | { type: "connection_lost"; message: string }
+  /** Opening /games/<id>: the GET is in flight. */
+  | { type: "game_opening" }
+  /** Back to "/": no game shown. */
+  | { type: "game_closed" }
+  | { type: "game_not_found" }
+  /** The server is unreachable; `message` is shown when a request was lost (null keeps the error). */
+  | { type: "reconnecting"; message: string | null }
+  /** A fresh GameView from GET after reconnecting. */
+  | { type: "reconnected"; game: GameView }
   | { type: "select"; square: string | null }
   /** The 200 TutorReveal from POST /tutor/reveal ("Show me"). */
   | { type: "tutor_reveal_received"; reveal: TutorReveal }
@@ -89,6 +108,10 @@ export const initialGameState: GameState = {
   sseSinceRequest: false,
   tutorSinceRequest: false,
   tutor: emptyTutorPanel,
+  loading: false,
+  reconnecting: false,
+  notFound: false,
+  unconfirmedMove: null,
 };
 
 /** For a GameView without `tutor` (a server from before #7): no coaching, no reason given. */
@@ -105,8 +128,10 @@ function syncTutor(panel: TutorPanelState, status: TutorStatus | undefined): Tut
   const progress = t.thinking ? panel.progress : null;
   const q = t.question;
   if (!q) return panel.open || progress !== panel.progress ? { ...panel, open: false, progress } : panel;
-  if (panel.question?.id === q.id) return { ...panel, question: q, open: true, progress };
-  return { ...emptyTutorPanel, question: q, open: true, progress };
+  // A reveal already shown (#47): a refreshed page shows it again.
+  const shown = t.reveal && t.reveal.questionId === q.id ? t.reveal : null;
+  if (panel.question?.id === q.id) return { ...panel, question: q, open: true, progress, reveal: panel.reveal ?? shown };
+  return { ...emptyTutorPanel, question: q, open: true, progress, reveal: shown };
 }
 
 /** A GameView from an HTTP reply; keeps the newer tutor state when a tutor event came first. */
@@ -173,6 +198,7 @@ export function gameReducer(state: GameState, action: GameAction): GameState {
         error: null,
         selected: null,
         pendingFen: action.fen,
+        unconfirmedMove: null,
         sseSinceRequest: false,
         tutorSinceRequest: false,
       };
@@ -186,18 +212,65 @@ export function gameReducer(state: GameState, action: GameAction): GameState {
 
     case "move_rejected":
       // Snap back: drop the optimistic position, the board shows the server's FEN again.
-      return { ...state, busy: false, pendingFen: null, selected: null, error: action.message };
+      return {
+        ...state,
+        busy: false,
+        pendingFen: null,
+        selected: null,
+        error: action.message,
+        unconfirmedMove: action.unconfirmed ?? null,
+      };
 
     case "request_succeeded":
-      if (state.game && state.game.id !== action.game.id) return state;
+      // A late reply for a game no longer shown (#47) is dropped, also when no game is shown.
+      if (!state.game || state.game.id !== action.game.id) return state;
       if (state.sseSinceRequest) return { ...state, busy: false, pendingFen: null, selected: null };
       return { ...state, ...applyReplyGame(state, action.game), busy: false, pendingFen: null, selected: null, error: null };
 
     case "request_failed":
       return { ...state, busy: false, pendingFen: null, error: action.message };
 
-    case "connection_lost":
-      return { ...state, error: action.message };
+    case "game_opening":
+      return { ...initialGameState, loading: true };
+
+    case "game_closed":
+      return initialGameState;
+
+    case "game_not_found":
+      return { ...initialGameState, notFound: true };
+
+    case "reconnecting":
+      return {
+        ...state,
+        loading: false,
+        reconnecting: true,
+        busy: false,
+        pendingFen: null,
+        selected: null,
+        error: action.message ?? state.error,
+      };
+
+    case "reconnected": {
+      if (state.game && state.game.id !== action.game.id) return state;
+      // A move that may not have arrived: the fresh view settles it when it holds the move.
+      const u = state.unconfirmedMove;
+      const applied = u !== null && action.game.moves[u.ply]?.uci === u.uci;
+      return {
+        ...state,
+        error: applied ? null : state.error,
+        unconfirmedMove: null,
+        game: action.game,
+        tutor: syncTutor(state.tutor, action.game.tutor),
+        loading: false,
+        reconnecting: false,
+        busy: false,
+        pendingFen: null,
+        selected: null,
+        // A request still in flight is older than this view.
+        sseSinceRequest: true,
+        tutorSinceRequest: true,
+      };
+    }
 
     case "select":
       return { ...state, selected: action.square };
@@ -241,6 +314,7 @@ export function isPlayersTurn(state: GameState): boolean {
   const g = state.game;
   return (
     g !== null &&
+    !state.reconnecting &&
     g.status === "playing" &&
     !g.botThinking &&
     !state.busy &&
@@ -253,6 +327,7 @@ export function canTakeback(state: GameState): boolean {
   const g = state.game;
   return (
     g !== null &&
+    !state.reconnecting &&
     g.status === "playing" &&
     !g.botThinking &&
     !state.busy &&
@@ -269,6 +344,7 @@ export function canRetryBot(state: GameState): boolean {
   const g = state.game;
   return (
     g !== null &&
+    !state.reconnecting &&
     g.status === "playing" &&
     !g.botThinking &&
     !state.busy &&
@@ -279,7 +355,7 @@ export function canRetryBot(state: GameState): boolean {
 
 export function canResign(state: GameState): boolean {
   const g = state.game;
-  return g !== null && g.status === "playing" && !state.busy;
+  return g !== null && g.status === "playing" && !state.busy && !state.reconnecting;
 }
 
 /** Hint (FR-12): whenever the player may move and coaching is available and idle. */
@@ -291,7 +367,9 @@ export function canHint(state: GameState): boolean {
 /** "Show me": an open question that holds a reveal not yet shown. */
 export function canReveal(state: GameState): boolean {
   const t = state.tutor;
-  return t.open && t.question !== null && t.question.canReveal && t.reveal?.questionId !== t.question.id;
+  return (
+    !state.reconnecting && t.open && t.question !== null && t.question.canReveal && t.reveal?.questionId !== t.question.id
+  );
 }
 
 export interface BoardArrow {
@@ -357,7 +435,11 @@ function resultText(game: GameView): string {
 /** The status line: whose move it is, or the result and its reason. */
 export function statusText(state: GameState): string {
   const g = state.game;
-  if (!g) return "Choose a color and start a new game.";
+  if (!g) {
+    if (state.notFound) return "Game not found.";
+    if (state.loading || state.reconnecting) return "Loading the game…";
+    return "Choose a color and start a new game.";
+  }
   if (g.status === "abandoned") return "Game abandoned.";
   if (g.status === "finished") return resultText(g);
   if (g.botThinking || state.pendingFen !== null) return "Bot is thinking...";

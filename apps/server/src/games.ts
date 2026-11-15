@@ -25,13 +25,14 @@ import {
   type CoachingDeps,
   type HeldQuestion,
   type TutorKind,
+  type TutorQuestion,
   type TutorReveal,
   type TutorStatus,
 } from "./coaching.ts";
 import { loadAttemptToleranceCp, loadKeyMomentThresholds } from "./config.ts";
 import { outcomeOf } from "./outcome.ts";
 import { toPgn } from "./pgn.ts";
-import type { GameStore } from "./store.ts";
+import type { GameStore, StoredGame } from "./store.ts";
 
 /** An error with the HTTP status the contract gives it (400, 404, 409, 503). */
 export class GameError extends Error {
@@ -67,6 +68,10 @@ export interface GameManagerOptions {
 export interface GameManager {
   /** Abandons (and saves) any game still playing, then starts a new one. */
   create(playerColor: Color): GameView;
+  /**
+   * Any game ever created: from memory, or rebuilt from the store (finished, abandoned).
+   * Undefined only when the store has no such game; a store read error is thrown (a 500).
+   */
   view(id: string): GameView | undefined;
   play(id: string, uci: string): GameView;
   takeback(id: string): GameView;
@@ -77,8 +82,12 @@ export interface GameManager {
   hint(id: string): void;
   /** "Show me": the held answer of the open question, with no Claude call. Closes the question. */
   reveal(id: string): TutorReveal;
-  /** Marks every game still playing as abandoned and saves it (shutdown). */
-  abandonAll(): void;
+  /**
+   * Shutdown (#47): aborts tutor asks and stops saving, so the store keeps every game as it
+   * was last acknowledged (still "playing", a pending ask still pending) for the next start.
+   * Games are not abandoned. Bot moves and tutor replies that arrive later are dropped.
+   */
+  close(): void;
   /** Throws GameError 404 for an unknown game. Returns the unsubscribe function. */
   subscribe(id: string, listener: GameListener): () => void;
   /**
@@ -114,10 +123,23 @@ interface Game {
   /** Detection and grading in flight (for idle()). */
   work: Set<Promise<void>>;
   session: TutorSession | null;
-  /** The tutor request in flight; a newer one replaces it (and aborts it). */
-  ask: { token: number; kind: TutorKind; attemptFen: string; controller: AbortController } | null;
+  /** The tutor request in flight; a newer one replaces it (and aborts it). Saved, so a restart re-asks. */
+  ask: { token: number; kind: TutorKind; attemptFen: string; request: TutorRequest; controller: AbortController } | null;
   /** At most one open question per game; the reveal stays here until "Show me" or a wrong try. */
   question: HeldQuestion | null;
+  /**
+   * The question whose reveal was shown ("Show me" or a wrong try), kept for GameView.tutor
+   * (#47) until the next player move, takeback, tutor ask or the end of the game. It is no
+   * longer open: no second "Show me", no grading.
+   */
+  shown: { question: TutorQuestion; reveal: TutorReveal } | null;
+  /** The last row written for this game (without updatedAt), so unchanged saves are skipped. */
+  lastSaved: string | null;
+  /**
+   * Rebuilt from a damaged row (a saved move that is not legal): served read-only, never saved
+   * and never resumed, so the row stays as it was for inspection (review 065).
+   */
+  readOnly: boolean;
   /** The engine wrapper this game's session uses for tool calls (NFR-3). */
   tutorEngine: TutorEngine | null;
 }
@@ -153,6 +175,14 @@ function unlessAborted<T>(p: Promise<T>, signal: AbortSignal | undefined): Promi
 const UCI_RE = /^[a-h][1-8][a-h][1-8][qrbn]?$/;
 const MAX_CACHED_ANALYSES = 64;
 
+function copyQuestion(q: TutorQuestion): TutorQuestion {
+  return { ...q, arrows: q.arrows.map((a) => ({ ...a })) };
+}
+
+function copyReveal(r: TutorReveal): TutorReveal {
+  return { ...r, move: r.move ? { ...r.move } : null, arrows: r.arrows.map((a) => ({ ...a })) };
+}
+
 function toUci(move: Move): string {
   return move.from + move.to + (move.promotion ?? "");
 }
@@ -186,6 +216,56 @@ interface MovePlayed {
   /** UCI moves before this one, from the start position. */
   history: string[];
   moveId: number;
+}
+
+/**
+ * What the store's `state` column holds for a game (schema v2, #47: NFR-14). With the row's
+ * own columns (colour, status, result, endReason, createdAt) it rebuilds the Game exactly:
+ * the board is replayed from `moves` through chess.js (FR-10), the bot is asked again if it
+ * is its turn, and a pending tutor ask is started again from `tutor.ask.request`. The held
+ * reveal is stored here too; it reaches the browser only once shown (architecture §3.5).
+ */
+interface LiveState {
+  v: 1;
+  moves: { uci: string; by: "player" | "bot" }[];
+  /** Whether the bot was searching at the save (informational: on load the bot is asked whenever it is its turn). */
+  botThinking: boolean;
+  tutor: {
+    ask: { kind: TutorKind; attemptFen: string; request: TutorRequest } | null;
+    question: HeldQuestion | null;
+    shown: { question: TutorQuestion; reveal: TutorReveal } | null;
+  };
+}
+
+function liveStateOf(g: Game): LiveState {
+  return {
+    v: 1,
+    moves: g.moves.map((m) => ({ uci: m.uci, by: m.by })),
+    botThinking: g.botThinking,
+    tutor: {
+      ask: g.ask ? { kind: g.ask.kind, attemptFen: g.ask.attemptFen, request: g.ask.request } : null,
+      question: g.question,
+      shown: g.shown,
+    },
+  };
+}
+
+/** The saved state, or null for a schema v1 row (or one that cannot be read). */
+function parseLiveState(row: StoredGame): LiveState | null {
+  if (row.state === null) return null;
+  try {
+    const parsed = JSON.parse(row.state) as LiveState | null;
+    return parsed && parsed.v === 1 && Array.isArray(parsed.moves) ? parsed : null;
+  } catch {
+    return null;
+  }
+}
+
+/** The moves of a PGN (schema v1 rows), with `by` from the player's colour. */
+function movesFromPgn(pgn: string, playerColor: Color): { uci: string; by: "player" | "bot" }[] {
+  const chess = new Chess();
+  chess.loadPgn(pgn);
+  return chess.history({ verbose: true }).map((m) => ({ uci: toUci(m), by: m.color === playerColor ? "player" : "bot" }));
 }
 
 /**
@@ -235,6 +315,8 @@ export function createGameManager(opts: GameManagerOptions): GameManager {
   const now = opts.now ?? (() => new Date());
   const log = opts.log ?? SILENT_LOG;
   const games = new Map<string, Game>();
+  /** Set by close() (shutdown): nothing more is saved, late results are dropped. */
+  let closed = false;
 
   const thresholds: KeyMomentThresholds | null = coaching ? (coaching.thresholds ?? loadKeyMomentThresholds()) : null;
   const toleranceCp = coaching ? (coaching.attemptToleranceCp ?? loadAttemptToleranceCp()) : 0;
@@ -255,7 +337,9 @@ export function createGameManager(opts: GameManagerOptions): GameManager {
       available: coachingOn(),
       reason: offReason,
       thinking: g.ask !== null,
-      question: g.question ? { ...g.question.view, arrows: g.question.view.arrows.map((a) => ({ ...a })) } : null,
+      question: g.question ? copyQuestion(g.question.view) : g.shown ? copyQuestion(g.shown.question) : null,
+      // Only a reveal already shown (#47); a held one stays on the server (architecture §3.5).
+      reveal: !g.question && g.shown ? copyReveal(g.shown.reveal) : null,
     };
   }
 
@@ -273,7 +357,12 @@ export function createGameManager(opts: GameManagerOptions): GameManager {
     };
   }
 
+  /**
+   * Sends an event to the game's subscribers. Every event but "tutor_progress" announces a
+   * change, so the game is saved first (#47: saved before it is acknowledged).
+   */
   function emit(g: Game, event: GameEvent): void {
+    if (event.type !== "tutor_progress") save(g);
     for (const listener of [...g.listeners]) {
       try {
         listener(event);
@@ -283,19 +372,143 @@ export function createGameManager(opts: GameManagerOptions): GameManager {
     }
   }
 
+  /**
+   * A game from memory, else rebuilt from the store (#47). A "playing" game found only in the
+   * store (not loaded at startup) joins the live games and resumes; a finished or abandoned
+   * one is rebuilt for this call only.
+   */
+  function lookup(id: string): Game | undefined {
+    const live = games.get(id);
+    if (live || closed) return live;
+    let row: StoredGame | undefined;
+    try {
+      row = store.get(id);
+    } catch (err) {
+      // Not a 404: the web treats that as "game not found" for good (review 068). This
+      // reaches the error handler as a 500 ApiError.
+      log.error({ gameId: id, err }, "could not read game from the store");
+      throw err;
+    }
+    if (!row) return undefined;
+    const { game, ask } = hydrate(row);
+    if (game.status === "playing" && !game.readOnly) {
+      games.set(game.id, game);
+      resume(game, ask);
+    }
+    return game;
+  }
+
   function find(id: string): Game {
-    const g = games.get(id);
+    const g = lookup(id);
     if (!g) throw new GameError(404, `no game with id "${id}"`);
     return g;
   }
 
+  function newGameRecord(id: string, playerColor: Color, createdAt: Date): Game {
+    return {
+      id,
+      playerColor,
+      chess: new Chess(),
+      moves: [],
+      moveIds: [],
+      fensBefore: [],
+      tutorEngine: null,
+      status: "playing",
+      result: "*",
+      endReason: null,
+      botThinking: false,
+      version: 0,
+      pending: null,
+      createdAt,
+      listeners: new Set(),
+      analyses: new Map(),
+      detecting: Promise.resolve(),
+      work: new Set(),
+      session: null,
+      ask: null,
+      question: null,
+      shown: null,
+      lastSaved: null,
+      readOnly: false,
+    };
+  }
+
+  /**
+   * Rebuilds a Game from its row (#47). The moves are replayed through chess.js; a move that is
+   * not legal (a damaged row) ends the replay there, logged. Returns the saved tutor ask too,
+   * for resume() to start again.
+   */
+  function hydrate(row: StoredGame): { game: Game; ask: LiveState["tutor"]["ask"] } {
+    const createdAt = new Date(row.createdAt);
+    const g = newGameRecord(row.id, row.playerColor, Number.isNaN(createdAt.getTime()) ? now() : createdAt);
+    const state = parseLiveState(row);
+    let moves: LiveState["moves"];
+    try {
+      moves = state ? state.moves : movesFromPgn(row.pgn, row.playerColor);
+    } catch (err) {
+      log.error({ gameId: row.id, err }, "saved game: could not read its moves; served read-only, row left as it is");
+      moves = [];
+      g.readOnly = true;
+    }
+    for (const m of moves) {
+      const fenBefore = g.chess.fen();
+      const move = tryUci(g.chess, m.uci);
+      if (!move) {
+        log.error(
+          { gameId: row.id, uci: m.uci, fen: fenBefore },
+          "saved game: illegal move, replay stopped; served read-only, row left as it is",
+        );
+        g.readOnly = true;
+        break;
+      }
+      g.moves.push({ uci: toUci(move), san: move.san, by: m.by });
+      g.moveIds.push(++nextMoveId);
+      g.fensBefore.push(fenBefore);
+    }
+    g.status = row.status;
+    g.result = row.result;
+    g.endReason = row.endReason;
+    if (g.readOnly) return { game: g, ask: null };
+    if (row.status === "playing" && state) {
+      g.question = state.tutor.question;
+      g.shown = state.tutor.shown;
+    }
+    return { game: g, ask: row.status === "playing" ? (state?.tutor.ask ?? null) : null };
+  }
+
+  /**
+   * After a restart (#47): asks the bot again if it is its turn, then starts a pending tutor ask
+   * again (same request) if it can still be coached. The bot goes first, so the tutor's tool
+   * calls wait for it as usual (NFR-3).
+   */
+  function resume(g: Game, ask: LiveState["tutor"]["ask"]): void {
+    enforceReachable(g);
+    if (g.chess.turn() !== g.playerColor) startBot(g);
+    if (ask) {
+      if (coachingOn() && reachable(g, ask.kind, ask.attemptFen)) {
+        log.info({ gameId: g.id, kind: ask.kind }, "tutor ask started again after a restart");
+        startAsk(g, ask.kind, ask.request, ask.attemptFen);
+      } else {
+        log.info({ gameId: g.id, kind: ask.kind }, "tutor ask not started again: coaching is off or its position is gone");
+      }
+    }
+    save(g);
+    log.info({ gameId: g.id, moves: g.moves.length, botThinking: g.botThinking, tutorThinking: g.ask !== null }, "game restored");
+  }
+
   function requirePlaying(g: Game): void {
+    if (g.readOnly) throw new GameError(409, `game ${g.id} could not be restored from its saved moves`);
     if (g.status !== "playing") throw new GameError(409, `game ${g.id} is ${g.status}`);
   }
 
-  function save(g: Game): void {
+  /**
+   * Writes the game (synchronously) unless nothing changed since the last write. After
+   * close() nothing is written, so the store keeps the last acknowledged state.
+   */
+  function save(g: Game, opts: { required?: boolean } = {}): void {
+    if (closed || g.readOnly) return;
     try {
-      store.save({
+      const row = {
         id: g.id,
         playerColor: g.playerColor,
         status: g.status,
@@ -303,10 +516,15 @@ export function createGameManager(opts: GameManagerOptions): GameManager {
         endReason: g.endReason,
         pgn: toPgn(viewOf(g), g.createdAt),
         createdAt: g.createdAt.toISOString(),
-        updatedAt: now().toISOString(),
-      });
+        state: JSON.stringify(liveStateOf(g)),
+      };
+      const key = JSON.stringify(row);
+      if (key === g.lastSaved) return;
+      store.save({ ...row, updatedAt: now().toISOString() });
+      g.lastSaved = key;
     } catch (err) {
       log.error({ gameId: g.id, err }, "could not save game");
+      if (opts.required) throw err;
     }
   }
 
@@ -320,6 +538,7 @@ export function createGameManager(opts: GameManagerOptions): GameManager {
     // A finished game has no attempt to make: abort the ask, close the question.
     cancelAsk(g);
     g.question = null;
+    g.shown = null;
     save(g);
     log.info({ gameId: g.id, status, result, endReason }, "game over");
   }
@@ -467,7 +686,7 @@ export function createGameManager(opts: GameManagerOptions): GameManager {
   }
 
   function scheduleDetection(g: Game, m: MovePlayed, opts: { ask: boolean }): void {
-    if (!coachingOn()) return;
+    if (closed || !coachingOn()) return;
     const botTurn = afterBot(g);
     const p = g.detecting
       .then(() => botTurn)
@@ -496,7 +715,7 @@ export function createGameManager(opts: GameManagerOptions): GameManager {
     });
     log.info({ gameId: g.id, uci: m.uci, keyMoment: moment?.kind ?? null }, "key-moment detection");
     if (!moment || !ask) return; // FR-7: a quiet move never reaches the tutor
-    if (g.status !== "playing" || !coachingOn()) return;
+    if (closed || g.status !== "playing" || !coachingOn()) return; // closed: shutting down (review 065)
     const attemptFen = LESSON_KINDS.has(moment.kind) ? m.fenBefore : m.fenAfter;
     if (!reachable(g, moment.kind, attemptFen)) {
       log.info({ gameId: g.id, uci: m.uci, keyMoment: moment.kind }, "key moment not coached: its position can no longer be reached");
@@ -518,12 +737,18 @@ export function createGameManager(opts: GameManagerOptions): GameManager {
   }
 
   function startAsk(g: Game, kind: TutorKind, request: TutorRequest, attemptFen: string): void {
+    // After close() nothing would abort a new ask (review 065); the next start re-runs saved asks.
+    if (closed) {
+      log.info({ gameId: g.id, kind }, "tutor ask not started: the server is shutting down");
+      return;
+    }
     cancelAsk(g);
     if (g.question) log.info({ gameId: g.id, questionId: g.question.view.id }, "tutor question replaced");
     g.question = null;
+    g.shown = null;
     const token = ++nextAskToken;
     const controller = new AbortController();
-    g.ask = { token, kind, attemptFen, controller };
+    g.ask = { token, kind, attemptFen, request, controller };
     log.info({ gameId: g.id, kind }, "tutor asked");
     // tutor_thinking at once; the session sends the first progress label itself (NFR-1).
     emit(g, { type: "tutor_thinking", kind });
@@ -585,7 +810,11 @@ export function createGameManager(opts: GameManagerOptions): GameManager {
     if (outcome.reason === "auth" && offReason === null) {
       // NFR-9: a missing or rejected key turns coaching off for the process; games go on.
       offReason = AUTH_REASON;
-      for (const other of games.values()) cancelAsk(other);
+      for (const other of games.values()) {
+        if (!other.ask) continue;
+        cancelAsk(other);
+        if (other !== g) save(other);
+      }
       log.error({ gameId: g.id }, "coaching turned off: the API key was rejected");
       emit(g, { type: "state", game: viewOf(g) });
     }
@@ -607,8 +836,13 @@ export function createGameManager(opts: GameManagerOptions): GameManager {
       }
       const correct = cpLoss <= toleranceCp;
       log.info({ gameId: g.id, questionId: q.view.id, uci: m.uci, cpLoss, correct }, "attempt graded");
+      const reveal = correct ? null : buildReveal(q);
+      // Kept for GameView.tutor.reveal (#47) unless the game has moved on to another question.
+      if (reveal && g.status === "playing" && !g.ask && !g.question && !closed) {
+        g.shown = { question: copyQuestion(q.view), reveal: copyReveal(reveal) };
+      }
       emit(g, { type: "tutor_attempt", questionId: q.view.id, move: { ...move }, correct, cpLoss });
-      if (!correct) emit(g, { type: "tutor_reveal", reveal: buildReveal(q) });
+      if (reveal) emit(g, { type: "tutor_reveal", reveal });
     })().catch((err: unknown) => log.warn({ gameId: g.id, err }, "attempt grading failed"));
     track(g, p);
   }
@@ -620,7 +854,7 @@ export function createGameManager(opts: GameManagerOptions): GameManager {
     const version = g.version;
     const fen = g.chess.fen();
     const t0 = performance.now();
-    const stale = () => g.version !== version || g.status !== "playing";
+    const stale = () => closed || g.version !== version || g.status !== "playing";
 
     const pending: Promise<void> = bot.chooseMove(fen).then(
       (botMove) => {
@@ -663,40 +897,42 @@ export function createGameManager(opts: GameManagerOptions): GameManager {
     g.pending = pending;
   }
 
+  // Startup (#47, NFR-14): every game still "playing" comes back from the store and resumes.
+  let restored: StoredGame[] = [];
+  try {
+    restored = store.listPlaying();
+  } catch (err) {
+    log.error({ err }, "could not load games in progress from the store");
+  }
+  for (const row of restored) {
+    try {
+      const { game, ask } = hydrate(row);
+      if (game.status !== "playing" || game.readOnly) continue; // a damaged row stays as it is
+      games.set(game.id, game);
+      resume(game, ask);
+    } catch (err) {
+      log.error({ gameId: row.id, err }, "could not restore a saved game");
+    }
+  }
+
   return {
     create(playerColor) {
-      for (const g of games.values()) if (g.status === "playing") abandon(g);
-      const g: Game = {
-        id: newId(),
-        playerColor,
-        chess: new Chess(),
-        moves: [],
-        moveIds: [],
-        fensBefore: [],
-        tutorEngine: null,
-        status: "playing",
-        result: "*",
-        endReason: null,
-        botThinking: false,
-        version: 0,
-        pending: null,
-        createdAt: now(),
-        listeners: new Set(),
-        analyses: new Map(),
-        detecting: Promise.resolve(),
-        work: new Set(),
-        session: null,
-        ask: null,
-        question: null,
-      };
+      const g = newGameRecord(newId(), playerColor, now());
+      // In the store before anything else changes (#47). If that fails, nothing has: the
+      // reply is 500 and the old game stays playing, with no event (reviews 065, 068).
+      save(g, { required: true });
+      for (const other of games.values()) if (other.status === "playing") abandon(other);
       games.set(g.id, g);
       log.info({ gameId: g.id, playerColor }, "new game");
-      if (playerColor === "b") startBot(g);
+      if (playerColor === "b") {
+        startBot(g);
+        save(g); // botThinking (informational: on load the bot is asked whenever it is its turn)
+      }
       return viewOf(g);
     },
 
     view(id) {
-      const g = games.get(id);
+      const g = lookup(id);
       return g ? viewOf(g) : undefined;
     },
 
@@ -715,6 +951,7 @@ export function createGameManager(opts: GameManagerOptions): GameManager {
       const attempt = g.question && samePosition(g.question.view.attemptFen, fenBefore) ? g.question : null;
       if (g.question && !attempt) log.info({ gameId: g.id, questionId: g.question.view.id }, "tutor question closed: the player moved on");
       g.question = null;
+      g.shown = null;
       enforceReachable(g); // e.g. a Hint for the position just left: aborted, thinking false
       if (checkOutcome(g)) {
         emit(g, { type: "game_over", game: viewOf(g) });
@@ -740,6 +977,7 @@ export function createGameManager(opts: GameManagerOptions): GameManager {
         g.fensBefore.pop();
       }
       g.version++;
+      g.shown = null;
       enforceReachable(g); // a takeback past attemptFen closes the question
       emit(g, { type: "state", game: viewOf(g) });
       return viewOf(g);
@@ -782,16 +1020,19 @@ export function createGameManager(opts: GameManagerOptions): GameManager {
       if (!q) throw new GameError(409, "there is no open tutor question");
       g.question = null;
       const reveal = buildReveal(q);
+      // Shown now: GameView.tutor carries it (#47) until the position moves on.
+      g.shown = { question: copyQuestion(q.view), reveal: copyReveal(reveal) };
       log.info({ gameId: g.id, questionId: q.view.id, move: reveal.move?.uci ?? null }, "tutor reveal");
       emit(g, { type: "tutor_reveal", reveal });
       return reveal;
     },
 
-    abandonAll() {
-      for (const g of games.values()) {
-        if (g.status === "playing") abandon(g);
-        else cancelAsk(g);
-      }
+    close() {
+      if (closed) return;
+      closed = true;
+      // In memory only: the store keeps each pending ask, so the next start asks again.
+      for (const g of games.values()) cancelAsk(g);
+      log.info({ games: [...games.values()].filter((g) => g.status === "playing").length }, "game manager closed; games in progress stay saved");
     },
 
     subscribe(id, listener) {
