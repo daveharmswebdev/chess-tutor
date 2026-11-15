@@ -26,6 +26,8 @@ import type { Color } from "./types.ts";
  *        The server also sends "state" after each player move and takeback, and "game_over" to an
  *        abandoned game's subscribers. When the bot fails, the server sends "state" (botThinking
  *        false) immediately before "error", so a client that clears its error on "state" still shows it.
+ *        While the game stays in that bot-failed state (playing, botThinking false, the bot's turn),
+ *        every later "state" (e.g. after a try is graded) is followed by the same "error" again (#53).
  *   Ordering (#23): an HTTP reply can arrive after SSE events caused by the same request (a bot
  *        that fails or answers within microtasks). SSE is the newer source: once a client has
  *        received any SSE event for the game after it sent a request, it keeps its SSE-derived
@@ -77,14 +79,22 @@ import type { Color } from "./types.ts";
  * the position it was about is left, it becomes a TutorNote in GameView.notes:
  *   Created: on the player's move that leaves the question's attemptFen (a graded try, or a move from
  *        another position after the player moved on), and at the end of the game (finished, resigned
- *        or abandoned) for a question still open or shown. A new tutor ask that replaces a question
- *        whose position is still on the board also turns it into a note. Never while it can still be
- *        tried: then it stays in TutorStatus.question and its reveal stays on the server.
+ *        or abandoned) for a question still open or shown. Never while its position is still on the
+ *        board: until then its reveal and best move stay on the server (FR-8).
+ *   Replaced: a new tutor ask (e.g. Hint after a player_blunder takeback) that replaces a question whose
+ *        attemptFen is the current position does not release it. The server keeps it as a pending note
+ *        (saved, not in GameView) and releases it, attempt null, by the same rules: the move that leaves
+ *        that position, or the end of the game. A takeback past its position drops it.
  *   Content: the question text, the reveal text and the engine's best move for the note's position
  *        (released now even if never asked for), and the graded try if there was one.
  *   Takebacks: a takeback removes every note with ply >= the new moves.length (the move it sat on
  *        is gone); it does not reopen the question. A takeback back to attemptFen before the question closed
- *        keeps the open question as before (the player_blunder retry).
+ *        keeps the open question as before (the player_blunder retry). A question shown by "Show me"
+ *        (TutorStatus.question with reveal set) also survives a takeback that lands exactly on its
+ *        attemptFen, and becomes a note when that position is left; any other takeback drops it.
+ *   Grading in flight: an acknowledged try whose grading has not finished is saved with the game and
+ *        graded again after a restart (NFR-14), so its note is not lost. A note's bestMove is filled in
+ *        if the engine's analysis arrives after the note was made.
  *   Saving: notes are saved with the game before the reply or event that carries them (NFR-14), come
  *        back after a restart, and are written into the saved PGN as `{...}` comments after the move
  *        they sit on (FR-5). They reach the client only inside GameView ("state", the HTTP replies,
@@ -162,7 +172,8 @@ export interface TutorStatus {
   /**
    * The open question, or the one whose reveal was just shown (then `reveal` is set and the question
    * is closed: "Show me" is 409 and the next move is not graded as an attempt). A shown question
-   * stays here until the next player move, a takeback, a new tutor ask or the end of the game (#47).
+   * stays here until the next player move, a takeback (except one landing on its attemptFen, #53),
+   * a new tutor ask or the end of the game (#47).
    */
   question: TutorQuestion | null;
   /**
