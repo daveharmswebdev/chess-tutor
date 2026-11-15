@@ -2,7 +2,7 @@
 
 | | |
 |---|---|
-| Status | Accepted v0.2 (amendments A1 and A2 applied 2026-11-07) |
+| Status | Accepted v0.2 (amendments A1 and A2 applied 2026-11-07, A3 2026-11-15) |
 | Date | 2026-11-04 |
 | Owner | Dave Harms |
 
@@ -37,6 +37,7 @@ The project has three goals: get better at chess, build a portfolio-quality piec
 | FR-3 | Once the position is out of the explorer data (too few games below a threshold), the bot switches to Stockfish at a reduced strength set for the player's level. | BR-1 |
 | FR-4 | The board enforces legal moves, shows the move list, and supports takebacks during sparring games. | BR-2 |
 | FR-5 | Finished and abandoned games are saved as PGN with the tutor's comments, so the player can look at them later. | BR-1 |
+| FR-20 | During a game, the board shows the pieces each side has captured, next to that side, and the material balance as a number of pawns for the side that is ahead (for example "+2"), counted with standard values (pawn 1, knight and bishop 3, rook 5, queen 9). It updates on every move, including takebacks. This is a plain piece count, not an engine evaluation. *Added by A3, 2026-11-15.* | BR-1 |
 
 ### 3.2 Coaching during the game
 
@@ -132,7 +133,7 @@ These follow from the functional requirements plus the proposed architecture: a 
 
 | Business | Functional | Non-functional | Infrastructure |
 |---|---|---|---|
-| BR-1 Handle deviations | FR-1–6, 9, 11, 13, 14, 18, 19 | NFR-1, 2, 3, 9 | IR-2, 3, 5, 7, 8 |
+| BR-1 Handle deviations | FR-1–6, 9, 11, 13, 14, 18, 19, 20 | NFR-1, 2, 3, 9 | IR-2, 3, 5, 7, 8 |
 | BR-2 Build understanding | FR-4, 7, 8, 12 | NFR-7 | — |
 | BR-3 Claude + engine, exam prep | FR-10, 15–19 | NFR-6, 8, 10, 12, 13 | IR-1, 2, 6, 9 |
 | BR-4 Cost | FR-6, 7 | NFR-4, 5, 9 | IR-4, 6 |
