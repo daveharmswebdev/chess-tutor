@@ -114,11 +114,16 @@ export interface TutorStatus {
   reason: string | null;
   /** True while the tutor is working on a key moment or a hint. */
   thinking: boolean;
-  /** The open question, if any. */
+  /**
+   * The open question, or the one whose reveal was just shown (then `reveal` is set and the question
+   * is closed: "Show me" is 409 and the next move is not graded as an attempt). A shown question
+   * stays here until the next player move, a takeback, a new tutor ask or the end of the game (#47).
+   */
   question: TutorQuestion | null;
   /**
    * The reveal already shown for `question` ("Show me" or a wrong try), so a refreshed page can show it
-   * again (#47). Null or absent while the reveal is still held on the server.
+   * again (#47). Null while the reveal is still held on the server or nothing was shown; the server
+   * always sends it from #47 on (optional only for older servers).
    */
   reveal?: TutorReveal | null;
 }
