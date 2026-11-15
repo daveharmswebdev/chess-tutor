@@ -443,3 +443,68 @@ describe("schema v1 database", () => {
     expect(() => createSqliteGameStore(dbPath)).toThrow(/schema version 99/);
   });
 });
+
+describe("review 065 (round 2)", () => {
+  it("(A) close() stops new tutor asks: detection held at shutdown starts none after release", async () => {
+    const a = boot("a", ["e7e5"]);
+    a.analyzer.set(START, 0, "d2d4");
+    a.analyzer.set(fenAfter(["e2e4"]), -300);
+    a.analyzer.set(fenAfter(["e2e4", "e7e5"]), -300);
+    const { id, events } = await newGame(a);
+    a.analyzer.hold();
+    expect((await post(a, `/api/games/${id}/moves`, { uci: "e2e4" })).status).toBe(200);
+    await events.next("bot_move"); // detection now waits on the held analyzer
+    await a.close();
+    a.analyzer.release();
+    await a.games.idle(id);
+    await new Promise((r) => setTimeout(r, 20));
+    expect(a.tutor.asks).toHaveLength(0);
+  });
+
+  it("(B) a damaged row (illegal saved move) is left unchanged on startup", async () => {
+    const a = boot("a", ["e7e5"]);
+    const { id } = await newGame(a);
+    await play(a, id, "e2e4");
+    await a.close();
+    const db = new DatabaseSync(dbPath);
+    const row = db.prepare("SELECT state FROM games WHERE id = ?").get(id) as { state: string };
+    const state = JSON.parse(row.state) as { moves: { uci: string; by: string }[] };
+    state.moves.push({ uci: "e1e8", by: "player" }, { uci: "a7a6", by: "bot" });
+    db.prepare("UPDATE games SET state = ? WHERE id = ?").run(JSON.stringify(state), id);
+    const before = db.prepare("SELECT * FROM games WHERE id = ?").get(id);
+    db.close();
+
+    const b = boot("b");
+    expect(b.bot.calls).toEqual([]);
+    expect((await get(b, id)).status).toBe(200);
+    expect((await post(b, `/api/games/${id}/moves`, { uci: "g1f3" })).status).toBe(409);
+    await newGame(b); // would abandon a live copy of it
+    await b.close();
+    const check = new DatabaseSync(dbPath);
+    expect(check.prepare("SELECT * FROM games WHERE id = ?").get(id)).toEqual(before);
+    check.close();
+  });
+
+  it("(C) a failed store write on create is a 500, not a 201", async () => {
+    const real = createSqliteGameStore(dbPath);
+    const failing: GameStore = {
+      save() {
+        throw new Error("disk full");
+      },
+      get: (id) => real.get(id),
+      listPlaying: () => real.listPlaying(),
+      close: () => real.close(),
+    };
+    const bot = createFakeBot();
+    const { app, games } = buildServer({ bot, store: failing, newId: () => "c1", logger: false });
+    try {
+      const res = await app.inject({ method: "POST", url: "/api/games", payload: { playerColor: "b" } });
+      expect(res.statusCode).toBe(500);
+      expect(res.json()).toEqual({ error: expect.any(String) });
+      expect(games.view("c1")).toBeUndefined();
+    } finally {
+      await app.close();
+      real.close();
+    }
+  });
+});

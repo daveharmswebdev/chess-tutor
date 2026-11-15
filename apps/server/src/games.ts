@@ -132,6 +132,11 @@ interface Game {
   shown: { question: TutorQuestion; reveal: TutorReveal } | null;
   /** The last row written for this game (without updatedAt), so unchanged saves are skipped. */
   lastSaved: string | null;
+  /**
+   * Rebuilt from a damaged row (a saved move that is not legal): served read-only, never saved
+   * and never resumed, so the row stays as it was for inspection (review 065).
+   */
+  readOnly: boolean;
   /** The engine wrapper this game's session uses for tool calls (NFR-3). */
   tutorEngine: TutorEngine | null;
 }
@@ -381,7 +386,7 @@ export function createGameManager(opts: GameManagerOptions): GameManager {
     }
     if (!row) return undefined;
     const { game, ask } = hydrate(row);
-    if (game.status === "playing") {
+    if (game.status === "playing" && !game.readOnly) {
       games.set(game.id, game);
       resume(game, ask);
     }
@@ -419,6 +424,7 @@ export function createGameManager(opts: GameManagerOptions): GameManager {
       question: null,
       shown: null,
       lastSaved: null,
+      readOnly: false,
     };
   }
 
@@ -435,14 +441,19 @@ export function createGameManager(opts: GameManagerOptions): GameManager {
     try {
       moves = state ? state.moves : movesFromPgn(row.pgn, row.playerColor);
     } catch (err) {
-      log.error({ gameId: row.id, err }, "saved game: could not read its moves");
+      log.error({ gameId: row.id, err }, "saved game: could not read its moves; served read-only, row left as it is");
       moves = [];
+      g.readOnly = true;
     }
     for (const m of moves) {
       const fenBefore = g.chess.fen();
       const move = tryUci(g.chess, m.uci);
       if (!move) {
-        log.error({ gameId: row.id, uci: m.uci, fen: fenBefore }, "saved game: illegal move, replay stopped");
+        log.error(
+          { gameId: row.id, uci: m.uci, fen: fenBefore },
+          "saved game: illegal move, replay stopped; served read-only, row left as it is",
+        );
+        g.readOnly = true;
         break;
       }
       g.moves.push({ uci: toUci(move), san: move.san, by: m.by });
@@ -452,6 +463,7 @@ export function createGameManager(opts: GameManagerOptions): GameManager {
     g.status = row.status;
     g.result = row.result;
     g.endReason = row.endReason;
+    if (g.readOnly) return { game: g, ask: null };
     if (row.status === "playing" && state) {
       g.question = state.tutor.question;
       g.shown = state.tutor.shown;
@@ -480,6 +492,7 @@ export function createGameManager(opts: GameManagerOptions): GameManager {
   }
 
   function requirePlaying(g: Game): void {
+    if (g.readOnly) throw new GameError(409, `game ${g.id} could not be restored from its saved moves`);
     if (g.status !== "playing") throw new GameError(409, `game ${g.id} is ${g.status}`);
   }
 
@@ -487,8 +500,8 @@ export function createGameManager(opts: GameManagerOptions): GameManager {
    * Writes the game (synchronously) unless nothing changed since the last write. After
    * close() nothing is written, so the store keeps the last acknowledged state.
    */
-  function save(g: Game): void {
-    if (closed) return;
+  function save(g: Game, opts: { required?: boolean } = {}): void {
+    if (closed || g.readOnly) return;
     try {
       const row = {
         id: g.id,
@@ -506,6 +519,7 @@ export function createGameManager(opts: GameManagerOptions): GameManager {
       g.lastSaved = key;
     } catch (err) {
       log.error({ gameId: g.id, err }, "could not save game");
+      if (opts.required) throw err;
     }
   }
 
@@ -667,7 +681,7 @@ export function createGameManager(opts: GameManagerOptions): GameManager {
   }
 
   function scheduleDetection(g: Game, m: MovePlayed, opts: { ask: boolean }): void {
-    if (!coachingOn()) return;
+    if (closed || !coachingOn()) return;
     const botTurn = afterBot(g);
     const p = g.detecting
       .then(() => botTurn)
@@ -696,7 +710,7 @@ export function createGameManager(opts: GameManagerOptions): GameManager {
     });
     log.info({ gameId: g.id, uci: m.uci, keyMoment: moment?.kind ?? null }, "key-moment detection");
     if (!moment || !ask) return; // FR-7: a quiet move never reaches the tutor
-    if (g.status !== "playing" || !coachingOn()) return;
+    if (closed || g.status !== "playing" || !coachingOn()) return; // closed: shutting down (review 065)
     const attemptFen = LESSON_KINDS.has(moment.kind) ? m.fenBefore : m.fenAfter;
     if (!reachable(g, moment.kind, attemptFen)) {
       log.info({ gameId: g.id, uci: m.uci, keyMoment: moment.kind }, "key moment not coached: its position can no longer be reached");
@@ -718,6 +732,11 @@ export function createGameManager(opts: GameManagerOptions): GameManager {
   }
 
   function startAsk(g: Game, kind: TutorKind, request: TutorRequest, attemptFen: string): void {
+    // After close() nothing would abort a new ask (review 065); the next start re-runs saved asks.
+    if (closed) {
+      log.info({ gameId: g.id, kind }, "tutor ask not started: the server is shutting down");
+      return;
+    }
     cancelAsk(g);
     if (g.question) log.info({ gameId: g.id, questionId: g.question.view.id }, "tutor question replaced");
     g.question = null;
@@ -883,7 +902,7 @@ export function createGameManager(opts: GameManagerOptions): GameManager {
   for (const row of restored) {
     try {
       const { game, ask } = hydrate(row);
-      if (game.status !== "playing") continue;
+      if (game.status !== "playing" || game.readOnly) continue; // a damaged row stays as it is
       games.set(game.id, game);
       resume(game, ask);
     } catch (err) {
@@ -898,7 +917,16 @@ export function createGameManager(opts: GameManagerOptions): GameManager {
       games.set(g.id, g);
       log.info({ gameId: g.id, playerColor }, "new game");
       if (playerColor === "b") startBot(g);
-      save(g); // in the store before the 201 (#47)
+      try {
+        save(g, { required: true }); // in the store before the 201 (#47)
+      } catch (err) {
+        // A game that would not survive a restart is not acknowledged: 500 (review 065).
+        g.status = "abandoned";
+        g.version++; // a bot search already started is discarded
+        g.botThinking = false;
+        games.delete(g.id);
+        throw err;
+      }
       return viewOf(g);
     },
 
