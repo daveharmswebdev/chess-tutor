@@ -163,19 +163,30 @@ function lastMoveOf(history: string[], side: Color, s: Mention["spec"]): string 
   return null;
 }
 
-/** Verbs that say a move was played; "was", "had", "answered", "worried" do not (review 056). */
-const PLAY_VERB = /^(?:played|took|traded|exchanged|recaptured|captured|pushed|advanced|moved|castled)$/i;
+/** Verbs that say a move was played; "was", "had", "worried" do not (review 056, review 059). */
+const PLAY_VERB = /^(?:played|took|traded|exchanged|recaptured|captured|pushed|advanced|moved|castled|answered|replied|responded|chose)$/i;
+/** PAST_CUE plus the verbs only a playing phrase needs: "opted for", "met ... with". */
+const PLAY_CUE = new RegExp(`${PAST_CUE.source}|\\b(?:opted|met)\\b`, "gi");
+/** A passive head: be-verb, participle, "by" ("is answered by", "was met by", "is simply met by"). */
+const PASSIVE_BY = /\b(?:is|are|was|were|be|been|being|gets?|got)\s+(?:\w+ly\s+)?\w+\s+by\s/i;
 
 /**
  * True when the last tense cue in the clause before the mention is a real playing verb ("White
- * played", "White took your pawn with"): "White was worried about dxe5" and "White's dxe5 is
- * answered by dxe5" are not (review 056).
+ * played", "White took your pawn with", "White replied with", "White went for", "White met your
+ * ...e5 with"): "White was worried about dxe5" and the passive "White's dxe5 is answered by dxe5"
+ * are not (review 056, review 059).
  */
 function playedHead(text: string, at: number): boolean {
   const head = text.slice(clauseStart(text, at), at);
-  const past = [...head.matchAll(PAST_CUE)].pop();
+  if (PASSIVE_BY.test(head)) return false;
+  const past = [...head.matchAll(PLAY_CUE)].pop();
   const present = Math.max(-1, ...[...head.matchAll(PRESENT_CUE)].map((m) => m.index!));
-  return past !== undefined && past.index! > present && PLAY_VERB.test(past[0]);
+  if (past === undefined || past.index! <= present) return false;
+  const word = past[0].toLowerCase();
+  const after = head.slice(past.index! + past[0].length);
+  if (word === "went" || word === "opted") return /^\s+for\b/i.test(after);
+  if (word === "met") return /\bwith\s*(?:\.\.\.\s?)?$/i.test(after);
+  return PLAY_VERB.test(word);
 }
 
 /**
@@ -762,11 +773,15 @@ const NOT_EVAL_BEFORE = /\bstockfish\s+$|\b(?:version|accuracy|accuracies|rating
 const PIECE_VALUE_BEFORE =
   /\b(?:pawns?|knights?|bishops?|rooks?|queens?|pieces?|exchange)\s+(?:is|are)\s+(?:(?:usually|normally|generally|roughly|about|around|only|still|each|traditionally)\s+)*worth\s+(?:(?:about|roughly|around|nearly|almost|just|only|over|under)\s+)?$/i;
 /**
- * A piece value after a piece word or "which", a whole number of pawns: "That wins a whole rook,
- * which is worth about 6 pawns", "a knight, worth 3 pawns" (#29, PR #35). A decimal stays graded.
+ * A piece value right after a singular piece word, a whole number of pawns: "That wins a whole
+ * rook, which is worth about 6 pawns", "a knight, worth 3 pawns" (#29, PR #35; narrowed in review
+ * 059: "a big lead, which is worth 7 pawns" and "Your pieces, worth 9 pawns" are graded). A decimal
+ * stays graded, and so does a value the piece does not have (PIECE_PAWNS: "the pawn, worth 9 pawns").
  */
 const PIECE_WORTH_BEFORE =
-  /(?:\b(?:pawns?|knights?|bishops?|rooks?|queens?|pieces?|exchange),?\s+|\bwhich\s+(?:is|are)\s+(?:(?:usually|normally|generally|roughly|about|around|only|still|each|traditionally)\s+)*)worth\s+(?:(?:about|roughly|around|nearly|almost|just|only|over|under)\s+)?$/i;
+  /\b(pawn|knight|bishop|rook|queen|piece|exchange)(?:,?\s+|,\s+which\s+(?:is|was)\s+(?:(?:usually|normally|generally|roughly|about|around|only|still|traditionally)\s+)*)worth\s+(?:(?:about|roughly|around|nearly|almost|just|only|over|under)\s+)?$/i;
+/** Pawn values a piece may be said to be worth. */
+const PIECE_PAWNS: Record<string, [number, number]> = { pawn: [1, 1], knight: [3, 3], bishop: [3, 3], piece: [3, 3], rook: [5, 6], queen: [9, 10], exchange: [1, 2] };
 const MATERIAL_FOLLOW = /^\s+(?:in|of)\s+material\b/i;
 
 interface RawQuote {
@@ -778,9 +793,12 @@ interface RawQuote {
   unit: string;
 }
 
-/** An unsigned whole number of pawns after "<piece>, worth" or "which is worth" (PIECE_WORTH_BEFORE). */
+/** An unsigned whole number of pawns after "<piece>, worth" or "<piece>, which is worth", within that piece's value. */
 function pieceWorth(text: string, q: RawQuote): boolean {
-  return q.unit.startsWith("p") && !q.num.includes(".") && PIECE_WORTH_BEFORE.test(text.slice(0, q.index));
+  if (!q.unit.startsWith("p") || q.num.includes(".")) return false;
+  const m = PIECE_WORTH_BEFORE.exec(text.slice(0, q.index));
+  const range = m ? PIECE_PAWNS[m[1]!.toLowerCase()] : undefined;
+  return range !== undefined && Number(q.num) >= range[0] && Number(q.num) <= range[1];
 }
 
 /** Every evaluation quoted in `text`, in order, without overlaps (the earliest, then longest, wins). */
@@ -841,13 +859,13 @@ export function gradeEvals(input: GradeInput): EvalsGrade {
       const size = unit.startsWith("c") ? Number(num) : Math.round(Number(num) * 100);
       const tol = !unit.startsWith("c") && !num.includes(".") ? 50 : EVAL_TOLERANCE_CP;
       const near = (a: number, b: number) => Math.abs(a - b) <= tol + 1e-9;
-      const { side, direction, worded } = sideOf(text, q.index, raw.length, input.playerColor, sign);
+      const { side, direction } = sideOf(text, q.index, raw.length, input.playerColor, sign);
       let problem: EvalQuote["problem"] = null;
       const signDir = sign === undefined ? 0 : sign === "+" ? 1 : -1;
-      if (side !== null && signDir !== 0 && worded !== 0) {
+      const favoured = signDir !== 0 ? quoteFavours(text, q.index, raw.length, input.playerColor) : null;
+      if (favoured !== null) {
         // A signed score is White's view (#29): "-5.63, a huge edge for Black" is graded by the sign
         // alone. The side the words favour must agree with the sign ("+2.1, an edge for Black" is wrong_side).
-        const favoured: Color = worded > 0 ? side : side === "w" ? "b" : "w";
         const white = signDir * size;
         if ((favoured === "w") !== signDir > 0) problem = "wrong_side";
         else if (ev.signed.some((e) => near(e, white))) problem = null;
@@ -870,12 +888,60 @@ export function gradeEvals(input: GradeInput): EvalsGrade {
   return { pass: quotes.every((q) => q.problem === null), quotes };
 }
 
+/** Clause breaks around a quote: punctuation, " but ", " and " (review 059). */
+const QUOTE_BREAK = /[,;:.!?](?=\s|$)|\s(?:but|and)\s/gi;
+const FAVOUR_SIDE = "(white|black|you're|you|your\\s+opponent|the\\s+opponent|opponent)";
+const UP_WORD = /^(?:up|ahead|better|advantage|edge|winning|plus|lead)$/i;
+/** A direction word attached to a side: "edge for Black", "advantage to White", "favours Black". */
+const DIR_FOR_SIDE = new RegExp(
+  `\\b(?:(up|ahead|better|advantage|edge|winning|lead|down|behind|worse|losing)\\s+(?:to|for)|favou?rs?|favou?ring)\\s+${FAVOUR_SIDE}\\b`,
+  "i",
+);
+/** A side with a direction predicate: "Black is better", "White is up", "you're ahead", "Black's winning". */
+const SIDE_IS_DIR = new RegExp(
+  `\\b${FAVOUR_SIDE}(?:\\s+(?:is|are|was|were|stands?|stood|remains?|stays?|looks?|gets?)|['’]s)?\\s+(?:(?:clearly|much|slightly|a\\s+bit|far|way|still|now|already|significantly|well|completely|totally|just)\\s+)*(up|ahead|better|winning|down|behind|worse|losing)\\b`,
+  "i",
+);
+
 /**
- * The side named nearest to the quote in its sentence, the direction (+1 up, -1 down, 0 none: the
- * sign first, else a direction word) and `worded`, the direction from the words alone. A signed
- * quote with no direction word ("Black is +0.4") keeps reading the sign from the named side's view.
+ * The side the quote's own clause favours in words, or null (review 059). The clause runs from the
+ * last break before the number to the next break after it; when a comma or colon follows the number
+ * at once ("−5.63, which is a huge edge for Black", "+2.1, a clear edge for Black") the next
+ * segment belongs to it too. Only a direction word attached to a side counts: "Bg3 was better", "a
+ * better move" and "the edge of the board" do not.
  */
-function sideOf(text: string, at: number, len: number, player: Color, sign: string | undefined): { side: Color | null; direction: number; worded: number } {
+function quoteFavours(text: string, at: number, len: number, player: Color): Color | null {
+  let start = 0;
+  for (const m of text.slice(0, at).matchAll(QUOTE_BREAK)) start = m.index! + m[0].length;
+  const rest = text.slice(at + len);
+  const breaks = [...rest.matchAll(QUOTE_BREAK)];
+  let end = rest.length;
+  if (breaks[0]) end = breaks[0].index === 0 && /^[,:]/.test(breaks[0][0]) ? (breaks[1]?.index ?? rest.length) : breaks[0].index!;
+  const clause = `${text.slice(start, at)} # ${rest.slice(0, end)}`;
+  const toSide = (w: string): Color => {
+    const x = w.toLowerCase();
+    return x === "white" ? "w" : x === "black" ? "b" : x.startsWith("you") ? player : player === "w" ? "b" : "w";
+  };
+  const other = (c: Color): Color => (c === "w" ? "b" : "w");
+  const a = DIR_FOR_SIDE.exec(clause);
+  if (a) {
+    const s = toSide(a[2]!);
+    return a[1] === undefined || UP_WORD.test(a[1]) ? s : other(s);
+  }
+  const b = SIDE_IS_DIR.exec(clause);
+  if (b) {
+    const s = toSide(b[1]!);
+    return UP_WORD.test(b[2]!) ? s : other(s);
+  }
+  return null;
+}
+
+/**
+ * The side named nearest to the quote in its sentence and the direction (+1 up, -1 down, 0 none:
+ * the sign first, else a direction word). A signed quote whose clause has no side-attached
+ * direction word ("Black is +0.4") reads the sign from the named side's view.
+ */
+function sideOf(text: string, at: number, len: number, player: Color, sign: string | undefined): { side: Color | null; direction: number } {
   const startSentence = Math.max(text.lastIndexOf(". ", at), text.lastIndexOf("! ", at), text.lastIndexOf("? ", at), text.lastIndexOf("; ", at)) + 1;
   const endMatch = /[.!?;](?:\s|$)/.exec(text.slice(at + len));
   const sentence = text.slice(startSentence, endMatch ? at + len + endMatch.index : text.length);
@@ -889,11 +955,10 @@ function sideOf(text: string, at: number, len: number, player: Color, sign: stri
     const w = s[1]!.toLowerCase();
     side = w === "white" ? "w" : w === "black" ? "b" : w.startsWith("opponent") ? (player === "w" ? "b" : "w") : player;
   }
-  const worded = UP.test(sentence) ? 1 : DOWN.test(sentence) ? -1 : 0;
-  let direction = worded;
+  let direction = UP.test(sentence) ? 1 : DOWN.test(sentence) ? -1 : 0;
   if (sign === "+") direction = 1;
   else if (sign === "-" || sign === "−") direction = -1;
-  return { side, direction, worded };
+  return { side, direction };
 }
 
 export interface RevealGrade {

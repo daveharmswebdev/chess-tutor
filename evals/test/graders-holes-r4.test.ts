@@ -219,3 +219,76 @@ describe("round 2: the opponent's real last move described as a past placement i
     expect(giveAway(NE5, "Black has moved the knight to e5.", "f3e5").join(" ")).toMatch(/names the answer/);
   });
 });
+
+/** Review 059 (brief 060): the round-1 rules narrowed to what they were meant to catch. */
+describe("review 059 of #29 (round 3)", () => {
+  /** One analyze_position result with several White-POV scores. */
+  const multi = (c: EvalCase, cps: number[]): ToolResultRecord => ({
+    ...analysis(c, cps[0]!),
+    content: JSON.stringify({ fen: c.attemptFen, depth: 16, lines: cps.map((eval_cp, i) => ({ rank: i + 1, eval_cp, mate_in: null, moves: [] })) }),
+  });
+  const problems = (c: EvalCase, text: string, cps: number[]) =>
+    gradeEvals(input(c, { message: "What now?", reveal: text }, { toolResults: [multi(c, cps)] })).quotes.map((q) => q.problem);
+
+  describe("(A) the White's-view override needs a direction word attached to a side in the quote's own clause", () => {
+    it.each([
+      [H6_E3, "You played Bd3, but Bg3 was better: after Bd3 the engine gives −1.2.", [-120], [null]],
+      [G4, "A better move was ...Bxg4, after which White is at −3.23.", [-323], [null]],
+      [G4, "White was better at +0.3 before, but after Bxg4 it is −3.23.", [30, -323], [null, null]],
+      [NE5_A6, "The knight on the edge is poor, and White is at −5.63.", [-563], [null]],
+    ])("passes (case %#) '%s'", (c, text, cps, want) => {
+      expect(problems(c, text, cps)).toEqual(want);
+    });
+
+    it.each([
+      [NE5_A6, "The engine rates it at −5.63, which is a huge edge for Black.", [-563], [null]],
+      [G4, "The engine rates the position after Bxg4 at −3.23, which is clearly better for Black.", [-323], [null]],
+      [NE5, "It is +2.1, a clear edge for Black.", [210], ["wrong_side"]],
+      [NE5, "It is +2.1, a clear edge for Black.", [-210], ["wrong_side"]],
+      [NE5, "Black is better at +2.1.", [210], ["wrong_side"]],
+      [NE5, "White is up at +2.1.", [210], [null]],
+      [NE5, "At +2.1 the advantage to Black is clear.", [210], ["wrong_side"]],
+    ])("keeps round 2's verdict (case %#) '%s'", (c, text, cps, want) => {
+      expect(problems(c, text, cps)).toEqual(want);
+    });
+  });
+
+  describe("(B) more playing verbs, and no passive head", () => {
+    it.each([
+      ["White answered your ...e5 with dxe5."],
+      ["White replied with dxe5."],
+      ["White chose dxe5, opening the centre."],
+      ["White went for dxe5."],
+      ["White opted for dxe5."],
+      ["White met your ...e5 with dxe5."],
+      ["White has just played dxe5."],
+      ["White just exchanged with dxe5."],
+      ["White took with dxe5."],
+    ])("passes '%s'", (message) => {
+      expect(giveAway(EXCHANGE, message)).toEqual([]);
+    });
+
+    it.each([
+      [EXCHANGE, "White was worried about dxe5."],
+      [EXCHANGE, "White's dxe5 is answered by dxe5."],
+      [EXCHANGE, "White's dxe5 was met by dxe5."],
+      [EXCHANGE, "White fears dxe5."],
+      [NXE5, "White's Nxe5 is answered by Nxe5."],
+    ])("keeps (case %#) '%s' flagged", (c, message) => {
+      expect(giveAway(c, message).join(" ")).toMatch(/names the answer/);
+    });
+  });
+
+  describe("(C) a piece value needs a singular piece word right before ', which' or ', worth', and a plausible value", () => {
+    it.each([["Black gets a big lead, which is worth about 7 pawns."], ["Your pieces, worth 9 pawns more than White's, should win."], ["Taking the pawn, worth 9 pawns of advantage."]])(
+      "grades '%s'",
+      (text) => {
+        expect(problems(G4, text, [-323])).toEqual(["unmatched"]);
+      },
+    );
+
+    it.each([["That wins a whole rook, which is worth about 6 pawns."], ["You win a knight, worth 3 pawns."]])("still does not grade '%s'", (text) => {
+      expect(problems(G4, text, [-323])).toEqual([]);
+    });
+  });
+});
