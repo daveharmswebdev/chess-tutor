@@ -40,6 +40,7 @@ export type {
   PlayMoveRequest,
   TutorArrow,
   TutorKind,
+  TutorNote,
   TutorQuestion,
   TutorReveal,
   TutorStatus,

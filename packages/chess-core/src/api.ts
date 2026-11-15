@@ -71,7 +71,24 @@ import type { Color } from "./types.ts";
  *   GameView.tutor tells the client whether coaching is available and why not (NFR-9), e.g. no
  *        ANTHROPIC_API_KEY, or the API is down. The first "state" on every connection carries it.
  * Only `message` and `arrows` reach the browser before a reveal; the reveal text and move stay
- * on the server until "Show me" or a wrong try (architecture §3.5).
+ * on the server until "Show me", a wrong try, or the question closing as a note (architecture §3.5).
+ *
+ * Tutor notes (#53: FR-25, FR-8 as amended by A6, FR-5, NFR-14, FR-10). When a question closes because
+ * the position it was about is left, it becomes a TutorNote in GameView.notes:
+ *   Created: on the player's move that leaves the question's attemptFen (a graded try, or a move from
+ *        another position after the player moved on), and at the end of the game (finished, resigned
+ *        or abandoned) for a question still open or shown. A new tutor ask that replaces a question
+ *        whose position is still on the board also turns it into a note. Never while it can still be
+ *        tried: then it stays in TutorStatus.question and its reveal stays on the server.
+ *   Content: the question text, the reveal text and the engine's best move for the note's position
+ *        (released now even if never asked for), and the graded try if there was one.
+ *   Takebacks: a takeback removes every note with ply >= the new moves.length (the move it sat on
+ *        is gone); it does not reopen the question. A takeback back to attemptFen before the question closed
+ *        keeps the open question as before (the player_blunder retry).
+ *   Saving: notes are saved with the game before the reply or event that carries them (NFR-14), come
+ *        back after a restart, and are written into the saved PGN as `{...}` comments after the move
+ *        they sit on (FR-5). They reach the client only inside GameView ("state", the HTTP replies,
+ *        "bot_move", "game_over"); there is no separate event.
  */
 
 export type GameStatus = "playing" | "finished" | "abandoned";
@@ -105,6 +122,34 @@ export interface GameView {
   /** True while the server is choosing the bot's reply; the board accepts no player move then. */
   botThinking: boolean;
   tutor: TutorStatus;
+  /**
+   * Closed tutor questions kept on the move they were about, in the order they closed (#53, FR-25).
+   * The server always sends it from #53 on (optional only for older servers).
+   */
+  notes?: TutorNote[];
+}
+
+/** A closed tutor question, kept on a move (#53, FR-25). Shown in the move list (#54). */
+export interface TutorNote {
+  questionId: string;
+  kind: TutorKind;
+  /**
+   * Moves played before the note's position (the question's attemptFen): the note sits on
+   * moves[ply], the move played from that position. ply === moves.length only when no move was
+   * played from it yet (the game ended there, or a new ask replaced it); then it sits after the last move.
+   */
+  ply: number;
+  /** The question as it was shown (TutorQuestion.message). */
+  message: string;
+  /** The full answer, or null when the tutor gave none beyond the question. */
+  reveal: string | null;
+  /**
+   * The engine's best move in the note's position, from the analysis used for grading (Stockfish,
+   * checked legal; FR-10), or null when the engine had no evaluation. Never from the model.
+   */
+  bestMove: MoveView | null;
+  /** The graded try (same values as "tutor_attempt"), or null when the move was not a try. */
+  attempt: { move: MoveView; correct: boolean; cpLoss: number } | null;
 }
 
 export interface TutorStatus {
