@@ -2,7 +2,7 @@
 
 | | |
 |---|---|
-| Status | Accepted v0.2 (amendments A1 and A2 applied 2026-11-07, A3 2026-11-15) |
+| Status | Accepted v0.2 (amendments A1 and A2 applied 2026-11-07, A3 and A4 2026-11-15) |
 | Date | 2026-11-04 |
 | Owner | Dave Harms |
 
@@ -67,6 +67,14 @@ The project has three goals: get better at chess, build a portfolio-quality piec
 | FR-17 | `evaluate_move(fen, move)` returns the centipawn loss compared with the best move, and the engine's reply. | BR-3 |
 | FR-18 | `opening_explorer(fen)` returns the moves human players chose, their frequencies, and their results at the configured rating band. | BR-1, BR-3 |
 | FR-19 | `get_repertoire_context(fen)` reports whether the position is in the player's London or KID repertoire and names the line. | BR-1 |
+| FR-21 | `exchange_on_square(fen, square)` returns, from deterministic code (no engine search): the attackers and defenders of the square in capture order, cheapest first, including pieces lined up behind them (x-rays); the capture sequence if both sides keep recapturing; and its material result in pawns, taking into account that either side may stop capturing early. Any attacker or defender count, or exchange outcome, the tutor states must come from this tool in the same turn (FR-10 applies). *Added by A4, 2026-11-15.* | BR-2, BR-3 |
+
+### 3.5 Calculation training
+
+| ID | Requirement | Source |
+|---|---|---|
+| FR-22 | At a key moment where a capture is involved (the best move, the player's move or the opponent's threat is a capture), the tutor's Socratic question can ask the player to **count**: how many pieces attack and defend the square, and whether taking wins material. The player answers in the UI (two numbers and yes or no). Code grades the answer against FR-21, and the tutor explains any difference. No extra model call is made outside key moments (FR-7). *Added by A4, 2026-11-15.* | BR-2 |
+| FR-23 | When the player has two or more captures available at a key moment, the tutor can ask the player to rank them before moving. Code grades the ranking with FR-21's exchange result for each capture and a Stockfish check (FR-17). When the two disagree (a pin, an in-between check, a hanging piece elsewhere), the tutor explains why the count alone was misleading. *Added by A4, 2026-11-15.* | BR-2, BR-3 |
 
 ## 4. Non-functional requirements
 
@@ -116,7 +124,7 @@ These follow from the functional requirements plus the proposed architecture: a 
 
 - Multiple users, authentication, and hosted deployment (the architecture shouldn't rule them out).
 - Importing and reviewing Chess.com games after they're played. This is a strong candidate for v2.
-- Opening drills and spaced repetition.
+- Opening drills and spaced repetition, including calculation drills built from the player's past games (v2, decided 2026-11-15).
 - Voice, mobile-native apps, and running a Maia (human-like engine) model locally.
 
 ## 8. Open questions
@@ -134,7 +142,7 @@ These follow from the functional requirements plus the proposed architecture: a 
 | Business | Functional | Non-functional | Infrastructure |
 |---|---|---|---|
 | BR-1 Handle deviations | FR-1–6, 9, 11, 13, 14, 18, 19, 20 | NFR-1, 2, 3, 9 | IR-2, 3, 5, 7, 8 |
-| BR-2 Build understanding | FR-4, 7, 8, 12 | NFR-7 | — |
-| BR-3 Claude + engine, exam prep | FR-10, 15–19 | NFR-6, 8, 10, 12, 13 | IR-1, 2, 6, 9 |
+| BR-2 Build understanding | FR-4, 7, 8, 12, 21–23 | NFR-7 | — |
+| BR-3 Claude + engine, exam prep | FR-10, 15–19, 21, 23 | NFR-6, 8, 10, 12, 13 | IR-1, 2, 6, 9 |
 | BR-4 Cost | FR-6, 7 | NFR-4, 5, 9 | IR-4, 6 |
 | BR-5 Fair play | — | NFR-11 | — |
