@@ -5,7 +5,7 @@
  *   pnpm eval -- --model <id> --effort <level> [--cases <kind|glob|list>] [--max-usd N]
  *                [--concurrency N] [--repeat N] [--out <dir>] [--prompt <file>] [--live-explorer] [--gate]
  *   pnpm eval -- compare <dir> <dir> ... [--out <dir>]
- *   pnpm eval -- regrade <dir> ...      (offline: re-grades recorded cases, no API call)
+ *   pnpm eval -- regrade <dir> ... | regrade <dir> --out <dir>   (offline: re-grades recorded cases, no API call)
  *
  * --model defaults to config/models.json "eval".tutor, --effort to config/tutor.json.
  * --gate: after the report is written, exit 1 and print one "gate: ..." line per missed threshold
@@ -53,11 +53,12 @@ async function compare(args: string[]): Promise<void> {
 }
 
 async function regrade(args: string[]): Promise<void> {
-  const { positionals } = parseArgs({ args, allowPositionals: true, options: {} });
+  const { values, positionals } = parseArgs({ args, allowPositionals: true, options: { out: { type: "string" } } });
   if (positionals.length < 1) fail("regrade needs at least one run directory");
+  if (values.out !== undefined && positionals.length !== 1) fail("regrade --out takes exactly one run directory");
   const tol = loadSettings().toleranceCp;
   for (const dir of positionals.map((p) => resolve(p))) {
-    const s = regradeDir(dir, { toleranceCp: tol });
+    const s = regradeDir(dir, { toleranceCp: tol, ...(values.out !== undefined ? { out: resolve(values.out) } : {}) });
     const m = s.metrics;
     const p = (x: number | null) => (x === null ? "n/a" : `${Math.round(x * 100)}%`);
     console.log(

@@ -163,12 +163,49 @@ function lastMoveOf(history: string[], side: Color, s: Mention["spec"]): string 
   return null;
 }
 
-/** True when the last tense cue in the clause before the mention is a past one ("White played", "White pushed the"). */
-function pastHead(text: string, at: number): boolean {
+/** Verbs that say a move was played; "was", "had", "worried" do not (review 056, review 059). */
+const PLAY_VERB = /^(?:played|took|traded|exchanged|recaptured|captured|pushed|advanced|moved|castled|answered|replied|responded|chose)$/i;
+/** PAST_CUE plus the verbs only a playing phrase needs: "opted for", "met ... with". */
+const PLAY_CUE = new RegExp(`${PAST_CUE.source}|\\b(?:opted|met)\\b`, "gi");
+/** A passive head: be-verb, participle, "by" ("is answered by", "was met by", "is simply met by"). */
+const PASSIVE_BY = /\b(?:is|are|was|were|be|been|being|gets?|got)\s+(?:\w+ly\s+)?\w+\s+by\s/i;
+
+/**
+ * True when the last tense cue in the clause before the mention is a real playing verb ("White
+ * played", "White took your pawn with", "White replied with", "White went for", "White met your
+ * ...e5 with"): "White was worried about dxe5" and the passive "White's dxe5 is answered by dxe5"
+ * are not (review 056, review 059).
+ */
+function playedHead(text: string, at: number): boolean {
   const head = text.slice(clauseStart(text, at), at);
-  const last = (re: RegExp) => Math.max(-1, ...[...head.matchAll(re)].map((m) => m.index!));
-  const past = last(PAST_CUE);
-  return past >= 0 && past > last(PRESENT_CUE);
+  if (PASSIVE_BY.test(head)) return false;
+  const past = [...head.matchAll(PLAY_CUE)].pop();
+  const present = Math.max(-1, ...[...head.matchAll(PRESENT_CUE)].map((m) => m.index!));
+  if (past === undefined || past.index! <= present) return false;
+  const word = past[0].toLowerCase();
+  const after = head.slice(past.index! + past[0].length);
+  if (word === "went" || word === "opted") return /^\s+for\b/i.test(after);
+  if (word === "met") return /\bwith\s*(?:\.\.\.\s?)?$/i.test(after);
+  return PLAY_VERB.test(word);
+}
+
+/**
+ * A piece placed in the past or perfect, ending at the mention's square: "just put a knight on
+ * e5", "has (just) put", "brought the knight to e5", "has brought", "just moved", "has moved"
+ * (#29 round 2). Plain "put" is not enough: it reads as an imperative or a plan.
+ */
+const PLACED_PAST =
+  /\b(?:(?:(?:has|have|had)\s+(?:just\s+)?|just\s+)(?:put|placed|brought|moved)|brought)\s+(?:(?:the|a|an|his|her|their|its|that|white's|black's)\s+)?(?:(?:other|light-squared|dark-squared|king's|queen's|kingside|queenside)\s+)?(?:king|queen|rook|bishop|knight|pawn)\s+(?:on|to|onto|into)\s+[a-h][1-8]$/i;
+
+/**
+ * "White just put a knight on e5" after 10.Nxe5: a piece-to-square mention placed in the past by
+ * the clause's subject, the opponent, whose real last move put that piece there (#29 round 2).
+ */
+function placedLastMove(text: string, m: Mention, player: Color, history: string[]): boolean {
+  if (!m.pieceTo) return false;
+  if (!PLACED_PAST.test(text.slice(clauseStart(text, m.start), m.start) + m.raw)) return false;
+  const subject = subjectSide(text, m.start, player);
+  return subject !== null && subject !== player && lastMoveOf(history, subject, m.spec) !== null;
 }
 
 /** Side words that can be a clause's subject; a possessive "your" ("took your pawn") is an object (review 054). */
@@ -290,6 +327,26 @@ function isPastMention(text: string, at: number, end: number, ctx: TenseContext)
   return past >= 0 && past > last(PRESENT_CUE);
 }
 
+/** A place-verb mention in the imperative: "put the bishop on g7", "bring the knight to d5" (notation PLACE_PIECE). */
+const PLACE_IMPERATIVE = /^(?:put|place|bring|plant|post|get|reroute|send)\s/i;
+/** Before it in its clause: nothing but a sequencing word (an instruction), or a plan frame ("the plan is to"). */
+const PLAN_HEAD =
+  /^\s*(?:(?:then|first|next|and|also|later|eventually|after\s+that)\s+)*$|\b(?:plan|idea|aim|goal)\s+(?:is|was|would\s+be)\s+to\s+$|\b(?:plan|aim|want|wants|intend|intends|hope|hopes)\s+to\s+$/i;
+/** A clause that puts the move now is not a plan: "Put the bishop on g7 now". */
+const NOW_WORD = /\b(?:now|right\s+away|immediately|this\s+move)\b/i;
+
+/**
+ * A plan sentence (#29, lb-kid-e4): "Put the bishop on g7.", "The plan is to bring the knight to
+ * d5." names where a piece goes over several moves, not a move claimed now, so gradeMoves skips it
+ * like a plan noun. NFR-7 still reads it as naming the move.
+ */
+function planSentence(text: string, m: Mention): boolean {
+  if (!m.pieceTo || !PLACE_IMPERATIVE.test(m.raw)) return false;
+  const start = clauseStart(text, m.start);
+  if (NOW_WORD.test(text.slice(start, clauseEnd(text, m.end)))) return false;
+  return PLAN_HEAD.test(text.slice(start, m.start));
+}
+
 const ucis = (moves: unknown): string[] =>
   Array.isArray(moves) ? moves.map((m) => (m && typeof m === "object" ? (m as { uci?: unknown }).uci : m)).filter((u): u is string => typeof u === "string") : [];
 
@@ -361,7 +418,7 @@ export function gradeMoves(input: GradeInput): MovesGrade {
     let all = unique([...history, ...current]);
     const ctx: TenseContext = { currentPly: Math.min(plyOf(input.fen), plyOf(input.attemptFen)), prev: null };
     for (const m of findMentions(text)) {
-      if (m.plan) continue;
+      if (m.plan || planSentence(text, m)) continue;
       const named = namedMover(text, m.start, input.playerColor);
       // "Black's last move, Qd6": that side's real last move, or else graded as played now (review 052).
       const lastOfSide = named.lastMove && named.mover ? lastMoveOf(input.history, named.mover, m.spec) : null;
@@ -447,7 +504,13 @@ const TOO = /\btoo\b|\bas\s+well\b|\blikewise\b/gi;
 /** Addressed to the player: "you", "your", or an imperative at the clause start. */
 const ADDRESSED = /\b(?:you|your|you're)\b|^\s*(?:castle|do|follow|get|bring|tuck|go|play|make)\b/i;
 /** A castle word that says the side did not castle: "hasn't castled", "skipped castling", "yet to castle". */
-const NEGATED = /\b(?:hasn't|has\s+not|haven't|have\s+not|hadn't|had\s+not|didn't|did\s+not|doesn't|does\s+not|not|never|yet\s+to|skipped|skips|skipping|skip|without|won't|can't|cannot)\b/i;
+const NEGATED =
+  /\b(?:hasn['’]t|has\s+not|haven['’]t|have\s+not|hadn['’]t|had\s+not|didn['’]t|did\s+not|doesn['’]t|does\s+not|isn['’]t|aren['’]t|wasn['’]t|weren['’]t|not|never|yet\s+to|skipped|skips|skipping|skip|without|won['’]t|can['’]t|cannot)\b/i;
+/** The player's "too" clause is about castling or the king ("your king wants safety as well", review 056 minors). */
+const ABOUT_KING = /\b(?:castl\w*|king|kingside|safety|safe)\b/i;
+/** An elliptical "too" clause that can only mean castling: "you should too", "and you can as well". */
+const ELLIPTICAL =
+  /^\s*(?:(?:and|so|then)\s+)?(?:(?:you|you're|you\s+are)\s+)?(?:(?:should|can|could|must|may|might|will|need\s+to|ought\s+to|want\s+to|do|probably|also|now|just|definitely|really|surely)\s+)*$/i;
 
 /** Non-empty clauses of `text`, in order (CLAUSE_BREAK boundaries). */
 function clauses(text: string): { start: number; end: number }[] {
@@ -486,10 +549,12 @@ function castleWords(text: string, player: Color): { player: boolean; opponent: 
     if (NEGATED.test(head.slice(found!.index!))) continue;
     out.opponent = true;
     const here = clauseOf(m.index!);
+    // The player's clause up to the "too" must be about castling or the king, or elliptical (review 056 minors).
+    const copies = (seg: string) => ADDRESSED.test(seg) && (ABOUT_KING.test(seg) || ELLIPTICAL.test(seg));
     for (const t of toos) {
       const c = clauseOf(t);
-      if (c === here && ADDRESSED.test(text.slice(m.index!, t))) out.copied = true;
-      if (c === here + 1 && ADDRESSED.test(text.slice(list[c]!.start, t))) out.copied = true;
+      if (c === here && copies(text.slice(m.index! + m[0].length, t))) out.copied = true;
+      if (c === here + 1 && copies(text.slice(list[c]!.start, t))) out.copied = true;
     }
   }
   return out;
@@ -531,8 +596,9 @@ function alongLine(from: string, to: string, a: { from: string; to: string }): b
  * Without a revealMove the answer is the case's engineBest: a reply that names the engine's
  * move without revealing it still gives it away (#29). Not the answer (review 052 narrowed both):
  * a mention whose named mover (moverOf, and the nearest side word) is the side not to move, told
- * in the past, and that side played it in the game ("White played dxe5"; "White fears dxe5" and
- * "White hopes you miss dxe5" are still graded); a mention numbered as an earlier ply, without a
+ * with a playing verb (PLAY_VERB), and that side played it in the game ("White played dxe5";
+ * "White fears dxe5", "White hopes you miss dxe5", "White was worried about dxe5" and "White's
+ * dxe5 is answered by dxe5" are still graded, review 056); a mention numbered as an earlier ply, without a
  * present cue or predicate ("It is not 1...d5" when Black plays move 2; "Play 1...d5 now" and
  * "10.e4 is the move" are still graded).
  */
@@ -566,10 +632,12 @@ export function gradeGiveAway(input: GradeInput): GiveAwayGrade {
     // (b) A possessive ("White's dxe5", "After your ...e5") naming that side's real last move, not put now.
     const possessive = possessiveSide(msg.slice(0, m.start), input.playerColor);
     if (possessive !== null && !presentClause(msg, m.start) && lastMoveOf(input.history, possessive, m.spec)) continue;
-    // (c, d) Told in the past by the clause's subject, who is also the nearest side word.
+    // (c, d) Told with a playing verb by the clause's subject, who is also the nearest side word.
     const subject = subjectSide(msg, m.start, input.playerColor) ?? named.mover;
     const nearest = nearestSide(msg, m.start, input.playerColor) ?? named.mover;
-    if (!named.lastMove && subject !== null && subject !== toMove && nearest === subject && !now && pastHead(msg, m.start) && playedBy(input.history, subject, m.spec)) continue;
+    if (!named.lastMove && subject !== null && subject !== toMove && nearest === subject && !now && playedHead(msg, m.start) && playedBy(input.history, subject, m.spec)) continue;
+    // (e) "White just put a knight on e5": the opponent's real last move, placed in the past (#29 round 2).
+    if (!now && placedLastMove(msg, m, input.playerColor, input.history)) continue;
     // Nor is a move numbered as an earlier ply, told in the past ("It is not 1...d5" when Black plays move 2).
     const numbered = NUMBERED.exec(msg.slice(0, m.start));
     if (numbered && numberedPly(numbered) < attemptPly && !now) continue;
@@ -704,6 +772,16 @@ const NOT_EVAL_BEFORE = /\bstockfish\s+$|\b(?:version|accuracy|accuracies|rating
 /** A piece value: "A bishop is worth 3 pawns", "a rook is worth about 5" (review 042). */
 const PIECE_VALUE_BEFORE =
   /\b(?:pawns?|knights?|bishops?|rooks?|queens?|pieces?|exchange)\s+(?:is|are)\s+(?:(?:usually|normally|generally|roughly|about|around|only|still|each|traditionally)\s+)*worth\s+(?:(?:about|roughly|around|nearly|almost|just|only|over|under)\s+)?$/i;
+/**
+ * A piece value right after a singular piece word, a whole number of pawns: "That wins a whole
+ * rook, which is worth about 6 pawns", "a knight, worth 3 pawns" (#29, PR #35; narrowed in review
+ * 059: "a big lead, which is worth 7 pawns" and "Your pieces, worth 9 pawns" are graded). A decimal
+ * stays graded, and so does a value the piece does not have (PIECE_PAWNS: "the pawn, worth 9 pawns").
+ */
+const PIECE_WORTH_BEFORE =
+  /\b(pawn|knight|bishop|rook|queen|piece|exchange)(?:,?\s+|,\s+which\s+(?:is|was)\s+(?:(?:usually|normally|generally|roughly|about|around|only|still|traditionally)\s+)*)worth\s+(?:(?:about|roughly|around|nearly|almost|just|only|over|under)\s+)?$/i;
+/** Pawn values a piece may be said to be worth. */
+const PIECE_PAWNS: Record<string, [number, number]> = { pawn: [1, 1], knight: [3, 3], bishop: [3, 3], piece: [3, 3], rook: [5, 6], queen: [9, 10], exchange: [1, 2] };
 const MATERIAL_FOLLOW = /^\s+(?:in|of)\s+material\b/i;
 
 interface RawQuote {
@@ -713,6 +791,14 @@ interface RawQuote {
   sign: string | undefined;
   num: string;
   unit: string;
+}
+
+/** An unsigned whole number of pawns after "<piece>, worth" or "<piece>, which is worth", within that piece's value. */
+function pieceWorth(text: string, q: RawQuote): boolean {
+  if (!q.unit.startsWith("p") || q.num.includes(".")) return false;
+  const m = PIECE_WORTH_BEFORE.exec(text.slice(0, q.index));
+  const range = m ? PIECE_PAWNS[m[1]!.toLowerCase()] : undefined;
+  return range !== undefined && Number(q.num) >= range[0] && Number(q.num) <= range[1];
 }
 
 /** Every evaluation quoted in `text`, in order, without overlaps (the earliest, then longest, wins). */
@@ -733,7 +819,7 @@ export function findEvalQuotes(text: string): RawQuote[] {
   }
   const sorted = found
     // Versions, accuracies and piece values are unsigned; a signed quote is always graded (review 052).
-    .filter((q) => q.sign !== undefined || /[–]\s*$/.test(text.slice(0, q.index)) || (!NOT_EVAL_BEFORE.test(text.slice(0, q.index)) && !PIECE_VALUE_BEFORE.test(text.slice(0, q.index))))
+    .filter((q) => q.sign !== undefined || /[–]\s*$/.test(text.slice(0, q.index)) || (!NOT_EVAL_BEFORE.test(text.slice(0, q.index)) && !PIECE_VALUE_BEFORE.test(text.slice(0, q.index)) && !pieceWorth(text, q)))
     .sort((a, b) => a.index - b.index || b.raw.length - a.raw.length);
   const out: RawQuote[] = [];
   for (const q of sorted) {
@@ -775,7 +861,18 @@ export function gradeEvals(input: GradeInput): EvalsGrade {
       const near = (a: number, b: number) => Math.abs(a - b) <= tol + 1e-9;
       const { side, direction } = sideOf(text, q.index, raw.length, input.playerColor, sign);
       let problem: EvalQuote["problem"] = null;
-      if (side !== null && direction !== 0) {
+      const signDir = sign === undefined ? 0 : sign === "+" ? 1 : -1;
+      const favoured = signDir !== 0 ? quoteFavours(text, q.index, raw.length, input.playerColor) : null;
+      if (favoured !== null) {
+        // A signed score is White's view (#29): "-5.63, a huge edge for Black" is graded by the sign
+        // alone. The side the words favour must agree with the sign ("+2.1, an edge for Black" is wrong_side).
+        const white = signDir * size;
+        if ((favoured === "w") !== signDir > 0) problem = "wrong_side";
+        else if (ev.signed.some((e) => near(e, white))) problem = null;
+        else if (ev.signed.some((e) => near(e, -white))) problem = "wrong_side";
+        else if (ev.magnitude.some((e) => near(e, size))) problem = null;
+        else problem = "unmatched";
+      } else if (side !== null && direction !== 0) {
         const white = (side === "w" ? 1 : -1) * direction * size;
         if (ev.signed.some((e) => near(e, white))) problem = null;
         else if (ev.signed.some((e) => near(e, -white))) problem = "wrong_side";
@@ -791,7 +888,59 @@ export function gradeEvals(input: GradeInput): EvalsGrade {
   return { pass: quotes.every((q) => q.problem === null), quotes };
 }
 
-/** The side named nearest to the quote in its sentence, and the direction (+1 up, -1 down, 0 none). */
+/** Clause breaks around a quote: punctuation, " but ", " and " (review 059). */
+const QUOTE_BREAK = /[,;:.!?](?=\s|$)|\s(?:but|and)\s/gi;
+const FAVOUR_SIDE = "(white|black|you're|you|your\\s+opponent|the\\s+opponent|opponent)";
+const UP_WORD = /^(?:up|ahead|better|advantage|edge|winning|plus|lead)$/i;
+/** A direction word attached to a side: "edge for Black", "advantage to White", "favours Black". */
+const DIR_FOR_SIDE = new RegExp(
+  `\\b(?:(up|ahead|better|advantage|edge|winning|lead|down|behind|worse|losing)\\s+(?:to|for)|favou?rs?|favou?ring)\\s+${FAVOUR_SIDE}\\b`,
+  "i",
+);
+/** A side with a direction predicate: "Black is better", "White is up", "you're ahead", "Black's winning". */
+const SIDE_IS_DIR = new RegExp(
+  `\\b${FAVOUR_SIDE}(?:\\s+(?:is|are|was|were|stands?|stood|remains?|stays?|looks?|gets?)|['’]s)?\\s+(?:(?:clearly|much|slightly|a\\s+bit|far|way|still|now|already|significantly|well|completely|totally|just)\\s+)*(up|ahead|better|winning|down|behind|worse|losing)\\b`,
+  "i",
+);
+
+/**
+ * The side the quote's own clause favours in words, or null (review 059). The clause runs from the
+ * last break before the number to the next break after it; when a comma or colon follows the number
+ * at once ("−5.63, which is a huge edge for Black", "+2.1, a clear edge for Black") the next
+ * segment belongs to it too. Only a direction word attached to a side counts: "Bg3 was better", "a
+ * better move" and "the edge of the board" do not.
+ */
+function quoteFavours(text: string, at: number, len: number, player: Color): Color | null {
+  let start = 0;
+  for (const m of text.slice(0, at).matchAll(QUOTE_BREAK)) start = m.index! + m[0].length;
+  const rest = text.slice(at + len);
+  const breaks = [...rest.matchAll(QUOTE_BREAK)];
+  let end = rest.length;
+  if (breaks[0]) end = breaks[0].index === 0 && /^[,:]/.test(breaks[0][0]) ? (breaks[1]?.index ?? rest.length) : breaks[0].index!;
+  const clause = `${text.slice(start, at)} # ${rest.slice(0, end)}`;
+  const toSide = (w: string): Color => {
+    const x = w.toLowerCase();
+    return x === "white" ? "w" : x === "black" ? "b" : x.startsWith("you") ? player : player === "w" ? "b" : "w";
+  };
+  const other = (c: Color): Color => (c === "w" ? "b" : "w");
+  const a = DIR_FOR_SIDE.exec(clause);
+  if (a) {
+    const s = toSide(a[2]!);
+    return a[1] === undefined || UP_WORD.test(a[1]) ? s : other(s);
+  }
+  const b = SIDE_IS_DIR.exec(clause);
+  if (b) {
+    const s = toSide(b[1]!);
+    return UP_WORD.test(b[2]!) ? s : other(s);
+  }
+  return null;
+}
+
+/**
+ * The side named nearest to the quote in its sentence and the direction (+1 up, -1 down, 0 none:
+ * the sign first, else a direction word). A signed quote whose clause has no side-attached
+ * direction word ("Black is +0.4") reads the sign from the named side's view.
+ */
 function sideOf(text: string, at: number, len: number, player: Color, sign: string | undefined): { side: Color | null; direction: number } {
   const startSentence = Math.max(text.lastIndexOf(". ", at), text.lastIndexOf("! ", at), text.lastIndexOf("? ", at), text.lastIndexOf("; ", at)) + 1;
   const endMatch = /[.!?;](?:\s|$)/.exec(text.slice(at + len));
@@ -806,11 +955,9 @@ function sideOf(text: string, at: number, len: number, player: Color, sign: stri
     const w = s[1]!.toLowerCase();
     side = w === "white" ? "w" : w === "black" ? "b" : w.startsWith("opponent") ? (player === "w" ? "b" : "w") : player;
   }
-  let direction = 0;
+  let direction = UP.test(sentence) ? 1 : DOWN.test(sentence) ? -1 : 0;
   if (sign === "+") direction = 1;
   else if (sign === "-" || sign === "−") direction = -1;
-  else if (UP.test(sentence)) direction = 1;
-  else if (DOWN.test(sentence)) direction = -1;
   return { side, direction };
 }
 

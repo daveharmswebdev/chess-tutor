@@ -1,4 +1,4 @@
-import { copyFileSync, mkdirSync, mkdtempSync, readFileSync, writeFileSync } from "node:fs";
+import { copyFileSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -46,6 +46,26 @@ describe("regradeDir", () => {
     expect(after.costUsd).toBe(before.costUsd);
     expect(JSON.parse(readFileSync(join(dir, "summary.json"), "utf8")).metrics.moveLegalPct).toBe(1);
     expect(readFileSync(join(dir, "report.md"), "utf8")).toMatch(/Points at the answer square/);
+  });
+
+  it("with out, writes the regraded run to a new directory and leaves the source untouched (#29)", () => {
+    const dir = runDir(["po-london-ng4", "hint-london-ne5"], { model: "claude-opus-5-5", effort: "medium", maxUsd: 2.5 });
+    writeFileSync(join(dir, "report.md"), "old report\n");
+    const snapshot = () =>
+      Object.fromEntries(["summary.json", "report.md", "cases/po-london-ng4.json", "cases/hint-london-ne5.json"].map((f) => [f, readFileSync(join(dir, f), "utf8")]));
+    const before = snapshot();
+    const out = join(mkdtempSync(join(tmpdir(), "evals-regrade-out-")), "regraded");
+
+    const summary = regradeDir(dir, { out });
+    expect(snapshot()).toEqual(before);
+    expect(readdirSync(dir).sort()).toEqual(["cases", "report.md", "summary.json"]);
+    expect(summary.metrics.cases).toBe(2);
+    expect(summary.maxUsd).toBe(2.5);
+    expect(readdirSync(join(out, "cases")).sort()).toEqual(["hint-london-ne5.json", "po-london-ng4.json"]);
+    const graded = JSON.parse(readFileSync(join(out, "cases", "po-london-ng4.json"), "utf8")) as CaseResult;
+    expect(graded.grades!.moves.illegal).toEqual([]);
+    expect(JSON.parse(readFileSync(join(out, "summary.json"), "utf8")).metrics.cases).toBe(2);
+    expect(readFileSync(join(out, "report.md"), "utf8")).toMatch(/Points at the answer square/);
   });
 
   it("works without a summary.json, taking model and effort from the cases", () => {
