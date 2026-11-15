@@ -189,3 +189,33 @@ describe("(5c) a plan sentence is not graded as a claimed move (lb-kid-e4)", () 
     expect(giveAway(NE5, "Put your knight on e5.", "f3e5").join(" ")).toMatch(/names the answer/);
   });
 });
+
+describe("round 2: the opponent's real last move described as a past placement is not the answer (po-kid-nxe5)", () => {
+  it.each([
+    ["White just put a knight on e5. Count the attackers and defenders on that square. How many of your pieces hit it, and how many White pieces guard it?"],
+    ["White has put a knight on e5."],
+    ["White has just put a knight on e5."],
+    ["White brought the knight to e5."],
+    ["White has brought a knight to e5."],
+    ["White just moved the knight to e5."],
+    ["White has moved the knight to e5."],
+  ])("passes '%s'", (message) => {
+    expect(giveAway(NXE5, message)).toEqual([]);
+  });
+
+  it.each([
+    ["Put a knight on e5."],
+    ["You should put a knight on e5."],
+    ["White would love to put a knight on e5."],
+    ["White wants to put a knight on e5."],
+    ["You just put a knight on e5."],
+  ])("keeps '%s' flagged", (message) => {
+    expect(giveAway(NXE5, message).join(" ")).toMatch(/names the answer/);
+  });
+
+  it("a past placement that is not the opponent's real last move stays flagged", () => {
+    // hint-london-ne5: Black's last move was ...b6; the answer here is Nf3-e5.
+    expect(giveAway(NE5, "Black just put a knight on e5.", "f3e5").join(" ")).toMatch(/names the answer/);
+    expect(giveAway(NE5, "Black has moved the knight to e5.", "f3e5").join(" ")).toMatch(/names the answer/);
+  });
+});

@@ -178,6 +178,25 @@ function playedHead(text: string, at: number): boolean {
   return past !== undefined && past.index! > present && PLAY_VERB.test(past[0]);
 }
 
+/**
+ * A piece placed in the past or perfect, ending at the mention's square: "just put a knight on
+ * e5", "has (just) put", "brought the knight to e5", "has brought", "just moved", "has moved"
+ * (#29 round 2). Plain "put" is not enough: it reads as an imperative or a plan.
+ */
+const PLACED_PAST =
+  /\b(?:(?:(?:has|have|had)\s+(?:just\s+)?|just\s+)(?:put|placed|brought|moved)|brought)\s+(?:(?:the|a|an|his|her|their|its|that|white's|black's)\s+)?(?:(?:other|light-squared|dark-squared|king's|queen's|kingside|queenside)\s+)?(?:king|queen|rook|bishop|knight|pawn)\s+(?:on|to|onto|into)\s+[a-h][1-8]$/i;
+
+/**
+ * "White just put a knight on e5" after 10.Nxe5: a piece-to-square mention placed in the past by
+ * the clause's subject, the opponent, whose real last move put that piece there (#29 round 2).
+ */
+function placedLastMove(text: string, m: Mention, player: Color, history: string[]): boolean {
+  if (!m.pieceTo) return false;
+  if (!PLACED_PAST.test(text.slice(clauseStart(text, m.start), m.start) + m.raw)) return false;
+  const subject = subjectSide(text, m.start, player);
+  return subject !== null && subject !== player && lastMoveOf(history, subject, m.spec) !== null;
+}
+
 /** Side words that can be a clause's subject; a possessive "your" ("took your pawn") is an object (review 054). */
 const SUBJECT_SIDE = /\b(white|black|you|your\s+opponent|the\s+opponent|opponent)\b/gi;
 
@@ -606,6 +625,8 @@ export function gradeGiveAway(input: GradeInput): GiveAwayGrade {
     const subject = subjectSide(msg, m.start, input.playerColor) ?? named.mover;
     const nearest = nearestSide(msg, m.start, input.playerColor) ?? named.mover;
     if (!named.lastMove && subject !== null && subject !== toMove && nearest === subject && !now && playedHead(msg, m.start) && playedBy(input.history, subject, m.spec)) continue;
+    // (e) "White just put a knight on e5": the opponent's real last move, placed in the past (#29 round 2).
+    if (!now && placedLastMove(msg, m, input.playerColor, input.history)) continue;
     // Nor is a move numbered as an earlier ply, told in the past ("It is not 1...d5" when Black plays move 2).
     const numbered = NUMBERED.exec(msg.slice(0, m.start));
     if (numbered && numberedPly(numbered) < attemptPly && !now) continue;
