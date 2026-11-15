@@ -1,0 +1,35 @@
+{
+  "brief_id": "060-grader-gate-r4-r3",
+  "agent": "tutor-agent",
+  "issue": 29,
+  "base_sha": "17c97db",
+  "scratch_dir": "/private/tmp/claude-501/-Users-daveharms-personal-workspace-chess-tutor/36d44e4e-1d9c-4f0f-a3ad-0103eee821af/scratchpad/060-grader-gate-r4-r3",
+  "objective": "Round 3, the LAST round under the 3-round limit, on your branch (base 17c97db). Review 059 said merge SHIP but gate NO because of two new false fails. Fix exactly these, nothing else: (A) MAJOR graders.ts ~892 `worded`: the White's-view override applies only when the direction word belongs to the quote: in the quote's own clause (split on ',', ';', ':', ' but ', ' and ' boundaries before/after the number) AND attached to a side ('edge for Black', 'better for White', 'Black is better', 'advantage to Black', '<side> is up/ahead/down'). A direction word about a move ('Bg3 was better', 'a better move', 'the better square') or the board ('the edge of the board', 'on the edge') never triggers it. (B) MAJOR graders.ts ~167 PLAY_VERB: add answered, replied, responded, chose, went for, opted for, met ... with; and reject a passive head (be-verb + participle + 'by', e.g. 'is answered by', 'was met by'), so review 056's \"White's dxe5 is answered by dxe5\" stays flagged. (C) minor graders.ts ~768 piece value: ', which is worth N pawns' only when a piece word (pawn, knight, bishop, rook, queen, exchange, piece singular) directly precedes ', which'; '<piece>, worth' only with a singular piece word. Then regrade the PR #35 artifact AND each recorded run under evals/results/ (2026-11-08T18-04-40-*, 2026-11-10T12-49-12-*, 2026-11-10T12-54-19-*, and the q3-2026-11-08/* sub-runs) with --out into scratch_dir, and report legal / give-away / eval match for each plus every flip vs your round-2 head 17c97db.",
+  "requirements": [
+    "NFR-6",
+    "NFR-7",
+    "NFR-10",
+    "FR-10"
+  ],
+  "contract": "Round 2 accepted at 17c97db (943 passed; regrade of artifact 100/100/100). Review 059 probes; make each a test with the verdict shown as REQUIRED after your fix:\n(A) must be ok (null, not wrong_side): mw-london-h6-e3 'You played Bd3, but Bg3 was better: after Bd3 the engine gives \u22121.2.'; po-kid-g4 'A better move was ...Bxg4, after which White is at \u22123.23.'; po-kid-g4 'White was better at +0.3 before, but after Bxg4 it is \u22123.23.' (both quotes null); mw-kid-ne5-a6 'The knight on the edge is poor, and White is at \u22125.63.'. Must stay as round 2 decided: mw-kid-ne5-a6 'The engine rates it at \u22125.63, which is a huge edge for Black' ok; po-kid-g4 '...after Bxg4 at \u22123.23, which is clearly better for Black' ok; '+2.1, a clear edge for Black' wrong_side. Nice-to-have only if it falls out of the clause split (not required, old behaviour): 'It went from +0.3 to \u22123.23, a clear edge for Black.' with +0.3 ok.\n(B) lb-kid-exchange (White's last move 8.dxe5, answer ...dxe5 d6e5): must be ok: 'White answered your ...e5 with dxe5.', 'White replied with dxe5.', 'White chose dxe5, opening the centre.', 'White went for dxe5.'. Must stay ok: 'White has just played dxe5.', 'White just exchanged with dxe5.', 'White took with dxe5.'. Must stay flagged: 'White was worried about dxe5.', \"White's dxe5 is answered by dxe5.\" (po-kid-nxe5 analogue too), 'White fears dxe5.'.\n(C) po-kid-g4 (engine -323): must be graded (unmatched): 'Black gets a big lead, which is worth about 7 pawns.', 'Your pieces, worth 9 pawns more than White's, should win.', 'Taking the pawn, worth 9 pawns of advantage.'. Must stay not graded: 'That wins a whole rook, which is worth about 6 pawns', 'a knight, worth 3 pawns'.\nKnown minors left for later (do NOT fix): placedLastMove framing 'You can see White just put...'; plan-sentence imperative legality skip; multi-quote sentences 'Black is up a pawn, but the engine still gives +0.26'.\nReview 059 regrade at 17c97db: artifact 100/100/100; 2026-11-10 12-49 and 12-54 100/100/100; 2026-11-08 legal 100/evals 100/give-away 88; q3 v1-prompt sub-runs vary (v1 prompt predates White's-view rule; flips there do not bear on the gate). q3-2026-11-08 itself has no cases/; regrade its sub-runs.\nArtifact (read-only): /private/tmp/claude-501/-Users-daveharms-personal-workspace-chess-tutor/36d44e4e-1d9c-4f0f-a3ad-0103eee821af/scratchpad/artifact-42864019702/eval-results. Gate decision after your return: --gate is enabled only if the artifact and both 2026-11-10 runs stay 100/100/>=90 with no new false fails.",
+  "scope": [
+    "packages/tutor/**",
+    "prompts/**",
+    "evals/**"
+  ],
+  "negative": [
+    "Do not edit files outside scope, docs, config, .github, root files or the lockfile.",
+    "No new dependencies.",
+    "Do not change packages/tutor, the TutorReply type or prompts/.",
+    "Never call the real Anthropic API; never modify anything under evals/results/ or the artifact directory (regrade only with --out).",
+    "No changes beyond (A), (B), (C), their tests and a README line if behaviour is documented there."
+  ],
+  "rubric": [
+    "Tests first (red then green): every probe above with its required verdict, must-change and keep alike.",
+    "Regrades with --out for the artifact and every recorded run, numbers plus flips vs 17c97db judged right/wrong.",
+    "pnpm test and pnpm typecheck clean from the repo root.",
+    "files_changed lists every file changed in 17c97db..your head. Commit message references NFR-6, NFR-7, NFR-10 and #29."
+  ],
+  "concurrency": "None in flight. Don't rebase; the coordinator does that at ship.",
+  "round": 3
+}

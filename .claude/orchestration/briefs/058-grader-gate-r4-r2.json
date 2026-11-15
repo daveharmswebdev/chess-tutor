@@ -1,0 +1,34 @@
+{
+  "brief_id": "058-grader-gate-r4-r2",
+  "agent": "tutor-agent",
+  "issue": 29,
+  "base_sha": "13dba36",
+  "scratch_dir": "/private/tmp/claude-501/-Users-daveharms-personal-workspace-chess-tutor/36d44e4e-1d9c-4f0f-a3ad-0103eee821af/scratchpad/058-grader-gate-r4-r2",
+  "objective": "Round 2 on your branch (base 13dba36). One fix: the give-away grader false-fails po-kid-nxe5 on \"White just put a knight on e5.\" That sentence describes White's last move (10.Nxe5), not the answer d7e5. Treat a PLACE_PIECE mention as opponent history, and skip it, only when ALL of these hold: the clause's subject is the opponent side (first side word, e.g. 'White'); the verb is past or perfect ('just put', 'put' in past with 'just', 'has put', 'has just put', 'brought', 'has brought', 'just moved', 'has moved'); and lastMoveOf(history, that side) lands the named piece on the named square. If any fails, it stays a give-away. Then regrade the same artifact with --out into scratch_dir/after-r2 and report legal / give-away / eval match, plus every case whose verdict changed compared with your round-1 'after' run.",
+  "requirements": [
+    "NFR-6",
+    "NFR-7",
+    "NFR-10"
+  ],
+  "contract": "Your round-1 return (accepted by the coordinator: diff matches files_changed, gate re-run 46 files / 930 passed, typecheck clean). Regrade after round 1: legal 1.0, eval match 1.0, give-away 0.9841269841269841 (63 graded), the one miss being po-kid-nxe5: \"White just put a knight on e5. Count the attackers and defenders on that square. ...\" -> d7e5 [message names the answer d7e5 as \"put a knight on e5\"].\nCoordinator decision on your brief defect: your split is accepted. A signed number plus a direction word (edge/better/advantage/worse...) is White's view; 'Black is +0.4' with no direction word keeps the side-relative reading. Keep the existing test.\nKeep flagged (must stay give-aways; add as tests): in po-kid-nxe5, 'Put a knight on e5.' (imperative), 'You should put a knight on e5.', 'White would love to put a knight on e5.', 'White wants to put a knight on e5.'; a past mention that does NOT match the opponent's real last move (pick a square/piece White did not just move to) stays flagged.\nArtifact (read-only; use --out): /private/tmp/claude-501/-Users-daveharms-personal-workspace-chess-tutor/36d44e4e-1d9c-4f0f-a3ad-0103eee821af/scratchpad/artifact-42864019702/eval-results.\nGate decision after your return: --gate is enabled by the coordinator only if this regrade shows legal 100%, give-away 100%, eval match >= 90%.",
+  "scope": [
+    "packages/tutor/**",
+    "prompts/**",
+    "evals/**"
+  ],
+  "negative": [
+    "Do not edit files outside scope, docs, config, .github, root files or the lockfile.",
+    "No new dependencies.",
+    "Do not change packages/tutor, the TutorReply type or prompts/.",
+    "Never call the real Anthropic API; never modify anything under evals/results/ or the artifact directory.",
+    "No changes beyond this one fix and its tests (README line if behaviour is documented there)."
+  ],
+  "rubric": [
+    "Tests first (red then green): the po-kid-nxe5 sentence passes as ok; every keep-flagged probe stays a give-away.",
+    "Regrade with --out reported as asked, with each changed verdict judged right or wrong.",
+    "pnpm test and pnpm typecheck clean from the repo root.",
+    "files_changed lists every file changed in 13dba36..your head. Commit message references NFR-6, NFR-10 and #29."
+  ],
+  "concurrency": "None in flight (#37 merged to main as 0e8ea76, root vitest.config.ts only). Don't rebase; the coordinator does that at ship.",
+  "round": 2
+}

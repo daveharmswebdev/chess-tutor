@@ -1,0 +1,34 @@
+{
+  "brief_id": "057-grader-gate-r4-r1",
+  "agent": "tutor-agent",
+  "issue": 29,
+  "base_sha": "08a2caa",
+  "scratch_dir": "/private/tmp/claude-501/-Users-daveharms-personal-workspace-chess-tutor/36d44e4e-1d9c-4f0f-a3ad-0103eee821af/scratchpad/057-grader-gate-r4-r1",
+  "objective": "Close the last grader holes so the CI eval can become a blocking gate (#29). Fix in evals/: (1) sideOf double read in evals/src/graders.ts: a SIGNED score is White's view, so a sentence that quotes a signed number and names the side it favours ('-5.63, which is a huge edge for Black') must be graded by the sign only; naming the side must not flip it again. A signed number that names the WRONG side for its sign ('+2.1, a clear edge for Black') stays wrong_side. (2) Piece value: 'worth about 6 pawns', 'worth 3 pawns', 'worth roughly a pawn' after a piece word or 'which' is a piece-value statement, not an evaluation (not graded as unmatched). (3) Review 056 major, give-away past-tense subject skip is too lenient: the opponent-history skip must require a real playing verb (played, took, traded, exchanged, recaptured, captured, pushed, advanced, moved, castled), not was/had/is answered/worried. 'White was worried about dxe5' and \"White's dxe5 is answered by dxe5\" in lb-kid-exchange and po-kid-nxe5 must be flagged as give-aways. (4) regrade CLI: add --out <dir> so a recorded run can be regraded into a new directory without rewriting the original; without --out keep today's in-place behaviour. Document in evals/README.md. (5) Cheap minors, same pass: NEGATED must accept curly apostrophes (hasn\u2019t, didn\u2019t, isn\u2019t); a 'too' in the player's clause after an opponent castle counts as copying only when that clause is about castling or the king; a plan sentence ('put the bishop on g7', 'the plan is to bring the knight to d5') is not graded as a claimed move by gradeMoves/unbacked checks in the grader (lb-kid-e4). Then regrade the PR #35 CI artifact (path in contract) with --out into your scratch_dir and report legal / give-away / eval-match before and after, and every case whose verdict flipped, each judged right or wrong.",
+  "requirements": [
+    "NFR-6",
+    "NFR-7",
+    "NFR-10"
+  ],
+  "contract": "Source: issue #29 comment 6774388781 and review 056, plus comment 6894170496 (regrade --out). Grader code: evals/src/graders.ts (sideOf, gradeGiveAway, gradeMoves, NEGATED, DO_SAME, MATERIAL_LEAD), CLI evals/src/regrade.ts (regradeDir(dir, opts)), README evals/README.md:79 ('pnpm eval -- regrade evals/results/<run> [<run> ...]').\nGate at base 08a2caa (measured by coordinator): pnpm test -> 45 files, 877 passed; pnpm typecheck clean.\nRecorded false fails from PR #35 CI eval (gate tried, eval match 95.2%, all 3 misses grader errors):\n- mw-kid-ne5-a6: 'The engine rates it at \u22125.63, which is a huge edge for Black' graded wrong_side -> must be ok.\n- po-kid-g4: '...after Bxg4 at \u22123.23, which is clearly better for Black' graded wrong_side -> must be ok.\n- mw-london-h6-e3: 'That wins a whole rook, which is worth about 6 pawns' graded unmatched evaluation -> must not be graded as an evaluation.\nNote the Unicode minus (U+2212) in the quotes; keep accepting it as a sign.\nReview 056 false passes (must become give-aways): lb-kid-exchange 'White was worried about dxe5.'; po-kid-nxe5 \"White's dxe5 is answered by dxe5.\" (use each case's real answer move). Keep ok (from review 054, already tested): \"White's last move, dxe5, opened the d-file.\", 'White traded with dxe5.', 'White took your pawn with dxe5.', 'After your ...e5, White played dxe5.'\nRecorded artifact to regrade (do NOT modify it; copy or use --out): /private/tmp/claude-501/-Users-daveharms-personal-workspace-chess-tutor/36d44e4e-1d9c-4f0f-a3ad-0103eee821af/scratchpad/artifact-42864019702/eval-results (summary.json, report.md, cases/*.json). It is the PR #35 run (GitHub run 42864019702).\nCoordinator gate decision after your return: --gate goes into .github/workflows (coordinator edit) only if the regrade of that artifact shows legal 100%, give-away 100%, eval match >= 90%. So report those three numbers exactly as the gate computes them.",
+  "scope": [
+    "packages/tutor/**",
+    "prompts/**",
+    "evals/**"
+  ],
+  "negative": [
+    "Do not edit files outside scope, docs, config, .github, root files or the lockfile.",
+    "No new dependencies.",
+    "Do not change packages/tutor, the TutorReply type or prompts/.",
+    "Never call the real Anthropic API; never modify anything under evals/results/ or the artifact directory.",
+    "Do not widen any other exemption beyond the five items."
+  ],
+  "rubric": [
+    "Tests first (red then green): every quoted probe above, both the must-change and the keep ones, plus a signed wrong-side keep-flagged probe and a regrade --out test showing the source dir is untouched.",
+    "Regrade of the artifact with --out: before/after legal, give-away, eval match reported, and every flipped case listed with a right/wrong judgement.",
+    "pnpm test and pnpm typecheck clean from the repo root.",
+    "files_changed lists every file changed in 08a2caa..your head. Commit message references NFR-6, NFR-7, NFR-10 and #29."
+  ],
+  "concurrency": "One other pick this round: the coordinator edits root vitest.config.ts inline for #37 (runs the real-WASM test files on their own). No overlap with evals/; if your pnpm test sees the new config after a rebase, that's expected.",
+  "round": 1
+}

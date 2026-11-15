@@ -1,0 +1,30 @@
+{
+  "brief_id": "059-review-grader-gate-r4-r1",
+  "agent": "reviewer",
+  "issue": 29,
+  "base_sha": "17c97db",
+  "scratch_dir": "/private/tmp/claude-501/-Users-daveharms-personal-workspace-chess-tutor/36d44e4e-1d9c-4f0f-a3ad-0103eee821af/scratchpad/059-review-grader-gate-r4-r1",
+  "objective": "Review #29 rounds 1-2 at 17c97db: `git diff 08a2caa..17c97db` (evals/ only). Severities blocking / major / minor. Decision this review feeds: whether the coordinator turns on `--gate` in the CI eval workflow so live evals BLOCK PRs. (1) Each item fixed, with a probe: signed score + direction word graded as White's view (mw-kid-ne5-a6 '\u22125.63, which is a huge edge for Black', po-kid-g4 '\u22123.23 ... clearly better for Black' ok; '+2.1, a clear edge for Black' stays wrong_side); piece value 'which is worth about 6 pawns' not an evaluation; give-away history skip needs a real playing verb ('White was worried about dxe5', \"White's dxe5 is answered by dxe5\" flagged); regrade --out leaves the source untouched; curly-apostrophe negations; castle 'too' only about castling/king; plan sentences not graded as moves; round 2: 'White just put a knight on e5' skipped only when it is the opponent's real last move. (2) New false passes or false fails these rounds open, in both directions. Weigh false fails by how likely the v2 tutor is to write them (the gate fails a PR on one unmatched eval, one illegal move or one give-away); weigh false passes by whether a real give-away or wrong evaluation would slip through (FR-10, NFR-7). Pay attention to the new exemptions: piece-value 'worth N pawns', plan-sentence skip in gradeMoves, PLACED_PAST skip. (3) Regrade the PR #35 artifact (path in contract) and any recorded runs under evals/results/ with `regrade <run> --out <your scratch dir>/...` (never in place), and list verdict flips vs 08a2caa with right/wrong. (4) Two verdicts: merge-fixes ship/no-ship, and enable-gate yes/no.",
+  "requirements": [
+    "NFR-6",
+    "NFR-7",
+    "NFR-10",
+    "FR-10"
+  ],
+  "contract": "Spoke-reported and coordinator-verified: gate at 17c97db 46 files / 943 passed, typecheck clean; coordinator ran `regrade <artifact> --out` at 17c97db: moves legal 100% | evals matched 100% | no give-away 100% (63 of 66 graded). Before (08a2caa graders, spoke on a copy): legal 100%, give-away 98.41%, eval match 95.24%. Flips reported: r1 mw-kid-ne5-a6, po-kid-g4, mw-london-h6-e3 nfr6Evals false->true; r2 po-kid-nxe5 nfr7 false->true.\nCoordinator decision recorded: signed number + direction word (edge/better/advantage/worse...) = White's view; 'Black is +0.4' with no direction word keeps the side-relative reading (existing test in evals/test/graders.test.ts).\nArtifact (read-only): /private/tmp/claude-501/-Users-daveharms-personal-workspace-chess-tutor/36d44e4e-1d9c-4f0f-a3ad-0103eee821af/scratchpad/artifact-42864019702/eval-results (PR #35 CI run 42864019702).\nThe main checkout is detached at 17c97db for you; read with git diff / git show.",
+  "scope": [],
+  "negative": [
+    "Read-only: do not edit, commit, or run anything that writes to the repo.",
+    "Never call the Anthropic API; never modify evals/results/ originals or the artifact (regrade only with --out into your scratch dir).",
+    "Read code with git diff / git show <sha>:<path>; vitest probes in your own scratch dir are fine."
+  ],
+  "rubric": [
+    "Each item: fixed / not fixed, with its probe result.",
+    "New probes in both directions with verdicts, especially against the three new exemptions.",
+    "Regrade flips listed with right/wrong.",
+    "Every finding classified blocking / major / minor with evidence.",
+    "Two verdicts: merge-fixes ship/no-ship, and enable-gate yes/no."
+  ],
+  "concurrency": null,
+  "round": 1
+}
