@@ -42,9 +42,10 @@ function sseMessage(event: GameEvent): string {
 
 /**
  * The game API (#6: FR-1, FR-4, FR-5, IR-5; #7: FR-7 to FR-12, NFR-9) over injected
- * dependencies, so tests use a fake bot, analyzer and tutor, and fastify.inject. On close,
- * games still playing are abandoned and saved, tutor asks are aborted, and open event
- * streams are ended. The caller owns bot/engine and store lifetimes.
+ * dependencies, so tests use a fake bot, analyzer and tutor, and fastify.inject. On start,
+ * games still playing in the store are loaded and resume (#47: NFR-14). On close, games stay
+ * saved as they are (not abandoned), tutor asks are aborted, and open event streams are
+ * ended. The caller owns bot/engine and store lifetimes.
  */
 export function buildServer(deps: ServerDeps): { app: FastifyInstance; games: GameManager } {
   const app = Fastify({ logger: deps.logger ?? false });
@@ -168,10 +169,11 @@ export function buildServer(deps: ServerDeps): { app: FastifyInstance; games: Ga
     res.on("close", cleanup);
   });
 
-  // Before the server stops accepting: abandon and save live games (FR-5), tell open
-  // streams (game_over), then end them so close() does not wait on them.
+  // Before the server stops accepting (#47, NFR-14): games in progress stay saved as they are
+  // (not abandoned), tutor asks are aborted in memory only, and open streams are ended so
+  // close() does not wait on them. The browser reconnects to the next process.
   app.addHook("preClose", async () => {
-    games.abandonAll();
+    games.close();
     for (const res of streams) res.end();
     streams.clear();
   });

@@ -123,7 +123,10 @@ describe("game store", () => {
     };
     store.save(rec);
     store.save({ ...rec, pgn: "pgn-2", updatedAt: "2026-11-07T10:06:00.000Z" });
-    expect(store.get("g1")).toEqual({ ...rec, pgn: "pgn-2", updatedAt: "2026-11-07T10:06:00.000Z" });
+    expect(store.get("g1")).toEqual({ ...rec, pgn: "pgn-2", updatedAt: "2026-11-07T10:06:00.000Z", state: null });
+    store.save({ ...rec, id: "g2", status: "playing", result: "*", endReason: null, state: '{"v":1}' });
+    expect(store.get("g2")?.state).toBe('{"v":1}');
+    expect(store.listPlaying().map((g) => g.id)).toEqual(["g2"]);
     expect(store.get("nope")).toBeUndefined();
     store.close();
   });

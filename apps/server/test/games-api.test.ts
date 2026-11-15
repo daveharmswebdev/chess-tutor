@@ -61,7 +61,7 @@ describe("POST /api/games", () => {
       result: "*",
       endReason: null,
       botThinking: false,
-      tutor: { available: false, reason: expect.stringMatching(/^Coaching is off/), thinking: false, question: null },
+      tutor: { available: false, reason: expect.stringMatching(/^Coaching is off/), thinking: false, question: null, reveal: null },
     });
     expect(bot.calls).toHaveLength(0);
   });
@@ -123,11 +123,13 @@ describe("POST /api/games", () => {
     expect(saved.pgn).toMatch(/1\. e4 e5 \*\s*$/);
   });
 
-  it("does not save a game that is still playing", async () => {
-    setup();
+  it("saves a game still playing too, with its PGN so far (#47, NFR-14)", async () => {
+    setup(["e7e5"]);
     const g = await newGame("w");
     await play(g.id, "e2e4");
-    expect(store.get(g.id)).toBeUndefined();
+    const saved = store.get(g.id)!;
+    expect(saved).toMatchObject({ status: "playing", result: "*", endReason: null, playerColor: "w" });
+    expect(saved.pgn).toMatch(/1\. e4 e5 \*\s*$/);
   });
 });
 
@@ -381,12 +383,15 @@ describe("game over", () => {
 });
 
 describe("shutdown", () => {
-  it("abandons and saves games still playing when the server closes", async () => {
+  it("keeps games still playing saved as they are when the server closes (#47, NFR-14)", async () => {
     setup();
     const g = await newGame("w");
     await play(g.id, "d2d4");
+    const events = eventCollector();
+    games.subscribe(g.id, events.push);
     await app.close();
-    expect(store.get(g.id)).toMatchObject({ status: "abandoned", result: "*", endReason: "abandoned" });
+    expect(store.get(g.id)).toMatchObject({ status: "playing", result: "*", endReason: null });
+    expect(events.events.map((e) => e.type)).not.toContain("game_over");
   });
 });
 

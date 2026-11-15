@@ -91,7 +91,7 @@ describe("setupTutor (NFR-9)", () => {
     try {
       const created = await app.inject({ method: "POST", url: "/api/games", payload: { playerColor: "w" } });
       const id = created.json().id as string;
-      expect(created.json().tutor).toEqual({ available: false, reason: setup.offReason, thinking: false, question: null });
+      expect(created.json().tutor).toEqual({ available: false, reason: setup.offReason, thinking: false, question: null, reveal: null });
       const moved = await app.inject({ method: "POST", url: `/api/games/${id}/moves`, payload: { uci: "d2d4" } });
       expect(moved.statusCode).toBe(200);
       await games.idle(id);
