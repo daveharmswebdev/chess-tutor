@@ -150,7 +150,8 @@ describe("tutor state: trying again", () => {
     expect(run(base, attempt, rev).tutor).toEqual(run(base, rev, attempt).tutor);
   });
 
-  it("keeps the result when the player's move state (question null) arrives before tutor_attempt", () => {
+  // #51 (FR-24): the try result no longer stays in the panel once the position is gone.
+  it("the player's move state (question null) arriving before tutor_attempt takes the question off the panel", () => {
     const moved = view({ fen: AFTER_D4_FEN, moves: [D4], botThinking: true });
     const s = run(
       started(),
@@ -158,9 +159,10 @@ describe("tutor state: trying again", () => {
       ev({ type: "state", game: moved }),
       ev({ type: "tutor_attempt", questionId: "q1", move: BF4, correct: true, cpLoss: 0 }),
     );
-    expect(s.tutor.attempt?.correct).toBe(true);
-    expect(s.tutor.question?.id).toBe("q1");
+    expect(s.tutor.attempt).toBeNull();
+    expect(s.tutor.question).toBeNull();
     expect(s.tutor.open).toBe(false);
+    expect(tutorStatusOf(s).question).toBeNull();
   });
 
   it("ignores tutor_attempt for an unknown question", () => {
@@ -402,11 +404,11 @@ describe("tutor state: the panel clears on the player's move (#51)", () => {
     empty(run(withQuestion(), tryBf4, { type: "move_accepted", game: afterBf4() }, { type: "request_started" }, { type: "request_succeeded", game: afterD5() }));
   });
 
-  it("a tutor_reply after the move shows the new question (before or after the move reply)", () => {
+  it("a tutor_reply after the move shows the new question (after the move reply, or after the move's state)", () => {
     const q2 = question({ id: "q2", message: "What does Nf6 threaten?" });
     const accepted: GameAction = { type: "move_accepted", game: afterBf4() };
     const reply = ev({ type: "tutor_reply", question: q2 });
-    for (const order of [[accepted, reply], [reply, accepted]]) {
+    for (const order of [[accepted, reply], [ev({ type: "state", game: afterBf4() }), reply, accepted]]) {
       const s = run(withQuestion(), tryBf4, ...order);
       expect(s.tutor.question?.id).toBe("q2");
       expect(s.tutor.open).toBe(true);
@@ -426,5 +428,108 @@ describe("tutor state: the panel clears on the player's move (#51)", () => {
     const notApplied = run(lost, { type: "reconnected", game: afterD5({ tutor: tutorStatus({ question: question() }) }) });
     expect(notApplied.tutor.question?.id).toBe("q1");
     expect(notApplied.tutor.open).toBe(true);
+  });
+
+  // Round 2 (review 072): tutor output that arrives while the move is in flight is about the
+  // position being left until the move's GameView says otherwise.
+  const qX = question({ id: "qX", message: "What is Black threatening?" });
+  const movedState = ev({ type: "state", game: afterBf4() });
+  const accepted: GameAction = { type: "move_accepted", game: afterBf4() };
+
+  it("a tutor_reply that arrives while the move is in flight leaves with the move (state then reply)", () => {
+    const s = run(started(), ev({ type: "tutor_thinking", kind: "hint" }), tryBf4, ev({ type: "tutor_reply", question: qX }), movedState, accepted);
+    empty(s);
+    expect(tutorStatusOf(s).question).toBeNull();
+  });
+
+  it("the same when the move reply comes before the state, or when there is no state", () => {
+    for (const order of [[accepted, movedState], [accepted]]) {
+      const s = run(started(), ev({ type: "tutor_thinking", kind: "hint" }), tryBf4, ev({ type: "tutor_reply", question: qX }), ...order);
+      empty(s);
+      expect(tutorStatusOf(s).question).toBeNull();
+    }
+  });
+
+  it("the same when the move reply overtakes the tutor_reply (reply, tutor_reply, state)", () => {
+    const s = run(started(), ev({ type: "tutor_thinking", kind: "hint" }), tryBf4, accepted, ev({ type: "tutor_reply", question: qX }), movedState);
+    empty(s);
+  });
+
+  it("a tutor_failed that arrives while the move is in flight leaves with the move", () => {
+    for (const order of [[movedState, accepted], [accepted], [accepted, movedState]]) {
+      const s = run(started(), ev({ type: "tutor_thinking", kind: "hint" }), tryBf4, ev({ type: "tutor_failed", message: "The tutor could not answer." }), ...order);
+      empty(s);
+    }
+  });
+
+  it("a tentative reply that the move's GameView still holds open stays shown", () => {
+    const holds = afterBf4({ tutor: tutorStatus({ question: qX }) });
+    for (const order of [[ev({ type: "state", game: holds }), { type: "move_accepted", game: holds } as GameAction], [{ type: "move_accepted", game: holds } as GameAction]]) {
+      const s = run(started(), ev({ type: "tutor_thinking", kind: "hint" }), tryBf4, ev({ type: "tutor_reply", question: qX }), ...order);
+      expect(s.tutor.question?.id).toBe("qX");
+      expect(s.tutor.open).toBe(true);
+    }
+  });
+
+  it("a reply for the new position after the move's state stays (player_blunder on the move just played)", () => {
+    const s = run(started(), tryBf4, movedState, ev({ type: "tutor_thinking", kind: "player_blunder" }), ev({ type: "tutor_reply", question: qX }), accepted);
+    expect(s.tutor.question?.id).toBe("qX");
+    expect(s.tutor.open).toBe(true);
+  });
+
+  it("Show me on the current position still shows after a state", () => {
+    const shown = afterD5({ tutor: tutorStatus({ question: question({ canReveal: false }), reveal: reveal() }) });
+    const s = run(withQuestion(), { type: "tutor_reveal_received", reveal: reveal() }, ev({ type: "state", game: shown }));
+    expect(s.tutor.question?.id).toBe("q1");
+    expect(s.tutor.reveal).toEqual(reveal());
+  });
+
+  it("a GameView without a question removes a closed question's text from the panel", () => {
+    const s = run(
+      started(),
+      ev({ type: "tutor_reply", question: question() }),
+      ev({ type: "tutor_attempt", questionId: "q1", move: BF4, correct: true, cpLoss: 0 }),
+      ev({ type: "state", game: afterBf4() }),
+    );
+    empty(s);
+  });
+
+  it("a rejection after a mid-request tutor_failed keeps the message", () => {
+    const s = run(withQuestion(), tryBf4, ev({ type: "tutor_failed", message: "The tutor could not answer." }), { type: "move_rejected", message: "illegal move" });
+    expect(s.tutor.failed).toBe("The tutor could not answer.");
+    expect(s.tutor.question?.id).toBe("q1");
+  });
+
+  it("a rejection after mid-request tutor_progress keeps the live label", () => {
+    const s = run(
+      started(),
+      ev({ type: "tutor_thinking", kind: "hint" }),
+      ev({ type: "tutor_progress", label: "Tutor is looking at the position…" }),
+      tryBf4,
+      ev({ type: "tutor_progress", label: "Checking Nf3…" }),
+      { type: "move_rejected", message: "illegal move" },
+    );
+    expect(s.tutor.progress).toBe("Checking Nf3…");
+    expect(tutorStatusOf(s).thinking).toBe(true);
+  });
+
+  it("a rejection after a mid-request tutor_reply keeps the new question", () => {
+    const s = run(started(), ev({ type: "tutor_thinking", kind: "hint" }), tryBf4, ev({ type: "tutor_reply", question: qX }), { type: "request_failed", message: "x" });
+    expect(s.tutor.question?.id).toBe("qX");
+    expect(s.tutor.open).toBe(true);
+    // Not tentative any more: a later move still clears it, and a later state holding it keeps it.
+    expect(run(s, ev({ type: "state", game: afterD5({ tutor: tutorStatus({ question: qX }) }) })).tutor.question?.id).toBe("qX");
+  });
+
+  it("a rejection after a mid-request state syncs with the server", () => {
+    const q2 = question({ id: "q2", message: "Another question." });
+    const replaced = run(withQuestion(), tryBf4, ev({ type: "state", game: afterD5({ tutor: tutorStatus({ question: q2 }) }) }), { type: "move_rejected", message: "illegal move" });
+    expect(replaced.tutor.question?.id).toBe("q2");
+    expect(replaced.tutor.open).toBe(true);
+    const same = run(withQuestion(), tryBf4, ev({ type: "state", game: afterD5({ tutor: tutorStatus({ question: question() }) }) }), { type: "move_rejected", message: "illegal move" });
+    expect(same.tutor.question?.id).toBe("q1");
+    expect(same.tutor.open).toBe(true);
+    const closed = run(withQuestion(), tryBf4, ev({ type: "state", game: afterD5() }), { type: "move_rejected", message: "illegal move" });
+    expect(closed.tutor.question).toBeNull();
   });
 });
