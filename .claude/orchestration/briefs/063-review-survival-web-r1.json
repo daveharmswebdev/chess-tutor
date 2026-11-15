@@ -1,0 +1,31 @@
+{
+  "brief_id": "063-review-survival-web-r1",
+  "agent": "reviewer",
+  "issue": 47,
+  "base_sha": "dfdeca9",
+  "scratch_dir": "/private/tmp/claude-501/-Users-daveharms-personal-workspace-chess-tutor/e5c87d5d-2b08-442e-9506-cc0a950d8e62/scratchpad/063-review-survival-web-r1",
+  "objective": "Review #47 web half at dfdeca9: `git diff 696f3ad..dfdeca9` (apps/web only, 9 files). Severities blocking / major / minor. Check against the 'Game survival (#47)' block in api.ts and NFR-14/NFR-9: (1) /games/<id> routing: pushState on new game, navigate on load and popstate, '/' shows new-game UI, back/forward, generation counter drops late replies for a left game; (2) refresh rebuild from GET incl. tutor question and tutor.reveal (only when it matches the open question); first SSE 'state' still the truth (#23 ordering rules intact after reconnect); (3) reconnect: network error / 5xx / EventSource error → 'Reconnecting…', board and actions locked, backoff 0.5 s doubling to 10 s cap, reset on first event of the new stream, no duplicate EventSources or leaked timers (dispose, StrictMode remount), no infinite tight loop; a move during disconnect is not silently lost; (4) only 404 shows 'Game not found' + New game; 503 from hint/reveal stays a tutor notice; (5) no localStorage/sessionStorage of game state, no router dependency, no reveal text shown before a reveal; (6) test quality: survival.test.ts and refresh.spec.ts actually exercise the behaviour (not mocks asserting themselves); the replaced 'connection_lost' test. Verdict: ship / no-ship for this half. The server half (persistence, resume on restart) is a separate spoke still running; don't review apps/server.",
+  "requirements": [
+    "NFR-14",
+    "NFR-9",
+    "FR-4",
+    "IR-5"
+  ],
+  "contract": "Spoke-reported and coordinator-verified at dfdeca9: pnpm test 47 files / 1003 passed, typecheck clean; files changed = exactly the 9 apps/web files in the diff. Spoke ran Playwright locally: 3 passed (play.spec.ts, refresh.spec.ts x2). Main checkout is detached at dfdeca9 so your worktree starts at the reviewed head. Today the server keeps live games only in memory; refresh works without the server half, restart survival needs it.",
+  "contract_files": [
+    "packages/chess-core/src/api.ts"
+  ],
+  "scope": [],
+  "negative": [
+    "Read-only: do not edit, commit, or run anything that writes to the repo.",
+    "Never call the Anthropic API.",
+    "Read code with git diff / git show <sha>:<path>; vitest probes in your own scratch dir are fine."
+  ],
+  "rubric": [
+    "Each of (1)-(6) checked with file:line evidence.",
+    "Every finding classified blocking / major / minor with evidence and owner.",
+    "Verdict: ship / no-ship."
+  ],
+  "concurrency": "server-agent (brief 061) is still working on apps/server in its own worktree; #42 (apps/web captured pieces) waits on this review.",
+  "round": 1
+}

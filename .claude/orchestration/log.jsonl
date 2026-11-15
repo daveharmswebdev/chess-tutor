@@ -219,3 +219,38 @@
 {"ts":"2026-11-15T12:42:32.413Z","event":"coordinator_verdict","brief_id":"059-review-grader-gate-r4-r1","agent":"reviewer","verdict":"review","reason":"merge SHIP, gate NO: 2 majors (direction word not tied to quote; PLAY_VERB drops answered/replied) -> round 3","tokens":94766,"duration_ms":649905}
 {"ts":"2026-11-15T12:48:04.479Z","event":"return_valid","agent_id":"ab5401fee539e8965","agent_type":"tutor-agent","via":"handback"}
 {"ts":"2026-11-15T12:49:01.192Z","event":"coordinator_verdict","brief_id":"060-grader-gate-r4-r3","agent":"tutor-agent","verdict":"accepted","reason":"diff = files_changed, gate 973 passed, coordinator regrade artifact + 2x 11-10 runs 100/100/100; brief defect (C) piece-value check accepted","tokens":172664,"duration_ms":301139}
+{"ts":"2026-11-15T15:44:22.746Z","event":"dispatch","subagent_type":"server-agent","brief_id":"061-game-survival-server-r1","base_sha":"696f3ad","spoke":true}
+{"ts":"2026-11-15T15:45:04.032Z","event":"dispatch","subagent_type":"web-agent","brief_id":"062-game-survival-web-r1","base_sha":"696f3ad","spoke":true}
+{"ts":"2026-11-15T15:45:04.199Z","event":"agent_complete","subagent_type":"server-agent","brief_id":"061-game-survival-server-r1","agent_id":"a43af302155451b8a","status":"async_launched","contract":"pending"}
+{"ts":"2026-11-15T15:45:04.308Z","event":"agent_complete","subagent_type":"web-agent","brief_id":"062-game-survival-web-r1","agent_id":"a37ec50ac7e18eac3","status":"async_launched","contract":"pending"}
+{"ts":"2026-11-15T15:51:24.306Z","event":"return_valid","agent_id":"a37ec50ac7e18eac3","agent_type":"web-agent","via":"handback"}
+{"ts":"2026-11-15T15:52:06.006Z","event":"coordinator_verdict","brief_id":"062-game-survival-web-r1","agent":"web-agent","verdict":"accepted","reason":"files match, gate re-run at dfdeca9; review pending","tokens":84467,"duration_ms":380350}
+{"ts":"2026-11-15T15:53:12.387Z","event":"dispatch","subagent_type":"reviewer","brief_id":"063-review-survival-web-r1","base_sha":"dfdeca9","spoke":true}
+{"ts":"2026-11-15T15:53:12.609Z","event":"agent_complete","subagent_type":"reviewer","brief_id":"063-review-survival-web-r1","agent_id":"adffe70a159e312c3","status":"async_launched","contract":"pending"}
+{"ts":"2026-11-15T15:56:29.313Z","event":"return_valid","agent_id":"adffe70a159e312c3","agent_type":"reviewer","via":"handback"}
+{"ts":"2026-11-15T15:56:54.781Z","event":"coordinator_verdict","brief_id":"063-review-survival-web-r1","agent":"reviewer","verdict":"review","reason":"NO-SHIP: 1 blocking (late reply revives left game), 1 major (late failure lands on new game), 4 minor -> r2 brief 064","tokens":62145,"duration_ms":197017}
+{"ts":"2026-11-15T15:57:43.079Z","event":"return_invalid","agent_id":"a43af302155451b8a","agent_type":"server-agent","attempt":1,"errors":["/tests_run: a 'gate' check failed, so this is not a success"]}
+{"ts":"2026-11-15T15:58:07.600Z","event":"return_valid","agent_id":"a43af302155451b8a","agent_type":"server-agent","via":"handback"}
+{"ts":"2026-11-15T15:59:00.877Z","event":"coordinator_verdict","brief_id":"061-game-survival-server-r1","agent":"server-agent","verdict":"accepted","reason":"files match, gate re-run at 6d1e75b 989 passed; review pending; contract wording for question+reveal fixed on main","tokens":146631,"duration_ms":783738}
+{"ts":"2026-11-15T15:59:52.053Z","event":"dispatch","subagent_type":"reviewer","brief_id":"065-review-survival-server-r1","base_sha":"6d1e75b","spoke":true}
+{"ts":"2026-11-15T15:59:52.419Z","event":"agent_complete","subagent_type":"reviewer","brief_id":"065-review-survival-server-r1","agent_id":"a827b2ad447c1bcea","status":"async_launched","contract":"pending"}
+{"ts":"2026-11-15T16:00:44.702Z","event":"return_valid","agent_id":"a37ec50ac7e18eac3","agent_type":"web-agent","via":"handback"}
+{"ts":"2026-11-15T16:01:30.593Z","event":"coordinator_verdict","brief_id":"064-game-survival-web-r2","agent":"web-agent","verdict":"accepted","reason":"files match (3), gate re-run at 73d65bf 1102 passed; e2e 3 passed (spoke)","tokens":113167,"duration_ms":207771}
+{"ts":"2026-11-15T16:03:13.492Z","event":"dispatch","subagent_type":"web-agent","brief_id":"066-captured-pieces-r1","base_sha":"4228621","spoke":true}
+{"ts":"2026-11-15T16:03:13.717Z","event":"agent_complete","subagent_type":"web-agent","brief_id":"066-captured-pieces-r1","agent_id":"aeb6926c6bc9c1503","status":"async_launched","contract":"pending"}
+{"ts":"2026-11-15T16:03:47.033Z","event":"return_valid","agent_id":"a827b2ad447c1bcea","agent_type":"reviewer","via":"handback"}
+{"ts":"2026-11-15T16:04:04.933Z","event":"coordinator_verdict","brief_id":"065-review-survival-server-r1","agent":"reviewer","verdict":"review","reason":"SHIP, 1 major (new tutor ask after close) + 4 minor -> r2 brief 067 (major + hydrate overwrite + create save failure)","tokens":0,"duration_ms":0}
+{"ts":"2026-11-15T16:04:28.826Z","event":"coordinator_verdict","brief_id":"065-review-survival-server-r1","agent":"reviewer","verdict":"review","reason":"cost entry (previous line had none)","tokens":77015,"duration_ms":234991}
+{"ts":"2026-11-15T16:06:45.795Z","event":"return_valid","agent_id":"a43af302155451b8a","agent_type":"server-agent","via":"handback"}
+{"ts":"2026-11-15T16:07:40.911Z","event":"return_valid","agent_id":"aeb6926c6bc9c1503","agent_type":"web-agent","via":"handback"}
+{"ts":"2026-11-15T16:07:51.725Z","event":"coordinator_verdict","brief_id":"067-game-survival-server-r2","agent":"server-agent","verdict":"accepted","reason":"files match (2); integrated as f03e57f: 1121 passed, typecheck clean, e2e 3/3","tokens":164732,"duration_ms":143056}
+{"ts":"2026-11-15T16:08:14.243Z","event":"dispatch","subagent_type":"reviewer","brief_id":"068-review-survival-integration-r1","base_sha":"f03e57f","spoke":true}
+{"ts":"2026-11-15T16:08:14.464Z","event":"agent_complete","subagent_type":"reviewer","brief_id":"068-review-survival-integration-r1","agent_id":"a5b1fc85384514553","status":"async_launched","contract":"pending"}
+{"ts":"2026-11-15T16:09:19.962Z","event":"coordinator_verdict","brief_id":"066-captured-pieces-r1","agent":"web-agent","verdict":"accepted","reason":"files match (7), gate re-run 1131 passed, captured e2e 3/3; coordinator read material.ts in place of reviewer (small pure change); known limit: queen lost then pawn promoted shows a pawn captured","tokens":44735,"duration_ms":267492}
+{"ts":"2026-11-15T16:14:21.129Z","event":"return_valid","agent_id":"a5b1fc85384514553","agent_type":"reviewer","via":"handback"}
+{"ts":"2026-11-15T16:14:36.759Z","event":"coordinator_verdict","brief_id":"068-review-survival-integration-r1","agent":"reviewer","verdict":"review","reason":"SHIP; 1 major (create abandons old game before failed save) + 1 server minor -> r3 brief 069; 2 web minors to triage","tokens":0,"duration_ms":0}
+{"ts":"2026-11-15T16:14:58.259Z","event":"coordinator_verdict","brief_id":"068-review-survival-integration-r1","agent":"reviewer","verdict":"review","reason":"cost entry","tokens":89037,"duration_ms":366976}
+{"ts":"2026-11-15T16:16:23.392Z","event":"return_valid","agent_id":"a43af302155451b8a","agent_type":"server-agent","via":"handback"}
+{"ts":"2026-11-15T16:17:19.636Z","event":"coordinator_verdict","brief_id":"069-game-survival-server-r3","agent":"server-agent","verdict":"accepted","reason":"files match (2), diff read; integrated, gate + e2e re-run","tokens":173488,"duration_ms":90683}
+{"ts":"2026-11-15T16:19:17.470Z","event":"shipped","issue":47,"pr":48}
+{"ts":"2026-11-15T16:22:08.337Z","event":"shipped","issue":42,"pr":49}

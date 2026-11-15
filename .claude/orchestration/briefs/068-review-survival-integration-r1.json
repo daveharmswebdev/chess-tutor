@@ -1,0 +1,31 @@
+{
+  "brief_id": "068-review-survival-integration-r1",
+  "agent": "reviewer",
+  "issue": 47,
+  "base_sha": "f03e57f",
+  "scratch_dir": "/private/tmp/claude-501/-Users-daveharms-personal-workspace-chess-tutor/e5c87d5d-2b08-442e-9506-cc0a950d8e62/scratchpad/068-review-survival-integration-r1",
+  "objective": "Final review of #47 before merge, on branch issue-47-game-survival at f03e57f. Severities blocking / major / minor. Scope: (1) the round-2 fixes not yet reviewed: web `git show 4228621` (late replies/failures for a left game dropped by generation + reducer id guard, Show me locked and single reconnect timer, MOVE_MAY_NOT_HAVE_ARRIVED cleared on reconnect when the move landed, newGame keeps the old stream until create succeeds) and server `git show f03e57f` (no new tutor ask after close, damaged rows read-only and untouched, create 500 when the save fails); confirm each review-063/065 finding is fixed with a probe. (2) integration between halves: the server keeps the closed question with tutor.reveal after a reveal (api.ts at f8ef78e); check the web treats question+reveal with matching ids as shown (Show me disabled, the next move not presented as an attempt), and that after a refresh the panel shows it; the web's 404-only not-found matches the server's GET/SSE store fallback (finished/abandoned → 200, never-created → 404); a POST /api/games 500 shows a sensible message and keeps the old game; reconnect after a real restart (the server's first SSE 'state' after resume, incl. a re-asked bot move) rebuilds correctly. (3) Issue #47 Done-when, item by item: address /games/<id>; saved before acknowledging; resume on startup with re-ask; Reconnecting with backoff and not-found only on 404; tests cover restart mid-game and refresh, E2E refresh. Verdict: ship / no-ship for the whole branch.",
+  "requirements": [
+    "NFR-14",
+    "FR-5",
+    "IR-7",
+    "NFR-9",
+    "FR-4"
+  ],
+  "contract": "Coordinator-verified at f03e57f: pnpm test 48 files / 1121 passed; typecheck clean; pnpm test:e2e 3 passed (play, refresh reload, unknown address) against the real server. Branch = main f8ef78e + 066e3fc (server r1) + 52e8c0a, 4228621 (web r1, r2) + f03e57f (server r2). Already reviewed and accepted: web r1 (063, everything except the fixed findings), server r1 (065, ship). Known and accepted for later, don't re-raise: detection/grading in flight at shutdown not re-run; lookup() resuming a store-only playing row next to a newer game; the attempt result (correct/cpLoss) not shown after a refresh. Main checkout is on issue-47-game-survival at f03e57f, so your worktree starts there.",
+  "scope": [],
+  "negative": [
+    "Read-only: do not edit, commit, or run anything that writes to the repo.",
+    "Never call the Anthropic API.",
+    "Read code with git diff / git show <sha>:<path>; vitest probes in your own scratch dir are fine (temp-dir SQLite only)."
+  ],
+  "rubric": [
+    "Each 063/065 finding: fixed / not fixed, with a probe.",
+    "Integration checks (2) with file:line evidence.",
+    "Done-when (3) item by item.",
+    "Every finding classified blocking / major / minor with evidence and owner; verdict ship / no-ship."
+  ],
+  "concurrency": "web-agent brief 066 (#42, captured pieces) is working on apps/web from 4228621 in its own worktree; it is not part of this review.",
+  "round": 1,
+  "contract_files": []
+}

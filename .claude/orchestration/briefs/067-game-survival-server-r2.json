@@ -1,0 +1,31 @@
+{
+  "brief_id": "067-game-survival-server-r2",
+  "agent": "server-agent",
+  "issue": 47,
+  "base_sha": "6d1e75b",
+  "scratch_dir": "/private/tmp/claude-501/-Users-daveharms-personal-workspace-chess-tutor/e5c87d5d-2b08-442e-9506-cc0a950d8e62/scratchpad/067-game-survival-server-r2",
+  "objective": "Round 2 on your branch (base 6d1e75b). Review 065 said SHIP with one major. Fix exactly these three, each test first (red then green), nothing else: (A) MAJOR games.ts ~699: close() must stop NEW tutor asks, not only abort existing ones. Key-moment detection in flight at shutdown finishes later and calls startAsk, starting a real Claude request nothing aborts (probe: analyzer.hold(); POST /moves e2e4 (player_blunder); app.close(); analyzer.release() → 'asks after close: 1 aborted: false'). Return early when closed in detectAndAsk, startAsk and scheduleDetection (and attempt grading if it can start an ask). Test: close() while detection is held → 0 asks started after release. (B) minor games.ts ~284/478: when hydrate stops a replay at an illegal move in a damaged row, resume() must not overwrite the saved row with the shortened game. Leave the row as it was (load the game read-only or skip it, logging the error); test with a hand-damaged row: the row is unchanged after startup. (C) minor games.ts ~490: when the store write fails on create, POST /api/games returns 500 (ApiError) instead of a 201 for a game that won't survive a restart. Keep the existing log-and-continue for later writes. Test with a throwing store.",
+  "requirements": [
+    "NFR-14",
+    "FR-5",
+    "IR-7"
+  ],
+  "contract": "Round 1 accepted at 6d1e75b (989 passed). Review 065 confirmed save-before-acknowledge on every path, restart/resume, migration, store fallback for GET/SSE, reveal never leaked, wasm-bot test change OK. Keep all of that. Left for later (do NOT fix): re-detecting a key moment / re-grading an attempt that was in flight at shutdown; lookup() resuming a store-only 'playing' row next to a newer game. Your branch is integrated by the coordinator on issue-47-game-survival with the web half; api.ts at f8ef78e now says: after a reveal tutor.question keeps the closed question with reveal set (your implementation). Don't touch api.ts.",
+  "scope": [
+    "apps/server/**"
+  ],
+  "negative": [
+    "Do not edit files outside scope, docs, config, .github, root files or the lockfile.",
+    "No new dependencies.",
+    "Do not edit packages/** or apps/web/**.",
+    "No changes beyond (A)-(C)."
+  ],
+  "rubric": [
+    "Tests first (red then green) for (A), (B), (C).",
+    "pnpm test and pnpm typecheck clean from the repo root.",
+    "files_changed lists every file changed in 6d1e75b..your head. Commit message references NFR-14 and #47."
+  ],
+  "concurrency": "web-agent brief 066 (#42) works on apps/web only. Don't rebase.",
+  "round": 2,
+  "contract_files": []
+}

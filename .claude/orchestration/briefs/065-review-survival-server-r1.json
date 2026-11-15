@@ -1,0 +1,30 @@
+{
+  "brief_id": "065-review-survival-server-r1",
+  "agent": "reviewer",
+  "issue": 47,
+  "base_sha": "6d1e75b",
+  "scratch_dir": "/private/tmp/claude-501/-Users-daveharms-personal-workspace-chess-tutor/e5c87d5d-2b08-442e-9506-cc0a950d8e62/scratchpad/065-review-survival-server-r1",
+  "objective": "Review #47 server half at 6d1e75b: `git diff 696f3ad..6d1e75b` (apps/server only, 11 files). Severities blocking / major / minor. Check against the 'Game survival (#47)' block in api.ts (read the current wording with `git show f8ef78e:packages/chess-core/src/api.ts`: after a reveal, tutor.question keeps the closed question with tutor.reveal set) and NFR-14, FR-5, IR-7: (1) persist-before-acknowledge: every change (create, player/bot move, takeback, bot-retry, resign, game end, old game's abandonment, tutor_thinking/reply/failed, reveal, attempt) is written synchronously before its HTTP reply or SSE event; find any path that replies or emits first, or a write that's skipped when the row did change; (2) restart: listPlaying + resume rebuilds the game exactly (fen, moves, botThinking, held question incl. held reveal, shown reveal, pending ask); bot re-asked when due (both colours), tutor ask re-run with same request, coaching off on restart; no double bot move or double ask; close() stops saving cleanly and late bot/tutor results after close() can't corrupt the row; (3) store v2 migration from v1 in a transaction, v1 rows (state NULL) rebuilt from PGN, newer schema refused, PGN still filled (FR-5); (4) GET/SSE fall back to the store for finished/abandoned games; 404 only for never-created ids; moves on such games 409; (5) reveal text never in GameView/SSE before it's shown (architecture 3.5), incl. from the persisted state; (6) the wasm-bot.integration.test.ts fallback-to-legal-move change doesn't hide a real failure; test quality of game-survival.test.ts (real file-backed DB, fresh connection reads). Also assess spoke's own minor: key-moment detection/attempt grading in flight at shutdown isn't re-run (is that acceptable under 'loses at most an unacknowledged request'?). Verdict: ship / no-ship for this half. Don't review apps/web (separate spoke).",
+  "requirements": [
+    "NFR-14",
+    "FR-5",
+    "IR-7",
+    "NFR-9",
+    "FR-4"
+  ],
+  "contract": "Spoke-reported and coordinator-verified at 6d1e75b: pnpm test 47 files / 989 passed, typecheck clean; files changed = exactly the 11 apps/server files. Main checkout detached at 6d1e75b so your worktree starts at the reviewed head. The server always sends tutor.reveal (null when not shown); abandonAll() replaced by close(); schema v2 = games.state JSON column (LiveState v1) + index on status. The web half (apps/web, routing + reconnect) is in a separate round; it treats question+reveal with matching ids as shown and disables Show me.",
+  "scope": [],
+  "negative": [
+    "Read-only: do not edit, commit, or run anything that writes to the repo.",
+    "Never call the Anthropic API.",
+    "Read code with git diff / git show <sha>:<path>; vitest probes in your own scratch dir are fine (temp-dir SQLite files only)."
+  ],
+  "rubric": [
+    "Each of (1)-(6) checked with file:line evidence, probes where a race or ordering is claimed.",
+    "Every finding classified blocking / major / minor with evidence and owner.",
+    "Verdict: ship / no-ship."
+  ],
+  "concurrency": "web-agent (brief 064, #47 web r2) is working on apps/web in its own worktree.",
+  "round": 1,
+  "contract_files": []
+}

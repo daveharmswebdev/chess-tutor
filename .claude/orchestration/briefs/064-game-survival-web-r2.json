@@ -1,0 +1,35 @@
+{
+  "brief_id": "064-game-survival-web-r2",
+  "agent": "web-agent",
+  "issue": 47,
+  "base_sha": "dfdeca9",
+  "scratch_dir": "/private/tmp/claude-501/-Users-daveharms-personal-workspace-chess-tutor/e5c87d5d-2b08-442e-9506-cc0a950d8e62/scratchpad/064-game-survival-web-r2",
+  "objective": "Round 2 on your branch (base dfdeca9). Review 063 was NO-SHIP. Fix exactly these, each with a test first (red then green), and nothing else: (A) BLOCKING game-state.ts:214 / controller.ts:287-297: a late HTTP reply (takeback, resign, bot-retry, move, hint, reveal) for a game the player has left must be dropped. Today after navigate('/') state.game is null so request_succeeded applies it and the old game reappears playable on '/' with no EventSource (probe: navigate('/games/g1'); takeback() pending; navigate('/'); resolve(view()) → 'game: g1 playable: true open sources: 0'). Capture the generation (or game id) when each request starts in play/simpleRequest/hint/reveal and drop the dispatch when it changed; also make the reducer require state.game?.id === action.game.id for reply actions. (B) MAJOR controller.ts:282: a late failure from a left game must not land on the game now shown (probe: play on g1 pending; navigate('/games/g2'); reject 409 → g2 shows 'Not your turn.'). Same generation guard for failures. (C) minor game-state.ts:350: 'Show me' (canReveal) is locked while reconnecting; startReconnecting does not schedule a second timer while a reconnect load is in flight (probe P4: 3 GETs/3 EventSources where 2 expected). (D) minor controller.ts:61: MOVE_NOT_SENT wording: say the move may not have reached the server, and on 'reconnected' clear that error when the fresh GameView shows the move was applied (moves grew to include it). (E) minor controller.ts:311: if POST /api/games fails with a network error/5xx after leave(), the old game must not stay on screen playable with no stream: either keep the old game's stream until the new game is created, or start reconnecting for the old game; pick the simpler, test it. (F) Tests for every late-reply/failure order after navigate('/') and after navigating to another id (move, takeback, resign, bot-retry, hint, reveal), and Show me while reconnecting.",
+  "requirements": [
+    "NFR-14",
+    "NFR-9",
+    "FR-4",
+    "IR-5"
+  ],
+  "contract": "Round 1 accepted at dfdeca9: 47 files / 1003 passed, typecheck clean, e2e 3 passed locally. Review 063 confirmed everything else: routing, refresh rebuild incl. tutor.reveal matching, #23 ordering after reconnect, backoff 0.5s→10s with reset, single EventSource, dispose/StrictMode, 404-only not-found, 503 tutor notice, no storage/router. Keep all of that. Coordinator decision on review's contract gap: after a refresh, a CLOSED question's reveal and attempt result are not restored; that is acceptable for #47 (follow-up issue). Do not try to restore them. The api.ts contract is unchanged since 696f3ad (it is in your round-1 brief). server-agent (brief 061) is still running on apps/server; no shared files.",
+  "scope": [
+    "apps/web/**"
+  ],
+  "negative": [
+    "Do not edit files outside scope, docs, config, .github, root files or the lockfile.",
+    "No new dependencies.",
+    "Do not edit packages/** or apps/server/**.",
+    "No router library; no localStorage/sessionStorage of game state.",
+    "No captured-pieces/material UI (that is #42).",
+    "No changes beyond (A)-(F)."
+  ],
+  "rubric": [
+    "Tests first (red then green) for (A)-(F), including both arrival orders where a reply and a navigation race.",
+    "Playwright e2e still passes locally (pnpm --filter @chess-tutor/web test:e2e).",
+    "pnpm test and pnpm typecheck clean from the repo root.",
+    "files_changed lists every file changed in dfdeca9..your head. Commit message references NFR-14, NFR-9 and #47."
+  ],
+  "concurrency": "server-agent brief 061 (#47 server half) still running on apps/server/** only. #42 (apps/web) waits for you. Don't rebase.",
+  "round": 2,
+  "contract_files": []
+}

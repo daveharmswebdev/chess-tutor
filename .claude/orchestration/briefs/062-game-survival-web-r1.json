@@ -1,0 +1,36 @@
+{
+  "brief_id": "062-game-survival-web-r1",
+  "agent": "web-agent",
+  "issue": 47,
+  "base_sha": "696f3ad",
+  "scratch_dir": "/private/tmp/claude-501/-Users-daveharms-personal-workspace-chess-tutor/e5c87d5d-2b08-442e-9506-cc0a950d8e62/scratchpad/062-game-survival-web-r1",
+  "objective": "Browser side of game survival (NFR-14, NFR-9), per the 'Game survival (#47)' block in api.ts (base 696f3ad). Produce: (1) Routing: a game's address is /games/<id>. Starting a game pushes /games/<id> (history.pushState, no router dependency). Loading or refreshing /games/<id> calls GET /api/games/:id and opens the SSE stream, rebuilding board, move list, status and tutor panel (open question, and tutor.reveal when present) from the GameView. '/' shows the new-game UI as today. Back/forward between '/' and a game works. (2) Reconnecting: a network error, a 5xx (502 during a deploy) or the EventSource erroring/closing is not 'game not found'. The page shows 'Reconnecting…' (visible, non-blocking, board not playable while shown) and retries with backoff (e.g. 0.5 s doubling to a 10 s cap, with injectable timers for tests): GET the game, then reopen the EventSource; on success the notice clears and state comes from the fresh GameView/first 'state'. A move submitted while disconnected is not lost silently: either blocked while reconnecting, or failed with a clear message. (3) Only a 404 from GET /api/games/:id (or a move/action returning 404) shows 'Game not found' with a New game action. (4) Tests: controller/game-state unit tests for refresh rebuild (incl. tutor.reveal), 502 then success, EventSource drop then reconnect, backoff schedule, 404 path; and a Playwright E2E in apps/web/e2e that plays a move, reloads the page, and sees the same move list and that the next move works (refresh only; the server keeps the game in memory today, so this passes without the server half).",
+  "requirements": [
+    "NFR-14",
+    "NFR-9",
+    "FR-4",
+    "IR-5"
+  ],
+  "contract": "Cause (issue #47): the web app keeps no game id (apps/web/src/controller.ts), so a refresh loses the game, and any error after a server restart reads as 'Game not found. Start a new game.' The SPA fallback in apps/server already serves index.html for /games/<id> (#12), and vite dev should too (check apps/web vite config; adjust inside apps/web if needed). The contract (api.ts, inlined below) is the source of truth; new parts: the 'Game survival (#47)' block and optional TutorStatus.reveal (null/absent while held). Existing SSE ordering rules (#23) still apply after a reconnect: the first 'state' on the new connection is the truth. The browser keeps no copy of the moves (no localStorage of game state): the id in the URL is the only client-side memory. Premises checked at 696f3ad: pnpm test 46 files / 973 passed; pnpm typecheck clean. E2E runs in CI (.github/workflows/ci.yml job e2e, `pnpm test:e2e`, playwright chromium); run it locally with `pnpm --filter @chess-tutor/web test:e2e` if browsers are installed, else say so in the return. Parallel work: server-agent (brief 061) persists games and resumes them on restart in apps/server only. Another web issue (#42, captured pieces next to player labels) will follow you in apps/web, so keep layout changes minimal: put the reconnecting notice where the existing error/notice shows.",
+  "contract_files": [
+    "packages/chess-core/src/api.ts"
+  ],
+  "scope": [
+    "apps/web/**"
+  ],
+  "negative": [
+    "Do not edit files outside scope, docs, config, .github, root files or the lockfile.",
+    "No new dependencies.",
+    "Do not edit packages/** or apps/server/** (if the contract is wrong or missing something, report it in contract_gaps).",
+    "No router library; no localStorage/sessionStorage of game state.",
+    "No captured-pieces/material UI (that is #42)."
+  ],
+  "rubric": [
+    "Tests first (red then green): refresh rebuild from GET incl. tutor question and reveal; 502/network error shows Reconnecting and retries with backoff then recovers; EventSource error reconnects; only 404 offers New game; pushState on new game and popstate handling.",
+    "Playwright E2E: move, reload, same moves, next move accepted.",
+    "pnpm test and pnpm typecheck clean from the repo root.",
+    "files_changed lists every file changed in 696f3ad..your head. Commit message references NFR-14, NFR-9 and #47."
+  ],
+  "concurrency": "server-agent brief 061 (#47 server half) runs in parallel on apps/server/** only; no shared files. #42 (apps/web) waits until you are done. Don't rebase; the coordinator integrates both onto one branch at ship.",
+  "round": 1
+}

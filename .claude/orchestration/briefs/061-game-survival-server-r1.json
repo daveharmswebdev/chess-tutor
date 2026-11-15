@@ -1,0 +1,37 @@
+{
+  "brief_id": "061-game-survival-server-r1",
+  "agent": "server-agent",
+  "issue": 47,
+  "base_sha": "696f3ad",
+  "scratch_dir": "/private/tmp/claude-501/-Users-daveharms-personal-workspace-chess-tutor/e5c87d5d-2b08-442e-9506-cc0a950d8e62/scratchpad/061-game-survival-server-r1",
+  "objective": "Make a game in progress survive a server restart (NFR-14), per the 'Game survival (#47)' block now in api.ts (base 696f3ad). Produce: (1) store schema v2 in apps/server/src/store.ts by migration from PRAGMA user_version 1 (existing v1 rows keep working): games in status 'playing' are saved too, and enough per-game state to rebuild a Game exactly: player colour, the move list (UCI + by), status/result/endReason, timestamps, whether the bot is due to move, and the tutor state (open question INCLUDING the server-held reveal text/move, whether the reveal was already shown, the pending tutor request kind/fen if tutor.thinking). Your choice of shape (extra columns, a moves table, a JSON column for tutor state) — keep the PGN column filled so FR-5 PGN export is unchanged. (2) games.ts writes to the store before every HTTP reply or SSE event that announces a change: player move, bot move, takeback, bot-retry, resign, game end, new game (and the old game's abandonment), tutor_thinking start, tutor_reply, reveal, attempt. (3) Startup: createGameManager (or a new load step called from main.ts/app.ts) loads every 'playing' game from the store into memory; if it's the bot's turn it asks the bot again; if the tutor was thinking it re-runs that ask (same kind, same fen) with the usual SSE. Shutdown (preClose / abandonAll) no longer abandons games; it only ends open streams. Starting a new game still abandons any other game still 'playing' (unchanged contract). (4) GET /api/games/:id serves a saved game from the store when it is not in memory (finished or abandoned games after a restart); 404 only for an id never created. (5) GameView.tutor.reveal is set once a reveal has been shown for the open question (POST reveal or wrong try) and cleared when the question closes; null otherwise. Tests: a restart mid-game (game manager A on a file-backed SQLite in a temp dir, play moves incl. a takeback and a tutor question, close A without abandoning; new manager B on the same DB file; GET shows the same moves/fen/question; the next player move is accepted and the bot replies); bot-due-on-restart re-asks the bot; tutor-thinking-on-restart re-asks the tutor (fake tutor); a finished game is still GET-able after restart; schema v1 DB migrates.",
+  "requirements": [
+    "NFR-14",
+    "FR-5",
+    "IR-7",
+    "NFR-9",
+    "FR-4"
+  ],
+  "contract": "Cause (issue #47): games in progress live only in memory (Map at apps/server/src/games.ts:237); store.ts saves only finished/abandoned games (store.ts:7, schema v1 = one games row with whole PGN, PRAGMA user_version=1); shutdown abandons live games (app.ts:171 preClose -> games.abandonAll(); games.ts:790). Render restarts the service on every deploy (disk-backed, no zero-downtime), so games must come back from SQLite. The contract (api.ts, inlined below) is the source of truth for observable behaviour; the new parts are the 'Game survival (#47)' block and optional TutorStatus.reveal. Reveal text must still never reach the browser before a reveal (architecture 3.5): storing it in SQLite is fine, sending it in GameView before it's shown is not. 'Before acknowledging' means synchronous node:sqlite write before reply.send / subscriber emit; node:sqlite DatabaseSync is synchronous, so no awaiting needed. Keep one DB connection per process. Premises checked at 696f3ad: pnpm test 46 files / 973 passed; pnpm typecheck clean. Existing tests that assert shutdown abandons games (apps/server/test/shutdown.test.ts, outcome-pgn-store.test.ts, games-api.test.ts) must be updated to the new contract, not deleted. Parallel work: web-agent (brief 062) is doing the browser side (routing /games/<id>, rebuild from GET, Reconnecting with backoff) in apps/web only; it relies on GET /api/games/:id + SSE first 'state' + tutor.reveal as in api.ts.",
+  "contract_files": [
+    "packages/chess-core/src/api.ts"
+  ],
+  "scope": [
+    "apps/server/**"
+  ],
+  "negative": [
+    "Do not edit files outside scope, docs, config, .github, root files or the lockfile.",
+    "No new dependencies.",
+    "Do not edit packages/** (api.ts is coordinator-owned; if the contract is wrong or missing something, report it in contract_gaps instead).",
+    "Do not send reveal text or move to the browser before a reveal.",
+    "Do not add localStorage or any browser-side copy; server only."
+  ],
+  "rubric": [
+    "Tests first (red then green): restart mid-game continues (same DB file, new manager); bot due on restart moves; tutor thinking on restart re-asks; reveal shown survives restart as tutor.reveal; finished game GET-able after restart; v1 DB migrates; shutdown no longer abandons.",
+    "Every state change is persisted before its reply/event: a test that reads the DB (a fresh store on the same file) right after an acknowledged move sees it.",
+    "pnpm test and pnpm typecheck clean from the repo root.",
+    "files_changed lists every file changed in 696f3ad..your head. Commit message references NFR-14, FR-5, IR-7 and #47."
+  ],
+  "concurrency": "web-agent brief 062 (#47 web half) runs in parallel on apps/web/** only; no shared files. #42 (web) waits. Don't rebase; the coordinator integrates both onto one branch at ship.",
+  "round": 1
+}

@@ -1,0 +1,33 @@
+{
+  "brief_id": "066-captured-pieces-r1",
+  "agent": "web-agent",
+  "issue": 42,
+  "base_sha": "4228621",
+  "scratch_dir": "/private/tmp/claude-501/-Users-daveharms-personal-workspace-chess-tutor/e5c87d5d-2b08-442e-9506-cc0a950d8e62/scratchpad/066-captured-pieces-r1",
+  "objective": "Show captured pieces and the material count during a game (FR-20, FR-4), web only. Produce: (1) a pure function (e.g. apps/web/src/material.ts) from a FEN to, for each colour, the opponent pieces it has captured grouped by type (and ordered pawn, knight, bishop, rook, queen) and the material difference. Pieces of a colour that were captured = starting set (8P 2N 2B 2R 1Q) minus that colour's pieces on board, after first counting each piece beyond its starting count (a promotion) as a pawn still on board: e.g. White with 2 queens and 7 pawns has lost no queen and no pawn. Those captured pieces are shown on the opponent's (capturing) side. Material = sum of values on the board, pawn 1, knight 3, bishop 3, rook 5, queen 9, king 0; so a promoted pawn counts as the new piece. (2) Next to each side's label above and below the board (add a small 'You' / 'Bot' label row if none exists; the board's top side is the bot, the bottom the player, following playerColor orientation) show that side's captured pieces, and '+N' only for the side ahead; nothing when level. Labelled so it can't be read as an engine eval (e.g. title/aria-label 'Material: +2 (piece count, not an engine evaluation)'). Use the board's input: boardFen(state) (game-state.ts:308), so takebacks, refresh rebuild and the optimistic pendingFen all just work. (3) Tests first: unit tests for the function (start position level; knight-for-pawn trade gives +2 to the knight side with the knight shown on that side; promotion to queen; underpromotion to knight; a side with two queens; takeback to an earlier FEN); a component/render test that the +N appears only on the side ahead and the labels; a Playwright E2E that makes a capture and sees the captured piece appear on the capturing side (look at the bot's typical replies in apps/web/e2e/play.spec.ts; pick a capture that's reliable, or assert generically that after any capture the counts change).",
+  "requirements": [
+    "FR-20",
+    "FR-4",
+    "FR-10"
+  ],
+  "contract": "Issue #42 (from the owner, 2026-11-15): 'Chess.com displays captured pieces and keeps score'. Done when: each side's captured pieces shown next to that side grouped by type; material count pawn 1, N/B 3, R 5, Q 9, shown only for the side ahead, nothing when level; promotions count correctly and a takeback updates the display; plain piece count labelled so it can't be mistaken for an engine evaluation (FR-10 spirit); tests pass in CI incl. an E2E check that a capture appears. No server, tutor or contract change. Your base is the #47 integration branch (issue-47-game-survival @ 4228621): it adds /games/<id> routing, ConnectionNotice.tsx, routing.ts and reconnect state in controller.ts/game-state.ts. Keep #47's code as is; put your UI beside the board, not in the notice panel. Premises checked at 4228621: pnpm test 48 files / 1118 passed; typecheck clean; pnpm test:e2e 3 passed locally. App.tsx has no player-name labels today (only a move list with title='Bot'/'You'). Piece glyphs: use what the board already uses if it exposes them, otherwise Unicode chess symbols; no new dependency or image assets.",
+  "scope": [
+    "apps/web/**"
+  ],
+  "negative": [
+    "Do not edit files outside scope, docs, config, .github, root files or the lockfile.",
+    "No new dependencies.",
+    "Do not edit packages/** or apps/server/**.",
+    "No engine evaluation display or eval bar; this is a piece count only.",
+    "Don't change #47 behaviour (routing, reconnect, late-reply guards) or its tests."
+  ],
+  "rubric": [
+    "Tests first (red then green): the material function cases above, the display (only the side ahead gets +N; nothing when level; label says piece count), takeback updates.",
+    "Playwright E2E: a capture appears on the capturing side; existing e2e specs still pass.",
+    "pnpm test and pnpm typecheck clean from the repo root.",
+    "files_changed lists every file changed in 4228621..your head. Commit message references FR-20 and #42."
+  ],
+  "concurrency": "#47 (same base branch) is in review; if its review needs web changes they'll be small and in controller.ts/game-state.ts, so keep your changes to game-state.ts minimal (prefer a new file). Don't rebase; the coordinator does that at ship.",
+  "round": 1,
+  "contract_files": []
+}

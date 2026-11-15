@@ -1,0 +1,31 @@
+{
+  "brief_id": "069-game-survival-server-r3",
+  "agent": "server-agent",
+  "issue": 47,
+  "base_sha": "6df5d1a",
+  "scratch_dir": "/private/tmp/claude-501/-Users-daveharms-personal-workspace-chess-tutor/e5c87d5d-2b08-442e-9506-cc0a950d8e62/scratchpad/069-game-survival-server-r3",
+  "objective": "Round 3, the LAST round, on your branch (base 6df5d1a). Final review 068 said SHIP with one major. Fix exactly these two, each test first, nothing else: (A) MAJOR games.ts ~915 create(): it abandons every playing game before the required save of the new one, so when that save fails the reply is 500 but the old game is already abandoned (game_over sent, later moves 409) (probe: store failing only for the new id → 'create#2 500, g1 abandoned in memory and in the store, game_over on g1'). Save the new game first (required); only after that succeeds abandon the others. On failure the old game stays 'playing' in memory and on disk with no event sent. Test: store throwing for the new id → 500, the old game still playing in memory and in a fresh store read, no game_over on its stream, a move on it 200. (B) minor games.ts ~384 lookup(): a store read error must not become 404 (the web treats 404 as permanent 'Game not found'). Return/throw so GET /api/games/:id and the SSE route answer 500 ApiError; 404 stays only for an id the store says doesn't exist. Test with store.get throwing.",
+  "requirements": [
+    "NFR-14",
+    "NFR-9",
+    "FR-5"
+  ],
+  "contract": "Round 2 accepted at 6df5d1a and integrated as f03e57f on issue-47-game-survival (1121 passed, e2e 3/3). Review 068 confirmed every 065 fix and the integration with the web half. Keep all of that. The coordinator cherry-picks your commit onto the integration branch.",
+  "scope": [
+    "apps/server/**"
+  ],
+  "negative": [
+    "Do not edit files outside scope, docs, config, .github, root files or the lockfile.",
+    "No new dependencies.",
+    "Do not edit packages/** or apps/web/**.",
+    "No changes beyond (A) and (B)."
+  ],
+  "rubric": [
+    "Tests first (red then green) for (A) and (B).",
+    "pnpm test and pnpm typecheck clean from the repo root.",
+    "files_changed lists every file changed in 6df5d1a..your head. Commit message references NFR-14 and #47."
+  ],
+  "concurrency": "None in flight on apps/server. Don't rebase.",
+  "round": 3,
+  "contract_files": []
+}
