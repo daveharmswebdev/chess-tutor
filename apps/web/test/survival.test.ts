@@ -6,10 +6,18 @@ import { createElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it } from "vitest";
 import { ApiRequestError, type ApiClient } from "../src/api.ts";
-import { createGameController, reconnectDelay, type EventSourceLike, type Timers } from "../src/controller.ts";
+import {
+  createGameController,
+  MOVE_MAY_NOT_HAVE_ARRIVED,
+  reconnectDelay,
+  type EventSourceLike,
+  type GameController,
+  type Timers,
+} from "../src/controller.ts";
 import { ConnectionNotice } from "../src/ConnectionNotice.tsx";
 import {
   canResign,
+  canReveal,
   canTakeback,
   gameReducer,
   initialGameState,
@@ -19,7 +27,7 @@ import {
   type GameState,
 } from "../src/game-state.ts";
 import { gamePath, gameIdFromPath } from "../src/routing.ts";
-import { AFTER_D4_D5_FEN, AFTER_D4_FEN, D4, D5, question, reveal, tutorStatus, view } from "./fixtures.ts";
+import { AFTER_D4_D5_FEN, AFTER_D4_FEN, BF4, D4, D5, question, reveal, tutorStatus, view } from "./fixtures.ts";
 
 class FakeEventSource implements EventSourceLike {
   readyState = 1;
@@ -405,7 +413,7 @@ describe("reconnecting", () => {
       await h.controller.navigate("/games/g1");
       expect(await h.controller.play("c1", "f4")).toBe(false);
       expect(h.state().pendingFen).toBeNull(); // snapped back
-      expect(h.state().error).toBe("Your move was not sent: the game server is unreachable. Play it again once reconnected.");
+      expect(h.state().error).toBe(MOVE_MAY_NOT_HAVE_ARRIVED);
       expect(h.state().reconnecting).toBe(true);
       expect(h.state().notFound).toBe(false);
       await h.timers.fire();
@@ -469,5 +477,248 @@ describe("reconnecting", () => {
     await h.controller.navigate("/games/g1");
     expect(get.calls).toEqual(["g1", "g1"]);
     expect(h.last().closed).toBe(false);
+  });
+});
+
+// Round 2 (#47 review 063): a reply or failure for a game the player has left never lands on
+// the page now shown, in either arrival order.
+interface Deferred<T> {
+  promise: Promise<T>;
+  resolve: (v: T) => void;
+  reject: (e: unknown) => void;
+}
+function deferred<T>(): Deferred<T> {
+  let resolve: (v: T) => void = () => {};
+  let reject: (e: unknown) => void = () => {};
+  const promise = new Promise<T>((res, rej) => {
+    resolve = res;
+    reject = rej;
+  });
+  return { promise, resolve, reject };
+}
+
+type ActionName = "move" | "takeback" | "resign" | "bot-retry" | "hint" | "reveal";
+
+interface ActionCase {
+  name: ActionName;
+  /** g1 as GET returns it: a state where the action is allowed. */
+  g1: GameView;
+  run: (c: GameController) => Promise<unknown>;
+  /** What a successful reply resolves with. */
+  ok: () => unknown;
+}
+
+const openQ = question();
+const cases: ActionCase[] = [
+  { name: "move", g1: afterD5(), run: (c) => c.play("c1", "f4"), ok: () => afterD5({ moves: [D4, D5, BF4], botThinking: true }) },
+  { name: "takeback", g1: afterD5(), run: (c) => c.takeback(), ok: () => view() },
+  {
+    name: "resign",
+    g1: afterD5(),
+    run: (c) => c.resign(),
+    ok: () => afterD5({ status: "finished", result: "0-1", endReason: "resigned" }),
+  },
+  {
+    name: "bot-retry",
+    g1: view({ fen: AFTER_D4_FEN, moves: [D4] }),
+    run: (c) => c.retryBot(),
+    ok: () => view({ fen: AFTER_D4_FEN, moves: [D4], botThinking: true }),
+  },
+  { name: "hint", g1: afterD5(), run: (c) => c.hint(), ok: () => undefined },
+  { name: "reveal", g1: afterD5({ tutor: tutorStatus({ question: openQ }) }), run: (c) => c.reveal(), ok: () => reveal() },
+];
+
+const g2 = () =>
+  view({ id: "g2", fen: AFTER_D4_FEN, moves: [D4], botThinking: true, tutor: tutorStatus({ available: false, reason: "off" }) });
+
+/** A controller on g1 with the case's request pending. */
+async function pending(c: ActionCase) {
+  const reply = deferred<unknown>();
+  const api = fakeApi({
+    getGame: async (id) => (id === "g1" ? c.g1 : g2()),
+    playMove: () => reply.promise as Promise<GameView>,
+    takeback: () => reply.promise as Promise<GameView>,
+    resign: () => reply.promise as Promise<GameView>,
+    botRetry: () => reply.promise as Promise<GameView>,
+    tutorHint: () => reply.promise as Promise<void>,
+    tutorReveal: () => reply.promise as never,
+  });
+  const h = harness(api);
+  await h.controller.navigate("/games/g1");
+  const running = c.run(h.controller);
+  await flush();
+  return { h, reply, running };
+}
+
+const settlements: Array<{ label: string; settle: (d: Deferred<unknown>, c: ActionCase) => void }> = [
+  { label: "success", settle: (d, c) => d.resolve(c.ok()) },
+  { label: "409", settle: (d) => d.reject(new ApiRequestError(409, "Not possible right now: not your turn")) },
+  { label: "502", settle: (d) => d.reject(new ApiRequestError(502, "Server error (502).")) },
+  { label: "network error", settle: (d) => d.reject(new ApiRequestError(0, "Cannot reach the game server.")) },
+  { label: "404", settle: (d) => d.reject(new ApiRequestError(404, "Game not found.")) },
+];
+
+describe("late replies for a game the player has left are dropped", () => {
+  for (const c of cases) {
+    for (const s of settlements) {
+      it(`${c.name}, ${s.label}: navigate to / then the reply`, async () => {
+        const { h, reply, running } = await pending(c);
+        await h.controller.navigate("/");
+        const before = h.state();
+        s.settle(reply, c);
+        await running;
+        await flush();
+        expect(h.state()).toEqual(before);
+        expect(h.state().game).toBeNull();
+        expect(isPlayersTurn(h.state())).toBe(false);
+        expect(h.sources.every((es) => es.closed)).toBe(true);
+        expect(h.timers.pending.size).toBe(0);
+      });
+
+      it(`${c.name}, ${s.label}: navigate to another game then the reply`, async () => {
+        const { h, reply, running } = await pending(c);
+        await h.controller.navigate("/games/g2");
+        const before = h.state();
+        const sources = h.sources.length;
+        s.settle(reply, c);
+        await running;
+        await flush();
+        expect(h.state()).toEqual(before);
+        expect(h.state().game?.id).toBe("g2");
+        expect(h.sources).toHaveLength(sources);
+        expect(h.last().closed).toBe(false);
+        expect(h.timers.pending.size).toBe(0);
+      });
+
+      it(`${c.name}, ${s.label}: the reply then navigate to /`, async () => {
+        const { h, reply, running } = await pending(c);
+        s.settle(reply, c);
+        await running;
+        await flush();
+        await h.controller.navigate("/");
+        expect(h.state()).toEqual(initialGameState);
+        expect(h.sources.every((es) => es.closed)).toBe(true);
+        expect(h.timers.pending.size).toBe(0);
+      });
+    }
+  }
+
+  it("the reducer ignores a reply when no game is shown", () => {
+    for (const type of ["request_succeeded", "move_accepted"] as const) {
+      expect(gameReducer(initialGameState, { type, game: view() })).toBe(initialGameState);
+    }
+  });
+});
+
+describe("reconnecting, round 2", () => {
+  it("Show me is locked while reconnecting", async () => {
+    const h = harness(fakeApi({ ...scriptedGet([afterD5({ tutor: tutorStatus({ question: openQ }) })]).api, tutorReveal: unexpected }));
+    await h.controller.navigate("/games/g1");
+    expect(canReveal(h.state())).toBe(true);
+    h.last().emit("error");
+    expect(canReveal(h.state())).toBe(false);
+    await h.controller.reveal(); // no request
+    h.controller.dispose();
+  });
+
+  it("a failure while a reconnect GET is in flight does not start a second reconnect", async () => {
+    const move = deferred<GameView>();
+    const get2 = deferred<GameView>();
+    let gets = 0;
+    const h = harness(
+      fakeApi({
+        getGame: async () => (++gets === 1 ? afterD5() : get2.promise),
+        playMove: () => move.promise,
+      }),
+    );
+    await h.controller.navigate("/games/g1");
+    const playing = h.controller.play("c1", "f4");
+    h.last().emit("error");
+    await h.timers.fire(); // reconnect GET now in flight
+    expect(gets).toBe(2);
+    move.reject(new ApiRequestError(502, "Server error (502)."));
+    await playing;
+    expect(h.timers.pending.size).toBe(0);
+    get2.resolve(afterD5());
+    await flush();
+    expect(gets).toBe(2);
+    expect(h.sources).toHaveLength(2);
+    expect(h.state().reconnecting).toBe(false);
+  });
+
+  it("a lost move's message says it may not have arrived, and clears when the fresh view has it", async () => {
+    const afterBf4 = afterD5({
+      moves: [D4, D5, BF4],
+      fen: "rnbqkbnr/ppp1pppp/8/3p4/3P1B2/8/PPP1PPPP/RN1QKBNR b KQkq - 1 2",
+      botThinking: true,
+    });
+    const h = harness(
+      fakeApi({
+        ...scriptedGet([afterD5(), afterBf4]).api,
+        playMove: async () => Promise.reject(new ApiRequestError(0, "Cannot reach the game server.")),
+      }),
+    );
+    await h.controller.navigate("/games/g1");
+    await h.controller.play("c1", "f4");
+    expect(h.state().error).toBe(MOVE_MAY_NOT_HAVE_ARRIVED);
+    expect(MOVE_MAY_NOT_HAVE_ARRIVED).toMatch(/may not have reached/);
+    await h.timers.fire();
+    expect(h.state().reconnecting).toBe(false);
+    expect(h.state().error).toBeNull();
+  });
+
+  it("a lost move's message stays when the fresh view does not have it", async () => {
+    const h = harness(
+      fakeApi({
+        ...scriptedGet([afterD5(), afterD5()]).api,
+        playMove: async () => Promise.reject(new ApiRequestError(502, "Server error (502).")),
+      }),
+    );
+    await h.controller.navigate("/games/g1");
+    await h.controller.play("c1", "f4");
+    await h.timers.fire();
+    expect(h.state().error).toBe(MOVE_MAY_NOT_HAVE_ARRIVED);
+  });
+});
+
+describe("a new game that cannot be created", () => {
+  for (const status of [0, 502]) {
+    it(`keeps the old game and its stream on ${status === 0 ? "a network error" : "a 502"}`, async () => {
+      const h = harness(
+        fakeApi({ ...scriptedGet([afterD5()]).api, newGame: async () => Promise.reject(new ApiRequestError(status, "x")) }),
+      );
+      await h.controller.navigate("/games/g1");
+      const es = h.last();
+      await h.controller.newGame("w");
+      expect(es.closed).toBe(false);
+      expect(h.state().game?.id).toBe("g1");
+      expect(h.state().error).not.toBeNull();
+      expect(h.pushed).toEqual([]);
+      // Still live: the old game's events keep coming.
+      es.emit("state", { type: "state", game: afterD5({ botThinking: true }) });
+      expect(h.state().game?.botThinking).toBe(true);
+    });
+  }
+
+  it("closes the old stream once the new game exists", async () => {
+    const h = harness(fakeApi({ ...scriptedGet([afterD5()]).api, newGame: async () => view({ id: "g2" }) }));
+    await h.controller.navigate("/games/g1");
+    const es = h.last();
+    await h.controller.newGame("w");
+    expect(es.closed).toBe(true);
+    expect(h.state().game?.id).toBe("g2");
+    expect(h.last().url).toBe("/api/games/g2/events");
+  });
+
+  it("navigating away while the new game is being created drops it", async () => {
+    const created = deferred<GameView>();
+    const h = harness(fakeApi({ ...scriptedGet([afterD5()]).api, newGame: () => created.promise }));
+    await h.controller.navigate("/games/g1");
+    const starting = h.controller.newGame("w");
+    await h.controller.navigate("/");
+    created.resolve(view({ id: "g2" }));
+    await starting;
+    expect(h.state().game).toBeNull();
+    expect(h.pushed).toEqual([]);
   });
 });

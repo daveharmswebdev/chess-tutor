@@ -61,6 +61,8 @@ export interface GameState {
   reconnecting: boolean;
   /** GET /api/games/:id (or a move or action) answered 404. */
   notFound: boolean;
+  /** A move whose request failed unreachable: it may still have been applied (cleared on reconnect). */
+  unconfirmedMove: { uci: string; ply: number } | null;
 }
 
 export type GameAction =
@@ -68,7 +70,7 @@ export type GameAction =
   | { type: "game_started"; game: GameView }
   | { type: "move_attempted"; uci: string; fen: string }
   | { type: "move_accepted"; game: GameView }
-  | { type: "move_rejected"; message: string }
+  | { type: "move_rejected"; message: string; unconfirmed?: { uci: string; ply: number } }
   | { type: "request_succeeded"; game: GameView }
   | { type: "request_failed"; message: string }
   | { type: "server_event"; event: GameEvent }
@@ -109,6 +111,7 @@ export const initialGameState: GameState = {
   loading: false,
   reconnecting: false,
   notFound: false,
+  unconfirmedMove: null,
 };
 
 /** For a GameView without `tutor` (a server from before #7): no coaching, no reason given. */
@@ -195,6 +198,7 @@ export function gameReducer(state: GameState, action: GameAction): GameState {
         error: null,
         selected: null,
         pendingFen: action.fen,
+        unconfirmedMove: null,
         sseSinceRequest: false,
         tutorSinceRequest: false,
       };
@@ -208,10 +212,18 @@ export function gameReducer(state: GameState, action: GameAction): GameState {
 
     case "move_rejected":
       // Snap back: drop the optimistic position, the board shows the server's FEN again.
-      return { ...state, busy: false, pendingFen: null, selected: null, error: action.message };
+      return {
+        ...state,
+        busy: false,
+        pendingFen: null,
+        selected: null,
+        error: action.message,
+        unconfirmedMove: action.unconfirmed ?? null,
+      };
 
     case "request_succeeded":
-      if (state.game && state.game.id !== action.game.id) return state;
+      // A late reply for a game no longer shown (#47) is dropped, also when no game is shown.
+      if (!state.game || state.game.id !== action.game.id) return state;
       if (state.sseSinceRequest) return { ...state, busy: false, pendingFen: null, selected: null };
       return { ...state, ...applyReplyGame(state, action.game), busy: false, pendingFen: null, selected: null, error: null };
 
@@ -238,10 +250,15 @@ export function gameReducer(state: GameState, action: GameAction): GameState {
         error: action.message ?? state.error,
       };
 
-    case "reconnected":
+    case "reconnected": {
       if (state.game && state.game.id !== action.game.id) return state;
+      // A move that may not have arrived: the fresh view settles it when it holds the move.
+      const u = state.unconfirmedMove;
+      const applied = u !== null && action.game.moves[u.ply]?.uci === u.uci;
       return {
         ...state,
+        error: applied ? null : state.error,
+        unconfirmedMove: null,
         game: action.game,
         tutor: syncTutor(state.tutor, action.game.tutor),
         loading: false,
@@ -253,6 +270,7 @@ export function gameReducer(state: GameState, action: GameAction): GameState {
         sseSinceRequest: true,
         tutorSinceRequest: true,
       };
+    }
 
     case "select":
       return { ...state, selected: action.square };
@@ -349,7 +367,9 @@ export function canHint(state: GameState): boolean {
 /** "Show me": an open question that holds a reveal not yet shown. */
 export function canReveal(state: GameState): boolean {
   const t = state.tutor;
-  return t.open && t.question !== null && t.question.canReveal && t.reveal?.questionId !== t.question.id;
+  return (
+    !state.reconnecting && t.open && t.question !== null && t.question.canReveal && t.reveal?.questionId !== t.question.id
+  );
 }
 
 export interface BoardArrow {

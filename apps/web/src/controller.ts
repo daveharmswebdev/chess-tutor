@@ -56,7 +56,8 @@ export function reconnectDelay(attempt: number): number {
   return Math.min(FIRST_RETRY_MS * 2 ** attempt, MAX_RETRY_MS);
 }
 
-const MOVE_NOT_SENT = "Your move was not sent: the game server is unreachable. Play it again once reconnected.";
+export const MOVE_MAY_NOT_HAVE_ARRIVED =
+  "Your move may not have reached the game server. Check the board once reconnected, and play it again if it is missing.";
 const REQUEST_NOT_SENT = "That did not reach the game server. Try again once reconnected.";
 
 export interface GameController {
@@ -166,6 +167,8 @@ export function createGameController(deps: GameControllerDeps): GameController {
   /** Bumped whenever the shown game changes, so late replies for an old one are dropped. */
   let generation = 0;
   let retryTimer: unknown = null;
+  /** The generation whose GET (open or reconnect) is in flight, or null. */
+  let loadingGeneration: number | null = null;
   let attempt = 0;
 
   function closeSource(): void {
@@ -201,7 +204,8 @@ export function createGameController(deps: GameControllerDeps): GameController {
     if (id === null) return;
     closeSource();
     dispatch({ type: "reconnecting", message: null });
-    if (retryTimer !== null) return;
+    // One reconnect at a time: a timer is pending or its GET is already in flight.
+    if (retryTimer !== null || loadingGeneration === generation) return;
     const gen = generation;
     retryTimer = timers.setTimeout(() => {
       retryTimer = null;
@@ -212,15 +216,18 @@ export function createGameController(deps: GameControllerDeps): GameController {
   /** GET the game, show it, then open its stream. Only a 404 means not found. */
   async function load(id: string, gen: number, mode: "open" | "reconnect"): Promise<void> {
     let game: GameView;
+    loadingGeneration = gen;
     try {
       game = await api.getGame(id);
     } catch (e) {
       if (gen !== generation) return;
+      loadingGeneration = null;
       if (statusOf(e) === 404) showNotFound();
       else startReconnecting();
       return;
     }
     if (gen !== generation) return;
+    loadingGeneration = null;
     dispatch(mode === "open" ? { type: "game_started", game } : { type: "reconnected", game });
     subscribe(id);
   }
@@ -273,12 +280,18 @@ export function createGameController(deps: GameControllerDeps): GameController {
       dispatch({ type: "select", square: null });
       return false;
     }
+    const gen = generation;
+    const ply = game.moves.length;
     dispatch({ type: "move_attempted", uci, fen: fenAfter(fen, uci) ?? fen });
     try {
-      dispatch({ type: "move_accepted", game: await api.playMove(game.id, uci) });
+      const reply = await api.playMove(game.id, uci);
+      if (gen !== generation) return false; // the player left this game (#47)
+      dispatch({ type: "move_accepted", game: reply });
       return true;
     } catch (e) {
-      const report = () => dispatch({ type: "move_rejected", message: MOVE_NOT_SENT });
+      if (gen !== generation) return false;
+      const report = () =>
+        dispatch({ type: "move_rejected", message: MOVE_MAY_NOT_HAVE_ARRIVED, unconfirmed: { uci, ply } });
       if (!handleLostServer(game.id, e, report)) dispatch({ type: "move_rejected", message: messageOf(e) });
       return false;
     }
@@ -287,10 +300,14 @@ export function createGameController(deps: GameControllerDeps): GameController {
   async function simpleRequest(run: (id: string) => Promise<GameView>): Promise<void> {
     const game = getState().game;
     if (!game) return;
+    const gen = generation;
     dispatch({ type: "request_started" });
     try {
-      dispatch({ type: "request_succeeded", game: await run(game.id) });
+      const reply = await run(game.id);
+      if (gen !== generation) return; // the player left this game (#47)
+      dispatch({ type: "request_succeeded", game: reply });
     } catch (e) {
+      if (gen !== generation) return;
       const report = () => dispatch({ type: "request_failed", message: REQUEST_NOT_SENT });
       if (!handleLostServer(game.id, e, report)) dispatch({ type: "request_failed", message: messageOf(e) });
     }
@@ -308,12 +325,13 @@ export function createGameController(deps: GameControllerDeps): GameController {
 
   return {
     async newGame(color) {
-      leave();
+      // The old game keeps its stream until the new one exists, so a failed create leaves it live.
       const gen = generation;
       dispatch({ type: "request_started" });
       try {
         const game = await api.newGame(color);
         if (gen !== generation) return; // the player navigated away meanwhile
+        leave();
         currentId = game.id;
         dispatch({ type: "game_started", game });
         deps.pushPath?.(gamePath(game.id));
@@ -381,11 +399,12 @@ export function createGameController(deps: GameControllerDeps): GameController {
       const state = getState();
       if (!state.game || !canHint(state)) return;
       const id = state.game.id;
+      const gen = generation;
       dispatch({ type: "tutor_notice", message: null });
       try {
         await api.tutorHint(id);
       } catch (e) {
-        tutorFailed(id, e);
+        if (gen === generation) tutorFailed(id, e);
       }
     },
 
@@ -393,12 +412,13 @@ export function createGameController(deps: GameControllerDeps): GameController {
       const state = getState();
       if (!state.game || !canReveal(state)) return;
       const id = state.game.id;
+      const gen = generation;
       dispatch({ type: "tutor_notice", message: null });
       try {
         const reveal = await api.tutorReveal(id);
-        if (getState().game?.id === id) dispatch({ type: "tutor_reveal_received", reveal });
+        if (gen === generation && getState().game?.id === id) dispatch({ type: "tutor_reveal_received", reveal });
       } catch (e) {
-        tutorFailed(id, e);
+        if (gen === generation) tutorFailed(id, e);
       }
     },
 
