@@ -6,7 +6,8 @@ import type { MoveView, TutorNote } from "@chess-tutor/chess-core";
 import { createElement, isValidElement, type ReactElement, type ReactNode } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it } from "vitest";
-import { MoveList, MoveListView, noteKey, type MoveListViewProps } from "../src/MoveList.tsx";
+import { MoveList, MoveListView, noteKey, rowKey, type MoveListViewProps } from "../src/MoveList.tsx";
+import { moveRows } from "../src/move-notes.ts";
 import { BF4, D4, D5 } from "./fixtures.ts";
 
 const G6: MoveView = { uci: "g7g6", san: "g6", by: "bot" };
@@ -40,6 +41,7 @@ function props(overrides: Partial<MoveListViewProps> = {}): MoveListViewProps {
     notes: NOTES,
     expanded: new Set(),
     openRows: new Set(),
+    cut: new Set(),
     onToggleNote: () => {},
     onToggleRow: () => {},
     ...overrides,
@@ -76,7 +78,9 @@ describe("move list: unchanged parts", () => {
   it("still says No moves yet. without moves or notes", () => {
     expect(html(props({ moves: [], notes: [] }))).toContain("No moves yet.");
     // The stateful wrapper renders the same list.
-    expect(renderToStaticMarkup(createElement(MoveList, { moves: MOVES, notes: NOTES }))).toBe(html(props()));
+    expect(renderToStaticMarkup(createElement(MoveList, { moves: MOVES, notes: NOTES }))).toBe(
+      `<div class="move-list-root">${html(props())}</div>`,
+    );
   });
 });
 
@@ -106,9 +110,9 @@ describe("move list: wide layout, Tutor column (FR-25)", () => {
     const more = allByTestId(tree(props({ onToggleNote: (k) => pressed.push(k) })), "move-note-more");
     expect(more).toHaveLength(1);
     (more[0]!.props["onClick"] as () => void)();
-    expect(pressed).toEqual([noteKey(LONG, 1)]);
+    expect(pressed).toEqual([noteKey(LONG)]);
 
-    const open = html(props({ expanded: new Set([noteKey(LONG, 1)]) }));
+    const open = html(props({ expanded: new Set([noteKey(LONG)]) }));
     const row = rowsOf(open)[2]!;
     expect(row).toContain('class="move-note expanded"');
     expect(row).toContain("The bishop on f4 has no retreat after ...Nh5.");
@@ -139,16 +143,16 @@ describe("move list: narrow layout, ❝ button (FR-25)", () => {
   });
 
   it("the ❝ button opens the notes under its own row and says so with aria-expanded", () => {
-    const pressed: number[] = [];
+    const pressed: string[] = [];
     const toggles = allByTestId(tree(props({ onToggleRow: (n) => pressed.push(n) })), "move-note-toggle");
     (toggles[0]!.props["onClick"] as () => void)();
-    expect(pressed).toEqual([2]);
+    expect(pressed).toEqual([rowKey(moveRows(MOVES, NOTES)[1]!)]);
 
     const closed = rowsOf(html(props()))[1]!;
     expect(closed).toContain('aria-expanded="false"');
     expect(closed).not.toContain("note-open");
 
-    const open = rowsOf(html(props({ openRows: new Set([2]) })));
+    const open = rowsOf(html(props({ openRows: new Set([rowKey(moveRows(MOVES, NOTES)[1]!)]) })));
     expect(open[1]).toContain('class="move-row has-note note-open"');
     expect(open[1]).toMatch(/aria-controls="move-notes-2" aria-expanded="true"/);
     // The notes block sits inside that row, after its moves, holding the full text.
@@ -159,5 +163,38 @@ describe("move list: narrow layout, ❝ button (FR-25)", () => {
   it("a second tap closes it: the row is no longer open", () => {
     const rows = rowsOf(html(props({ openRows: new Set() })));
     expect(rows[1]).toContain('class="move-row has-note"');
+  });
+});
+
+describe("move list: ▸ more for a cut-off line (review 095)", () => {
+  const ONLY: TutorNote = { ...SHORT, questionId: "q9", ply: 2, message: "Why does Bf4 come before e3 here, do you think?" };
+
+  it("offers ▸ more for a message-only note only when the browser found its line cut off", () => {
+    const fits = html(props({ notes: [ONLY] }));
+    expect(fits).not.toContain("move-note-more");
+    expect(fits).toContain(`data-note-key="${noteKey(ONLY)}"`);
+    const cut = html(props({ notes: [ONLY], cut: new Set([noteKey(ONLY)]) }));
+    expect(cut).toContain(">▸ more</button>");
+    const open = html(props({ notes: [ONLY], cut: new Set([noteKey(ONLY)]), expanded: new Set([noteKey(ONLY)]) }));
+    expect(open).toContain('class="move-note expanded"');
+    expect(open).toContain(">▾ less</button>");
+  });
+});
+
+describe("move list: no stale open state after a takeback (review 095)", () => {
+  it("a new note on a row whose old note was taken back renders closed in both layouts", () => {
+    // Before: SHORT on row 2 (ply 3), opened with ❝ and expanded with ▸ more.
+    const before = moveRows(MOVES, [SHORT]);
+    const openRows = new Set([rowKey(before[1]!)]);
+    const expanded = new Set([noteKey(SHORT)]);
+    expect(rowsOf(html(props({ notes: [SHORT], openRows, expanded })))[1]).toContain("note-open");
+    // Takeback to ply 3 removes SHORT; the next move brings a new question's note on the same ply.
+    const fresh: TutorNote = { ...SHORT, questionId: "q-new", message: "A new question.", reveal: "More." };
+    const row = rowsOf(html(props({ notes: [fresh], openRows, expanded })))[1]!;
+    expect(row).toContain("A new question.");
+    expect(row).not.toContain("note-open");
+    expect(row).toContain('aria-expanded="false"');
+    expect(row).not.toContain("expanded\"");
+    expect(row).toContain('class="move-note"');
   });
 });

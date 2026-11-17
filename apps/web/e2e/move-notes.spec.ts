@@ -57,22 +57,33 @@ const GAME: GameView = {
   notes: NOTES,
 };
 
-/** Serves GAME for GET /api/games/<id>, and a stream with one "state" event. Counts the GETs. */
-async function stubGame(page: Page): Promise<{ gets: number }> {
+/** Serves `game` for GET /api/games/<id>, and a stream with one "state" event. Counts the GETs. */
+async function stubGame(page: Page, game: GameView = GAME): Promise<{ gets: number }> {
   const seen = { gets: 0 };
-  await page.route(`**/api/games/${GAME_ID}/events`, (route) =>
+  await page.route(`**/api/games/${game.id}/events`, (route) =>
     route.fulfill({
       status: 200,
       headers: { "content-type": "text/event-stream", "cache-control": "no-cache" },
-      body: `event: state\ndata: ${JSON.stringify({ type: "state", game: GAME })}\n\n`,
+      body: `event: state\ndata: ${JSON.stringify({ type: "state", game })}\n\n`,
     }),
   );
-  await page.route(`**/api/games/${GAME_ID}`, (route) => {
+  await page.route(`**/api/games/${game.id}`, (route) => {
     seen.gets++;
-    return route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify(GAME) });
+    return route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify(game) });
   });
   return seen;
 }
+
+/** Message-only notes (review 095): one too long for the Tutor column, one that fits. */
+const CUT_MESSAGE = "Why does Bf4 come before e3 here, do you think?";
+const MESSAGE_ONLY: GameView = {
+  ...GAME,
+  id: "e2e-notes-message-only",
+  notes: [
+    { questionId: "q-cut", kind: "hint", ply: 2, message: CUT_MESSAGE, reveal: null, bestMove: null, attempt: null },
+    { questionId: "q-fits", kind: "hint", ply: 6, message: "Good.", reveal: null, bestMove: null, attempt: null },
+  ],
+};
 
 async function noHorizontalScroll(page: Page) {
   const m = await page.evaluate(() => ({
@@ -175,5 +186,43 @@ for (const width of [375, 320]) {
     await toggle.click();
     await expect(toggle).toHaveAttribute("aria-expanded", "false");
     await expect(note).toBeHidden();
+  });
+}
+
+test("wide screen (1440 px): a message-only note cut off by the column gets ▸ more; one that fits does not", async ({ page }) => {
+  await page.setViewportSize({ width: 1440, height: 900 });
+  await stubGame(page, MESSAGE_ONLY);
+  await page.goto(`/games/${MESSAGE_ONLY.id}`);
+  const notes = page.getByTestId("move-note");
+  await expect(notes).toHaveCount(2);
+  const cut = notes.nth(0);
+  await expect(cut.locator(".note-short")).toHaveText(CUT_MESSAGE);
+  const short = await cut.locator(".note-short").evaluate((el) => ({ scroll: el.scrollWidth, client: el.clientWidth }));
+  expect(short.scroll, JSON.stringify(short)).toBeGreaterThan(short.client);
+  const more = cut.getByTestId("move-note-more");
+  await expect(more).toBeVisible();
+  await more.click();
+  await expect(cut.locator(".note-full")).toBeVisible();
+  await expect(cut.locator(".note-full")).toHaveText(CUT_MESSAGE);
+  const full = await cut.locator(".note-full").evaluate((el) => ({ scroll: el.scrollWidth, client: el.clientWidth }));
+  expect(full.scroll, JSON.stringify(full)).toBeLessThanOrEqual(full.client);
+  await more.click();
+  await expect(cut.locator(".note-full")).toBeHidden();
+  // The short note fits on its line: nothing to open.
+  await expect(notes.nth(1).locator(".note-short")).toBeVisible();
+  await expect(notes.nth(1).getByTestId("move-note-more")).toHaveCount(0);
+});
+
+for (const width of [768, 780, 800]) {
+  test(`no sideways scrolling at ${width} px (review 095)`, async ({ page }) => {
+    await page.setViewportSize({ width, height: 900 });
+    await stubGame(page);
+    await page.goto(`/games/${GAME_ID}`);
+    await expect(page.getByTestId("move-note")).toHaveCount(2);
+    await noHorizontalScroll(page);
+    await page.goto("/");
+    await expect(page.getByTestId("new-game")).toBeVisible();
+    const m = await page.evaluate(() => [document.documentElement.scrollWidth, document.documentElement.clientWidth]);
+    expect(m[0], JSON.stringify(m)).toBeLessThanOrEqual(m[1]!);
   });
 }

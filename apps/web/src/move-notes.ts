@@ -16,9 +16,6 @@ export interface MoveRow {
   notes: TutorNote[];
 }
 
-/** A message longer than this is shortened in the wide layout even with nothing else to show. */
-export const SHORT_NOTE_CHARS = 60;
-
 /**
  * The move list's rows with their notes. A note sits on moves[note.ply]; ply === moves.length
  * means after the last move, so it goes on the last row. A note past that (never sent by the
@@ -55,13 +52,15 @@ function attemptLine(a: NonNullable<TutorNote["attempt"]>): string {
 
 /**
  * The full note, one part per field: the message; the reveal when not null; the graded try when
- * not null; "Best was <san>." when the engine's best move is known and is not the try.
+ * not null; "Best was <san>." when the engine's best move is known and the try (if any) was wrong
+ * and not that move. A correct try names no other move: "correct, the best move. Best was X."
+ * would contradict itself (review 095; tryResultText names no best move for a correct try either).
  */
 export function noteParts(note: TutorNote): string[] {
   const parts = [note.message];
   if (note.reveal !== null && note.reveal.trim() !== "") parts.push(note.reveal);
   if (note.attempt !== null) parts.push(attemptLine(note.attempt));
-  if (note.bestMove !== null && note.bestMove.uci !== note.attempt?.move.uci) {
+  if (note.bestMove !== null && !note.attempt?.correct && note.bestMove.uci !== note.attempt?.move.uci) {
     parts.push(`Best was ${note.bestMove.san}.`);
   }
   return parts;
@@ -71,9 +70,12 @@ export function noteText(note: TutorNote): string {
   return noteParts(note).join(" ");
 }
 
-/** True when the full note says more than the short line: "▸ more" is offered then. */
+/**
+ * True when the full note says more than its message. "▸ more" is offered then, and also when the
+ * browser finds the one-line message cut off by the column (MoveList measures that; review 095).
+ */
 export function noteHasMore(note: TutorNote): boolean {
-  return noteParts(note).length > 1 || note.message.length > SHORT_NOTE_CHARS;
+  return noteParts(note).length > 1;
 }
 
 function moveName(row: MoveRow, ply: number, moves: { white: MoveView | undefined; black: MoveView | undefined }): string {

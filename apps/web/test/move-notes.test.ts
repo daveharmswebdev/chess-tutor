@@ -112,9 +112,9 @@ describe("noteText: the full note (FR-25, FR-10)", () => {
     expect(noteParts(n).slice(1)).toEqual(["You tried Nf3: correct, the best move."]);
   });
 
-  it("gives a correct try's loss in pawns with one decimal, and the best move when it differs", () => {
+  it("gives a correct try's loss in pawns with one decimal", () => {
     const n = note({ attempt: { move: NF3, correct: true, cpLoss: 37 }, bestMove: E3 });
-    expect(noteParts(n).slice(1)).toEqual(["You tried Nf3: correct, only 0.4 off the best move.", "Best was e3."]);
+    expect(noteParts(n).slice(1)).toEqual(["You tried Nf3: correct, only 0.4 off the best move."]);
     const tiny = note({ attempt: { move: NF3, correct: true, cpLoss: 3 }, bestMove: null });
     expect(noteParts(tiny).slice(1)).toEqual(["You tried Nf3: correct, less than 0.1 off the best move."]);
   });
@@ -138,8 +138,21 @@ describe("noteText: the full note (FR-25, FR-10)", () => {
     expect(noteText(note())).not.toMatch(/tried|Best was|pawns/);
   });
 
-  it("offers more for a message longer than the short line, even with nothing else", () => {
-    expect(noteHasMore(note({ message: "x".repeat(200) }))).toBe(true);
+  it("leaves a message-only note's cut-off check to the browser (review 095): no character count", () => {
+    // Whether the one-line message is cut off depends on the column width; MoveList measures it.
+    expect(noteHasMore(note({ message: "Why does Bf4 come before e3 here, do you think?" }))).toBe(false);
+    expect(noteHasMore(note({ message: "x".repeat(200) }))).toBe(false);
+  });
+
+  it("names no other best move after a correct try (review 095): no 'correct, the best move. Best was X.'", () => {
+    const best = note({ attempt: { move: NF3, correct: true, cpLoss: 0 }, bestMove: E3 });
+    expect(noteParts(best).slice(1)).toEqual(["You tried Nf3: correct, the best move."]);
+    expect(noteText(best)).not.toContain("Best was");
+    const close = note({ attempt: { move: NF3, correct: true, cpLoss: 37 }, bestMove: E3 });
+    expect(noteText(close)).not.toContain("Best was");
+    // A wrong try still names the best move.
+    const wrong = note({ attempt: { move: NF3, correct: false, cpLoss: 118 }, bestMove: E3 });
+    expect(noteText(wrong)).toContain("Best was e3.");
   });
 });
 

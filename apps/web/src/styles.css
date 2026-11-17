@@ -59,10 +59,6 @@ main {
   main {
     grid-template-columns: minmax(0, 1fr);
   }
-
-  .controls {
-    flex-wrap: wrap;
-  }
 }
 
 .board {
@@ -169,8 +165,11 @@ main {
   font-size: 1rem;
 }
 
+/* Wraps at every width: at 761-820 px the side column is only 260 px wide and 'New game' would
+   push the page sideways (review 095). */
 .controls {
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
   justify-content: space-between;
   gap: 12px;
