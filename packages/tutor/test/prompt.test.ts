@@ -4,15 +4,32 @@ import { describe, expect, it } from "vitest";
 import { TOOL_DEFINITIONS } from "../src/tools.ts";
 
 const root = fileURLToPath(new URL("../../../", import.meta.url));
-const prompt = readFileSync(`${root}prompts/tutor-system.v2.md`, "utf8");
+const prompt = readFileSync(`${root}prompts/tutor-system.v3.md`, "utf8");
 const changelog = readFileSync(`${root}prompts/CHANGELOG.md`, "utf8");
 
-describe("prompts/tutor-system.v2.md (release artifact)", () => {
-  it("is versioned and logged in the changelog with #26 and #28", () => {
-    expect(prompt).toMatch(/version: 2/);
-    const entry = changelog.split("\n").find((l) => l.includes("tutor-system.v2.md"));
+describe("prompts/tutor-system.v3.md (release artifact)", () => {
+  it("is versioned and logged in the changelog with #41, FR-10 and FR-8", () => {
+    expect(prompt).toMatch(/version: 3/);
+    const entry = changelog.split("\n").find((l) => l.includes("**tutor-system.v3.md**"));
     expect(entry).toBeDefined();
-    for (const phrase of ["#26", "#28", "`evals`", "give-away"]) expect(entry).toContain(phrase);
+    for (const phrase of ["#41", "FR-10", "FR-8", "usual_setup", "get_repertoire_context"]) expect(entry).toContain(phrase);
+  });
+
+  it("evals default to v3 (#41)", () => {
+    const config = readFileSync(`${root}evals/src/config.ts`, "utf8");
+    expect(config).toContain(`"tutor-system.v3.md"`);
+  });
+
+  it("backs the plan after the opponent leaves book, or words it without moves (#41, FR-10, FR-9)", () => {
+    const rule = prompt.slice(prompt.indexOf("- `opponent_left_book` (FR-9)"), prompt.indexOf("- `hint` (FR-12)"));
+    expect(rule).toContain("get_repertoire_context");
+    expect(rule).toMatch(/Name a plan move only if this turn's tool results hold it: a move in `usual_setup`, an engine line, or an explorer move/);
+    expect(rule).toMatch(/a move from memory gets the reply rejected/);
+    expect(rule).toMatch(/in words, without naming the move/);
+    expect(rule).toMatch(/pawn break in the centre/);
+    // A setup move is the repertoire's plan, not an engine-checked answer.
+    expect(rule).toMatch(/`revealMove` unless `analyze_position` or `evaluate_move` backs it/);
+    expect(prompt).toMatch(/`usual_setup`: the student's own next moves of the last book line/);
   });
 
   it("names every tool and covers the FR-8 to FR-12 rules", () => {
@@ -39,6 +56,17 @@ describe("prompts/tutor-system.v2.md (release artifact)", () => {
     expect(prompt).toMatch(/to-square is fine/);
     expect(prompt).toMatch(/give a check/);
     expect(prompt).toMatch(/piece/);
+  });
+});
+
+describe("prompts/tutor-system.v2.md stays on disk unchanged", () => {
+  it("is still version 2, without the #41 rule, and still logged", () => {
+    const v2 = readFileSync(`${root}prompts/tutor-system.v2.md`, "utf8");
+    expect(v2).toMatch(/version: 2/);
+    expect(v2).toContain("`evals`");
+    expect(v2).not.toContain("usual_setup");
+    const entry = changelog.split("\n").find((l) => l.includes("**tutor-system.v2.md**"));
+    for (const phrase of ["#26", "#28", "`evals`", "give-away"]) expect(entry).toContain(phrase);
   });
 });
 

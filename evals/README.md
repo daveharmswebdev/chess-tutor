@@ -49,7 +49,7 @@ pnpm eval -- --model claude-opus-5-5 --effort medium --cases hint --max-usd 0.5
 | `--concurrency` | 2 | cases running at the same time (they share one Stockfish, which queues searches) |
 | `--repeat` | 1 | runs every case N times (ids get `#1`, `#2`, ...) |
 | `--out` | `evals/results/<timestamp>-<model>-<effort>` | output directory (gitignored) |
-| `--prompt` | `prompts/tutor-system.v2.md` | system prompt file to test |
+| `--prompt` | `prompts/tutor-system.v3.md` | system prompt file to test |
 | `--live-explorer` | off | uses the real Lichess explorer (needs `LICHESS_TOKEN`). By default the explorer always answers "unavailable", so runs need no network and are repeatable. |
 | `--gate` | off | makes the run a check: after the report is written, the command exits with code 1 and prints one `gate: ...` line per missed threshold when NFR-6 move legality is below 100%, NFR-6 eval match is below 100% or NFR-7 no give-away is below 90%. A metric with no graded replies (all asks failed) counts as a miss, and so does a run where fewer than 90% of its cases were graded (cases not started because of the budget count as not graded): `gate: graded 80% of cases (need >= 90%): 8 of 10`. Without `--gate` the exit code does not depend on the metrics. |
 
