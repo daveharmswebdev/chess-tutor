@@ -1028,7 +1028,8 @@ export function createGameManager(opts: GameManagerOptions): GameManager {
 
   function finishAsk(g: Game, token: number, kind: TutorKind, attemptFen: string, outcome: TutorOutcome): void {
     // source (FR-28, #64): lets usage reporting (#60) split demo spend from real use.
-    const meta = { gameId: g.id, source: g.source, kind, ok: outcome.ok, ms: outcome.ms, usage: outcome.usage };
+    // Key gameSource, not source: the "bot move" line already uses source for book/engine (review 081).
+    const meta = { gameId: g.id, gameSource: g.source, kind, ok: outcome.ok, ms: outcome.ms, usage: outcome.usage };
     if (g.ask?.token !== token) {
       log.info(meta, "tutor reply dropped: the question was replaced");
       return;
@@ -1201,7 +1202,7 @@ export function createGameManager(opts: GameManagerOptions): GameManager {
       save(g, { required: true });
       for (const other of games.values()) if (other.status === "playing") abandon(other);
       games.set(g.id, g);
-      log.info({ gameId: g.id, playerColor, source }, "new game");
+      log.info({ gameId: g.id, playerColor, gameSource: source }, "new game");
       if (playerColor === "b") {
         startBot(g);
         save(g); // botThinking (informational: on load the bot is asked whenever it is its turn)

@@ -1,7 +1,7 @@
 import { afterEach, describe, expect, it } from "vitest";
 import type { FastifyInstance } from "fastify";
 import type { GameView } from "@chess-tutor/chess-core";
-import { buildServer } from "../src/app.ts";
+import { buildServer, demoSource } from "../src/app.ts";
 import type { GameManager } from "../src/games.ts";
 import { createSqliteGameStore, type GameStore } from "../src/store.ts";
 import { createFakeBot, eventCollector, ucis, type FakeBot } from "./helpers.ts";
@@ -166,6 +166,35 @@ describe("demo games (FR-28, IR-10, #64)", () => {
     expect(store.get(res.body.id)?.source).toBe("player");
   });
 
+  it("a configured token with a trailing newline or surrounding spaces matches the trimmed header (review 081)", async () => {
+    expect(demoSource("tok\n", "tok")).toBe("demo");
+    expect(demoSource("  tok  ", "tok")).toBe("demo");
+    expect(demoSource("\ttok\r\n", "tok")).toBe("demo");
+    expect(demoSource("tok\n", "tox")).toBeNull();
+    setup([], { demoToken: `${TOKEN}\n` });
+    const res = await app.inject({
+      method: "POST",
+      url: "/api/games",
+      // What Node's HTTP parser delivers for "x-demo-token:   <token>   " (inject does not trim).
+      headers: { "x-demo-token": TOKEN },
+      payload: { playerColor: "w" },
+    });
+    expect(res.statusCode, res.body).toBe(201);
+    expect(store.get((res.json() as GameView).id)?.source).toBe("demo");
+  });
+
+  it("a whitespace-only token is off: any header is ignored, the game is a player game", async () => {
+    for (const blank of ["", " ", "\n", " \t\r\n "]) {
+      expect(demoSource(blank, "anything"), JSON.stringify(blank)).toBe("player");
+      expect(demoSource(blank, ""), JSON.stringify(blank)).toBe("player");
+      expect(demoSource(blank, undefined), JSON.stringify(blank)).toBe("player");
+    }
+    setup([], { demoToken: " \n" });
+    const res = await create({ "x-demo-token": "anything" });
+    expect(res.status).toBe(201);
+    expect(store.get(res.body.id)?.source).toBe("player");
+  });
+
   it("DEMO_TOKEN set, no header: a player game", async () => {
     setup([], { demoToken: TOKEN });
     const res = await create();
@@ -181,7 +210,9 @@ describe("demo games (FR-28, IR-10, #64)", () => {
     expect(res.body).not.toHaveProperty("source");
     expect(res.raw).not.toContain(TOKEN);
     expect(logLines.join("")).not.toContain(TOKEN);
-    expect(logLines.some((l) => l.includes('"msg":"new game"') && l.includes('"source":"demo"'))).toBe(true);
+    const newGameLine = logLines.map((l) => JSON.parse(l) as Record<string, unknown>).find((e) => e["msg"] === "new game");
+    expect(newGameLine).toMatchObject({ gameSource: "demo" });
+    expect(newGameLine).not.toHaveProperty("source");
   });
 
   it("DEMO_TOKEN set, a wrong header of the same length: 403, no game created", async () => {

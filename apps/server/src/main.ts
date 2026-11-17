@@ -72,6 +72,8 @@ async function main(): Promise<void> {
   const attemptToleranceCp = loadAttemptToleranceCp();
   // Before the engine starts: a deploy without its web build fails here.
   const webDist = resolveWebDist(env["WEB_DIST"]);
+  // IR-10, FR-28: unset or blank (after trimming) turns demo marking off.
+  const demoToken = env["DEMO_TOKEN"]?.trim() ?? "";
 
   const dbPath = resolveDbPath(env);
   let store: GameStore | undefined;
@@ -99,8 +101,8 @@ async function main(): Promise<void> {
       coaching: { analyzer, engine, ...tutor, thresholds, attemptToleranceCp, repertoire },
       health: createHealthProbe({ engine, store }),
       ...(webDist ? { webDist } : {}),
-      // IR-10, FR-28: unset or blank turns demo marking off (the header is then ignored).
-      ...(env["DEMO_TOKEN"] ? { demoToken: env["DEMO_TOKEN"] } : {}),
+      // Trimmed above (review 081): a value pasted with a trailing newline still matches the header.
+      ...(demoToken ? { demoToken } : {}),
       logger: { level: env["LOG_LEVEL"] || "info" },
     });
     for (const w of warnings) app.log.warn(w);

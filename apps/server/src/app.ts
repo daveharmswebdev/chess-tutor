@@ -42,12 +42,15 @@ export const DEMO_TOKEN_HEADER = "x-demo-token";
 /**
  * The source of a new game from its x-demo-token header (FR-28). Returns null for a header that
  * does not match a configured token. Constant-time comparison; unequal lengths do not match.
+ * The configured token is trimmed (review 081): Node delivers header values trimmed, so a token
+ * pasted with a trailing newline must still match. Blank after trimming means off.
  */
 export function demoSource(configured: string | undefined, header: string | string[] | undefined): GameSource | null {
-  if (configured === undefined || configured.trim() === "") return "player";
+  const token = configured?.trim() ?? "";
+  if (token === "") return "player";
   if (header === undefined) return "player";
   if (typeof header !== "string") return null;
-  const expected = Buffer.from(configured, "utf8");
+  const expected = Buffer.from(token, "utf8");
   const given = Buffer.from(header, "utf8");
   if (given.length !== expected.length) return null;
   return timingSafeEqual(given, expected) ? "demo" : null;
