@@ -60,6 +60,30 @@ export function loadAttemptToleranceCp(path: string = TUTOR_CONFIG_PATH): number
   return cp;
 }
 
+/** USD per million tokens for one model (config/models.json pricingPerMTok; NFR-5, FR-29). */
+export interface ModelPrice {
+  input: number;
+  output: number;
+  cacheRead: number;
+  cacheWrite: number;
+}
+
+/**
+ * config/models.json `pricingPerMTok`, by model id. Entries that are not four numbers are left
+ * out (their tokens are then counted at 0 spend, with a warning); a missing block is {}.
+ */
+export function loadPricing(path: string = MODELS_CONFIG_PATH): Record<string, ModelPrice> {
+  const json = JSON.parse(readFileSync(path, "utf8")) as { pricingPerMTok?: Record<string, Partial<ModelPrice>> };
+  const out: Record<string, ModelPrice> = {};
+  for (const [model, p] of Object.entries(json.pricingPerMTok ?? {})) {
+    const fields = [p?.input, p?.output, p?.cacheRead, p?.cacheWrite];
+    if (fields.every((f) => typeof f === "number" && Number.isFinite(f) && f >= 0)) {
+      out[model] = { input: p.input!, output: p.output!, cacheRead: p.cacheRead!, cacheWrite: p.cacheWrite! };
+    }
+  }
+  return out;
+}
+
 const EFFORTS = new Set(["low", "medium", "high", "xhigh", "max"]);
 
 /**

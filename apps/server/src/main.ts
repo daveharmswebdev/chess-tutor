@@ -23,6 +23,10 @@
  *   APP_ENV            default "development": picks the tutor model in config/models.json.
  *   TUTOR_PROMPT_PATH  default <repo>/prompts/tutor-system.v2.md; a missing file turns coaching
  *                      off with a reason, never a crash.
+ * Usage stats (#60, FR-29, IR-10):
+ *   OPS_STATS_TOKEN  unset or blank => GET /ops/daily-stats is off (404). Otherwise callers send
+ *                    `authorization: Bearer <token>`. Never logged. Counts come from the usage
+ *                    ledger in DB_PATH (schema v4), priced by config/models.json pricingPerMTok.
  * Detection, attempt grading, the bot and the tutor's tools share the one Stockfish process
  * (one search at a time, queued). The server's analysis waits for the bot's search, and the
  * tutor's tool calls go through a per-game wrapper that submits one search at a time, after
@@ -39,6 +43,7 @@ import {
   loadBotConfig,
   loadEngineThreads,
   loadKeyMomentThresholds,
+  loadPricing,
   loadTutorConfig,
 } from "./config.ts";
 import { createBotExplorer, type BotExplorerSetup } from "./explorer-env.ts";
@@ -74,6 +79,10 @@ async function main(): Promise<void> {
   const webDist = resolveWebDist(env["WEB_DIST"]);
   // IR-10, FR-28: unset or blank (after trimming) turns demo marking off.
   const demoToken = env["DEMO_TOKEN"]?.trim() ?? "";
+  // IR-10, FR-29 (#60): unset or blank (after trimming) turns GET /ops/daily-stats off (404). Never logged.
+  const opsStatsToken = env["OPS_STATS_TOKEN"]?.trim() ?? "";
+  // Read at startup so a broken config/models.json stops the server, not the first stats call.
+  const pricing = loadPricing();
 
   const dbPath = resolveDbPath(env);
   let store: GameStore | undefined;
@@ -103,6 +112,9 @@ async function main(): Promise<void> {
       ...(webDist ? { webDist } : {}),
       // Trimmed above (review 081): a value pasted with a trailing newline still matches the header.
       ...(demoToken ? { demoToken } : {}),
+      // The SQLite store is also the usage ledger (IR-7); buildServer picks it up from `store`.
+      ...(opsStatsToken ? { opsStatsToken } : {}),
+      pricing,
       logger: { level: env["LOG_LEVEL"] || "info" },
     });
     for (const w of warnings) app.log.warn(w);

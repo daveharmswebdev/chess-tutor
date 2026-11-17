@@ -32,7 +32,10 @@ export function checkWebDist(dir: string): void {
   }
 }
 
-/** True for /api, /api/... and /api?...: those never fall back to index.html. */
+/**
+ * True for /api and /ops (#60), with /..., ?... or #... after them: those never fall back to
+ * index.html, so an unknown path there gets the JSON 404.
+ */
 export function isApiPath(url: string): boolean {
-  return /^\/api(?:[/?#]|$)/.test(url);
+  return /^\/(?:api|ops)(?:[/?#]|$)/.test(url);
 }

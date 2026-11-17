@@ -30,6 +30,8 @@ export interface TutorSetup {
   /** null when coaching is off; offReason then says why. */
   tutor: TutorFactory | null;
   offReason: string | null;
+  /** The model the sessions use (config.model), set only when coaching is on; for the usage ledger (#60). */
+  model?: string;
 }
 
 export interface TutorSetupOptions {
@@ -73,5 +75,6 @@ export function setupTutor(opts: TutorSetupOptions): TutorSetup {
         createTutorSession({ ...shared, engine: game.engine }, { playerColor: game.playerColor, playerProfile: PLAYER_PROFILE }),
     },
     offReason: null,
+    model: opts.config.model,
   };
 }

@@ -35,6 +35,50 @@ export interface SavedGame {
 
 export type GameSource = "player" | "demo";
 
+/**
+ * One row of the usage ledger (schema v4; FR-29, NFR-5, architecture 3.8): one per finished tutor
+ * ask (replies dropped after the fact included: their tokens were spent) and one per bot failure.
+ * Counts and categories only; no PGN, FEN or text (NFR-15).
+ */
+export interface UsageEvent {
+  /** ISO 8601 UTC, from the game manager's now(). */
+  at: string;
+  /** For per-game sums (#9); never part of the daily stats. Null when unknown. */
+  gameId: string | null;
+  source: GameSource;
+  /** A TutorKind for tutor asks, or "bot_failed". */
+  kind: string;
+  ok: boolean;
+  /** The TutorFailureReason of a failed ask; null when ok and for bot_failed. */
+  reason: string | null;
+  ms: number;
+  requests: number;
+  inputTokens: number;
+  outputTokens: number;
+  cacheReadInputTokens: number;
+  cacheCreationInputTokens: number;
+  /** The model that served the ask; null for bot_failed rows or when unknown. */
+  model: string | null;
+}
+
+/** The stored usage ledger (IR-7): survives restarts; read by /ops/daily-stats and later BudgetGuard (#9). */
+export interface UsageLedger {
+  /** Appends a row; synchronous like save(). */
+  recordUsage(event: UsageEvent): void;
+  /** Rows with from <= at < to (ISO strings), oldest first. */
+  usageBetween(fromIso: string, toIso: string): UsageEvent[];
+  /** Games created with from <= created_at < to, by source. */
+  gamesStartedBetween(fromIso: string, toIso: string): Record<GameSource, number>;
+}
+
+export type SqliteGameStore = GameStore & UsageLedger;
+
+/** True when a store also keeps the usage ledger (the SQLite store does). */
+export function isUsageLedger(value: unknown): value is UsageLedger {
+  const v = value as Partial<UsageLedger> | null;
+  return !!v && typeof v.recordUsage === "function" && typeof v.usageBetween === "function" && typeof v.gamesStartedBetween === "function";
+}
+
 /** A row as read back: `state` and `source` are always present (null and "player" for old rows). */
 export type StoredGame = SavedGame & { state: string | null; source: GameSource };
 
@@ -55,7 +99,7 @@ export function resolveDbPath(env: Record<string, string | undefined>): string {
   return path === undefined || path === "" ? DEFAULT_DB_PATH : path;
 }
 
-export const SCHEMA_VERSION = 3;
+export const SCHEMA_VERSION = 4;
 
 /**
  * SQLite game store (node:sqlite, one connection). Writes are synchronous: when save()
@@ -68,11 +112,15 @@ export const SCHEMA_VERSION = 3;
  *      state NULL and are rebuilt from their PGN.
  *   3  adds `source` ('player' or 'demo', default 'player'; FR-28, #64), so usage reporting can
  *      tell demo games apart. Migrated by ALTER TABLE; older rows read back as 'player'.
+ *   4  adds the usage ledger `usage_events` (FR-29, NFR-5, #60; architecture 3.8): one row per
+ *      finished tutor ask and per bot failure (at, game_id, source, kind, ok, reason, ms, the five
+ *      token counts, model), indexed on `at`. Read by GET /ops/daily-stats and later BudgetGuard
+ *      (#9). Created with CREATE TABLE IF NOT EXISTS; v3 games are untouched.
  * Tutor notes (#53, FR-25, FR-5) live in `state` (its `notes` array, [] when absent) and in the
  * PGN as {...} comments; no separate table and no schema change.
  * A database with a newer version than this code knows is refused.
  */
-export function createSqliteGameStore(path: string): GameStore {
+export function createSqliteGameStore(path: string): SqliteGameStore {
   if (path !== ":memory:" && !path.startsWith("file:")) mkdirSync(dirname(path), { recursive: true });
   const db = new DatabaseSync(path);
   try {
@@ -91,6 +139,13 @@ export function createSqliteGameStore(path: string): GameStore {
   );
   const select = db.prepare("SELECT * FROM games WHERE id = ?");
   const selectPlaying = db.prepare("SELECT * FROM games WHERE status = 'playing' ORDER BY created_at, id");
+  const insertUsage = db.prepare(
+    `INSERT INTO usage_events (at, game_id, source, kind, ok, reason, ms, requests, input_tokens, output_tokens,
+       cache_read_input_tokens, cache_creation_input_tokens, model)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+  );
+  const selectUsage = db.prepare("SELECT * FROM usage_events WHERE at >= ? AND at < ? ORDER BY at, id");
+  const countStarted = db.prepare("SELECT source, COUNT(*) AS n FROM games WHERE created_at >= ? AND created_at < ? GROUP BY source");
 
   return {
     save(g) {
@@ -102,6 +157,31 @@ export function createSqliteGameStore(path: string): GameStore {
     },
     listPlaying() {
       return selectPlaying.all().map(fromRow);
+    },
+    recordUsage(e) {
+      insertUsage.run(
+        e.at,
+        e.gameId,
+        e.source,
+        e.kind,
+        e.ok ? 1 : 0,
+        e.reason,
+        Math.round(e.ms),
+        e.requests,
+        e.inputTokens,
+        e.outputTokens,
+        e.cacheReadInputTokens,
+        e.cacheCreationInputTokens,
+        e.model,
+      );
+    },
+    usageBetween(fromIso, toIso) {
+      return selectUsage.all(fromIso, toIso).map(usageFromRow);
+    },
+    gamesStartedBetween(fromIso, toIso) {
+      const counts: Record<GameSource, number> = { player: 0, demo: 0 };
+      for (const r of countStarted.all(fromIso, toIso)) counts[r["source"] === "demo" ? "demo" : "player"] += Number(r["n"]);
+      return counts;
     },
     close() {
       db.close();
@@ -122,6 +202,25 @@ function fromRow(row: Record<string, unknown>): StoredGame {
     updatedAt: String(row["updated_at"]),
     state: state === null || state === undefined ? null : String(state),
     source: row["source"] === "demo" ? "demo" : "player",
+  };
+}
+
+function usageFromRow(row: Record<string, unknown>): UsageEvent {
+  const nullable = (v: unknown) => (v === null || v === undefined ? null : String(v));
+  return {
+    at: String(row["at"]),
+    gameId: nullable(row["game_id"]),
+    source: row["source"] === "demo" ? "demo" : "player",
+    kind: String(row["kind"]),
+    ok: Number(row["ok"]) === 1,
+    reason: nullable(row["reason"]),
+    ms: Number(row["ms"]),
+    requests: Number(row["requests"]),
+    inputTokens: Number(row["input_tokens"]),
+    outputTokens: Number(row["output_tokens"]),
+    cacheReadInputTokens: Number(row["cache_read_input_tokens"]),
+    cacheCreationInputTokens: Number(row["cache_creation_input_tokens"]),
+    model: nullable(row["model"]),
   };
 }
 
@@ -152,6 +251,26 @@ function migrate(db: DatabaseSync): void {
     db.exec("CREATE INDEX IF NOT EXISTS games_status ON games (status)");
     // Version 3 (#64, FR-28): who started the game; every older row is a player game.
     if (!columns.includes("source")) db.exec("ALTER TABLE games ADD COLUMN source TEXT NOT NULL DEFAULT 'player' CHECK (source IN ('player', 'demo'))");
+    // Version 4 (#60, FR-29): the usage ledger. Counts only (NFR-15); `at` is ISO UTC.
+    db.exec(`
+      CREATE TABLE IF NOT EXISTS usage_events (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        at TEXT NOT NULL,
+        game_id TEXT,
+        source TEXT NOT NULL CHECK (source IN ('player', 'demo')),
+        kind TEXT NOT NULL,
+        ok INTEGER NOT NULL CHECK (ok IN (0, 1)),
+        reason TEXT,
+        ms INTEGER NOT NULL,
+        requests INTEGER NOT NULL,
+        input_tokens INTEGER NOT NULL,
+        output_tokens INTEGER NOT NULL,
+        cache_read_input_tokens INTEGER NOT NULL,
+        cache_creation_input_tokens INTEGER NOT NULL,
+        model TEXT
+      )
+    `);
+    db.exec("CREATE INDEX IF NOT EXISTS usage_events_at ON usage_events (at)");
     db.exec(`PRAGMA user_version = ${SCHEMA_VERSION}`);
     db.exec("COMMIT");
   } catch (err) {

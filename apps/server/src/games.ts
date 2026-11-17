@@ -14,7 +14,7 @@ import {
   type SparringBot,
   type TutorNote,
 } from "@chess-tutor/chess-core";
-import type { TutorEngine, TutorOutcome, TutorRequest, TutorSession } from "@chess-tutor/tutor";
+import type { TutorEngine, TutorOutcome, TutorRequest, TutorSession, TutorUsage } from "@chess-tutor/tutor";
 import {
   AUTH_REASON,
   bestMoveOf,
@@ -34,7 +34,7 @@ import {
 import { loadAttemptToleranceCp, loadKeyMomentThresholds } from "./config.ts";
 import { outcomeOf } from "./outcome.ts";
 import { toPgn } from "./pgn.ts";
-import type { GameSource, GameStore, StoredGame } from "./store.ts";
+import type { GameSource, GameStore, StoredGame, UsageEvent, UsageLedger } from "./store.ts";
 
 /** An error with the HTTP status the contract gives it (400, 404, 409, 503). */
 export class GameError extends Error {
@@ -55,6 +55,12 @@ export interface GameLog {
 
 const SILENT_LOG: GameLog = { info() {}, warn() {}, error() {} };
 
+/**
+ * Ledger reason for an ask the server cancelled itself (#60, review 088): not an error, but its
+ * tokens still count (NFR-5).
+ */
+export const CANCELLED_REASON = "cancelled";
+
 export type GameListener = (event: GameEvent) => void;
 
 export interface GameManagerOptions {
@@ -65,6 +71,12 @@ export interface GameManagerOptions {
   newId?: () => string;
   now?: () => Date;
   log?: GameLog;
+  /**
+   * The stored usage ledger (FR-29, NFR-5, #60): one row per finished tutor ask (dropped
+   * replies included) and per bot failure. Without it nothing is recorded. A failed write is
+   * logged and the game goes on.
+   */
+  ledger?: UsageLedger;
 }
 
 export interface GameManager {
@@ -390,6 +402,7 @@ export function createGameManager(opts: GameManagerOptions): GameManager {
   const newId = opts.newId ?? randomUUID;
   const now = opts.now ?? (() => new Date());
   const log = opts.log ?? SILENT_LOG;
+  const ledger = opts.ledger;
   const games = new Map<string, Game>();
   /** Set by close() (shutdown): nothing more is saved, late results are dropped. */
   let closed = false;
@@ -682,10 +695,43 @@ export function createGameManager(opts: GameManagerOptions): GameManager {
    * "error". The order matters: the web reducer clears its message on state.
    */
   function botFailed(g: Game, message: string): void {
+    recordUsage(g, { kind: "bot_failed", ok: false, reason: null, ms: 0, usage: null });
     g.botThinking = false;
     g.version++;
     g.botError = message;
     emitState(g); // followed by "error" while the game stays bot-failed
+  }
+
+  /**
+   * One usage ledger row (FR-29, NFR-5): counts and categories only, no text (NFR-15). A write
+   * failure (or a store already closed at shutdown) is logged and never breaks the game.
+   */
+  function recordUsage(
+    g: Game,
+    e: { kind: string; ok: boolean; reason: string | null; ms: number; usage: TutorUsage | null; model?: string | null },
+  ): void {
+    if (!ledger) return;
+    const u = e.usage;
+    const row: UsageEvent = {
+      at: now().toISOString(),
+      gameId: g.id,
+      source: g.source,
+      kind: e.kind,
+      ok: e.ok,
+      reason: e.reason,
+      ms: Number.isFinite(e.ms) ? Math.max(0, Math.round(e.ms)) : 0,
+      requests: u?.requests ?? 0,
+      inputTokens: u?.inputTokens ?? 0,
+      outputTokens: u?.outputTokens ?? 0,
+      cacheReadInputTokens: u?.cacheReadInputTokens ?? 0,
+      cacheCreationInputTokens: u?.cacheCreationInputTokens ?? 0,
+      model: e.model ?? null,
+    };
+    try {
+      ledger.recordUsage(row);
+    } catch (err) {
+      log.warn({ gameId: g.id, kind: e.kind, err }, "could not record usage");
+    }
   }
 
   /** True while the game waits for a bot retry: playing, the bot's turn, not thinking. */
@@ -1024,13 +1070,27 @@ export function createGameManager(opts: GameManagerOptions): GameManager {
         const usage = { requests: 0, inputTokens: 0, outputTokens: 0, cacheReadInputTokens: 0, cacheCreationInputTokens: 0 };
         return { ok: false, reason: "api_unavailable", message: String(err), usage, ms: 0 };
       })
-      .then((o) => finishAsk(g, token, kind, attemptFen, o));
+      .then((o) => finishAsk(g, token, kind, attemptFen, o, controller.signal));
   }
 
-  function finishAsk(g: Game, token: number, kind: TutorKind, attemptFen: string, outcome: TutorOutcome): void {
+  function finishAsk(
+    g: Game,
+    token: number,
+    kind: TutorKind,
+    attemptFen: string,
+    outcome: TutorOutcome,
+    signal?: AbortSignal,
+  ): void {
     // source (FR-28, #64): lets usage reporting (#60) split demo spend from real use.
     // Key gameSource, not source: the "bot move" line already uses source for book/engine (review 081).
     const meta = { gameId: g.id, gameSource: g.source, kind, ok: outcome.ok, ms: outcome.ms, usage: outcome.usage };
+    // Every finished ask is in the ledger (#60), dropped ones too: their tokens were spent. An ask
+    // the server cancelled itself (moved on, replaced, game over, auth-off, shutdown) is not an
+    // error: the session answers an abort with api_unavailable, stored as "cancelled" (review 088).
+    // A validated reply that arrives after a cancel stays ok.
+    const cancelled = !outcome.ok && (signal?.aborted === true || g.ask?.token !== token);
+    const reason = outcome.ok ? null : cancelled ? CANCELLED_REASON : outcome.reason;
+    recordUsage(g, { kind, ok: outcome.ok, reason, ms: outcome.ms, usage: outcome.usage, model: coaching?.model ?? null });
     if (g.ask?.token !== token) {
       log.info(meta, "tutor reply dropped: the question was replaced");
       return;

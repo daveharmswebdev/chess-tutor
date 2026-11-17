@@ -38,6 +38,11 @@ export interface CoachingDeps {
   /** null when coaching is off (no key, no prompt file); offReason then says why. */
   tutor: TutorFactory | null;
   offReason?: string | null;
+  /**
+   * The tutor's model id (config/models.json for APP_ENV, IR-9), recorded with each ask in the
+   * usage ledger so its spend is priced right (#60, NFR-5). Null or omitted: recorded as unknown.
+   */
+  model?: string | null;
   /** Default: config/tutor.json keyMoments. */
   thresholds?: KeyMomentThresholds;
   /** Default: config/tutor.json tutor.attemptToleranceCp. */

@@ -7,7 +7,9 @@ import type { CoachingDeps } from "./coaching.ts";
 import { createGameManager, GameError, type GameManager } from "./games.ts";
 import type { HealthProbe } from "./health.ts";
 import { checkWebDist, isApiPath } from "./static.ts";
-import type { GameSource, GameStore } from "./store.ts";
+import { loadPricing } from "./config.ts";
+import { dailyStatsFromLedger, parseStatsDate, type Pricing } from "./stats.ts";
+import { isUsageLedger, type GameSource, type GameStore, type UsageLedger } from "./store.ts";
 
 export type { CoachingDeps } from "./coaching.ts";
 
@@ -35,9 +37,38 @@ export interface ServerDeps {
    * blank: the header is ignored and every game is a player game. Never logged or stored.
    */
   demoToken?: string;
+  /**
+   * OPS_STATS_TOKEN (IR-10, FR-29, #60). When set (not blank after trimming), GET /ops/daily-stats
+   * answers callers with `authorization: Bearer <token>`. Unset or blank: the route answers the
+   * usual JSON 404. Never logged or returned.
+   */
+  opsStatsToken?: string;
+  /**
+   * The stored usage ledger (FR-29, NFR-5). Default: `store`, when it keeps one (the SQLite store
+   * does). Without one, nothing is recorded and /ops/daily-stats answers 503.
+   */
+  ledger?: UsageLedger;
+  /** Prices per model for the stats' spendUsd. Default: config/models.json pricingPerMTok, read on first use. */
+  pricing?: Pricing;
 }
 
 export const DEMO_TOKEN_HEADER = "x-demo-token";
+
+/**
+ * True when an authorization header carries `Bearer <configured>` (IR-10). The scheme is
+ * case-insensitive (RFC 7235), the token is not. The configured token must be non-blank
+ * (trimmed). Constant-time comparison of equal-length buffers; unequal lengths do not match.
+ */
+export function bearerMatches(configured: string, header: string | string[] | undefined): boolean {
+  const token = configured.trim();
+  if (token === "" || typeof header !== "string") return false;
+  const match = /^Bearer (.+)$/i.exec(header);
+  if (!match) return false;
+  const expected = Buffer.from(token, "utf8");
+  const given = Buffer.from(match[1]!, "utf8");
+  if (given.length !== expected.length) return false;
+  return timingSafeEqual(given, expected);
+}
 
 /**
  * The source of a new game from its x-demo-token header (FR-28). Returns null for a header that
@@ -75,12 +106,15 @@ function sseMessage(event: GameEvent): string {
  */
 export function buildServer(deps: ServerDeps): { app: FastifyInstance; games: GameManager } {
   const app = Fastify({ logger: deps.logger ?? false });
+  const ledger = deps.ledger ?? (isUsageLedger(deps.store) ? deps.store : undefined);
+  const now = deps.now ?? (() => new Date());
   const games = createGameManager({
     bot: deps.bot,
     store: deps.store,
     ...(deps.coaching ? { coaching: deps.coaching } : {}),
     ...(deps.newId ? { newId: deps.newId } : {}),
     ...(deps.now ? { now: deps.now } : {}),
+    ...(ledger ? { ledger } : {}),
     log: app.log,
   });
   const streams = new Set<ServerResponse>();
@@ -128,6 +162,37 @@ export function buildServer(deps: ServerDeps): { app: FastifyInstance; games: Ga
   app.get("/api/health", async (_request, reply) => {
     const status = deps.health ? await deps.health() : { ok: false as const, reason: "no health probe configured" };
     return reply.status(status.ok ? 200 : 503).send(status);
+  });
+
+  // Daily usage counts for the ops dashboard (FR-29, #60; IR-10, NFR-15). Counts only.
+  const opsToken = deps.opsStatsToken?.trim() ?? "";
+  let pricing: Pricing | undefined = deps.pricing;
+  const warnedModels = new Set<string | null>();
+  app.get("/ops/daily-stats", async (request, reply) => {
+    if (opsToken === "") return reply.status(404).send(apiError(`no route ${request.method} ${request.url}`));
+    if (!bearerMatches(opsToken, request.headers.authorization)) {
+      return reply.status(401).send(apiError("a valid bearer token is required"));
+    }
+    const parsed = parseStatsDate((request.query as Record<string, unknown> | undefined)?.["date"], now());
+    if ("error" in parsed) return reply.status(400).send(apiError(parsed.error));
+    if (!ledger) return reply.status(503).send(apiError("the usage ledger is not configured"));
+    pricing ??= loadPricing();
+    return reply.status(200).send(
+      dailyStatsFromLedger(ledger, {
+        date: parsed.date,
+        now: now(),
+        pricing,
+        warnUnknownModel: (model) => {
+          if (warnedModels.has(model)) return;
+          warnedModels.add(model);
+          if (model === null) {
+            request.log.warn("usage stats: rows with an unknown model (none recorded); their tokens count at 0 spend");
+          } else {
+            request.log.warn({ model }, "usage stats: no price for this model; its tokens count at 0 spend");
+          }
+        },
+      }),
+    );
   });
 
   app.post("/api/games", async (request, reply) => {

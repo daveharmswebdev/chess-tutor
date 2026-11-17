@@ -71,6 +71,8 @@ describe("setupTutor (NFR-9)", () => {
     const setup = setupTutor({ ...deps(), apiKey: "sk-test-not-real", promptPath: tempPrompt("You are a tutor.") });
     expect(setup.offReason).toBeNull();
     expect(setup.tutor).not.toBeNull();
+    // The model the sessions use, for the usage ledger (#60, NFR-5).
+    expect(setup.model).toBe("claude-opus-5-5");
     const session = setup.tutor!.createSession({ id: "g1", playerColor: "w", engine: fakeEngine });
     expect(typeof session.ask).toBe("function");
     expect(clientsMade).toBe(1);
