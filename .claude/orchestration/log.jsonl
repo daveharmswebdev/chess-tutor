@@ -338,3 +338,16 @@
 {"ts":"2026-11-17T02:28:26.499Z","event":"return_valid","agent_id":"af85355a7b23679bc","agent_type":"server-agent","via":"handback"}
 {"ts":"2026-11-17T02:29:33.624Z","event":"coordinator_verdict","brief_id":"089-daily-stats-r2","agent":"server-agent","verdict":"accepted","reason":"6 files match; rebased on 0f4dd1a + fixup re-applied -> e817b63; 1319 passed, typecheck clean; coordinator read games.ts/static.ts diff; no further review","tokens":146191,"duration_ms":211248}
 {"ts":"2026-11-17T02:31:16.010Z","event":"shipped","issue":60,"pr":74}
+{"ts":"2026-11-17T02:57:33.479Z","event":"dispatch","subagent_type":"web-agent","brief_id":"090-demo-video-r1","base_sha":"de786d0","spoke":true}
+{"ts":"2026-11-17T02:57:33.726Z","event":"agent_complete","subagent_type":"web-agent","brief_id":"090-demo-video-r1","agent_id":"a91104495e1d4ffd8","status":"async_launched","contract":"pending"}
+{"ts":"2026-11-17T03:00:10.409Z","event":"shipped","issue":63,"pr":76}
+{"ts":"2026-11-17T03:05:38.615Z","event":"return_valid","agent_id":"a91104495e1d4ffd8","agent_type":"web-agent","via":"handback"}
+{"ts":"2026-11-17T03:06:36.210Z","event":"coordinator_verdict","brief_id":"090-demo-video-r1","agent":"web-agent","verdict":"accepted","reason":"10 files match; rebased a735981 on 16b76ef; 1344 passed; Claude steps unrun (no key)","tokens":75853,"duration_ms":485232}
+{"ts":"2026-11-17T03:07:06.279Z","event":"dispatch","subagent_type":"reviewer","brief_id":"091-review-demo-video-r1","base_sha":"a735981","spoke":true}
+{"ts":"2026-11-17T03:07:06.735Z","event":"agent_complete","subagent_type":"reviewer","brief_id":"091-review-demo-video-r1","agent_id":"a8d29cc3570c1290f","status":"async_launched","contract":"pending"}
+{"ts":"2026-11-17T03:10:47.244Z","event":"return_valid","agent_id":"a8d29cc3570c1290f","agent_type":"reviewer","via":"handback"}
+{"ts":"2026-11-17T03:10:57.529Z","event":"coordinator_verdict","brief_id":"091-review-demo-video-r1","agent":"reviewer","verdict":"review","reason":"SHIP, 5 minor; r2 for 4 web minors + truthful Hint captions"}
+{"ts":"2026-11-17T03:11:17.916Z","event":"coordinator_verdict","brief_id":"091-review-demo-video-r1","agent":"reviewer","verdict":"review","reason":"cost","tokens":62990,"duration_ms":220871}
+{"ts":"2026-11-17T03:15:29.021Z","event":"return_valid","agent_id":"a91104495e1d4ffd8","agent_type":"web-agent","via":"handback"}
+{"ts":"2026-11-17T03:16:17.300Z","event":"coordinator_verdict","brief_id":"092-demo-video-r2","agent":"web-agent","verdict":"accepted","reason":"5 files match; 4a70aea on 16b76ef; 1354 passed; no re-review (targeted minor fixes)","tokens":97283,"duration_ms":223050}
+{"ts":"2026-11-17T03:18:23.399Z","event":"shipped","issue":59,"pr":77}

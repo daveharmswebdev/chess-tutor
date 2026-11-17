@@ -1,0 +1,32 @@
+{
+  "brief_id": "092-demo-video-r2",
+  "agent": "web-agent",
+  "issue": 59,
+  "base_sha": "a735981",
+  "scratch_dir": "/private/tmp/claude-501/-Users-daveharms-personal-workspace-chess-tutor/fc6b2a30-92ba-4529-bb63-5438071b1892/scratchpad/092-demo-video-r2",
+  "objective": "Round 2 of #59 on your branch (head a735981, already rebased onto main 16b76ef): fix the five minor findings from review 091 so the demo never crashes on a terminal position, its captions never contradict the evaluation or what the app actually does, and every failure ends with a specific reason and a saved video. Success: each fix has a red-then-green test where it is testable as a pure helper, and the gate stays green.",
+  "requirements": [
+    "FR-27",
+    "FR-10"
+  ],
+  "contract": "Review 091 findings (verdict SHIP, all minor):\n1. apps/web/demo/mistake.ts:60 evaluateMoves throws when a legal White move checkmates or stalemates: the real WASM engine returns lines: [] for a terminal position (uci-client.ts:72 keeps only info lines with a pv; Stockfish sends 'score mate 0' with no pv). Reproduced: FEN after 1.e4 e5 2.Bc4 Nc6 3.Qh5 Nf6 -> 'THREW: engine returned no line for r1bqkb1r/pppp1Qpp/2n2n2/4p3/2B1P3/8/PPPP1PPP/RNB1K1NR b KQkq - 0 4'. Fix: score terminal positions with chess.js (checkmate by White -> +MATE_CP, i.e. never a mistake; draw/stalemate -> 0) without calling the engine. Replace the test at apps/web/test/demo-mistake.test.ts:120 that fakes 'mate 0' with one where the fake engine returns lines: [] for the terminal FEN, as the real one does.\n2. Hint (coordinator decision, keep the issue's sequence question -> Hint -> Show me): POST /tutor/hint starts a new 'hint' ask on the CURRENT position (after the bot's reply, games.ts:1362-1369); it closes the blunder lesson as a note and Show me then reveals the hint ask's answer for the current position. Make the captions say exactly that, truthfully, e.g. before Hint: 'Hint asks the tutor for a nudge on your next move, still without the answer.' and before Show me: 'Show me gives the engine's best move here.' (your wording, but accurate; no caption may imply Hint and Show me are about the blunder's position).\n3. Caption at tutor.demo.ts:40 says 'loses about two pawns' but there is no upper bound (a run picked Bxc7, loss 706 cp). Either word it as 'two pawns or more' (captions are fixed text, so never the picker's numbers): use fixed wording that is true for any loss >= 250 cp. Optionally also prefer a moderate loss (e.g. the smallest qualifying loss already); keep the threshold behaviour.\n4. tutor.demo.ts:97 waitForTutor: target.or(failed).or(unavailable) toBeVisible can raise a strict-mode violation when two are visible (rejected key shows tutor-failed AND tutor-unavailable); add .first(), include tutor-notice (a refused Hint/Show me, TutorPanel.tsx:71-75) in the failure set, and report its text. Show me disabled (hint reply with no reveal: canReveal false, game-state.ts:583-587) must fail with a specific message, not a bare 15 s toBeEnabled timeout.\n5. tutor.demo.ts:193 finally calls engine.quit() before page.close()/video.saveAs(): if quit rejects, the video is lost. Save the video first, or isolate quit in its own try.\nGate at a735981 (coordinator): pnpm test 57 files, 1344 passed; typecheck clean.",
+  "scope": [
+    "apps/web/**"
+  ],
+  "negative": [
+    "Do not edit files outside scope, docs, config, .github, root files or the lockfile.",
+    "No new dependencies.",
+    "Do not change apps/server, packages/*, or apps/web/src behaviour.",
+    "Captions stay fixed text; no evaluation or move chosen by Claude or hard-coded (FR-10).",
+    "Do not add the demo to pnpm test, test:e2e, or CI."
+  ],
+  "rubric": [
+    "Red then green: a fake engine returning lines: [] for a terminal position no longer throws, a mating move is never picked, and a stalemating move scores 0.",
+    "Captions before Hint and Show me describe the current-position behaviour; the mistake caption is true for any loss >= 250 cp.",
+    "waitForTutor uses .first() and includes tutor-notice; a disabled Show me fails with a specific reason; the video is saved even if engine.quit() rejects.",
+    "pnpm test and pnpm typecheck clean from the repo root; run pnpm demo keyless again through the mistake step and report it.",
+    "files_changed lists every file changed in a735981..your head. Commit message references FR-27 and #59."
+  ],
+  "concurrency": "None in flight. Don't rebase; the coordinator does that at ship.",
+  "round": 2
+}

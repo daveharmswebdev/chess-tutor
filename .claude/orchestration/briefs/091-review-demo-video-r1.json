@@ -1,0 +1,24 @@
+{
+  "brief_id": "091-review-demo-video-r1",
+  "agent": "reviewer",
+  "issue": 59,
+  "base_sha": "a735981",
+  "scratch_dir": "/private/tmp/claude-501/-Users-daveharms-personal-workspace-chess-tutor/fc6b2a30-92ba-4529-bb63-5438071b1892/scratchpad/091-review-demo-video-r1",
+  "objective": "Review #59 round 1: `git diff 16b76ef..a735981` (web-agent: guided demo video in apps/web/demo/, rebased onto main 16b76ef) against FR-27, FR-28, FR-10 and the issue's done-when list. Focus: (1) the mistake is chosen only from Stockfish scores of the actual position (built from the page's move list), never hard-coded or by Claude; White-POV score handling and mate handling in demo/mistake.ts are correct, and the selection (loss >= 250 cp, White <= +500 afterwards, no forced mate against White, no king moves) will reliably trigger the server's key-moment detector (blunderCp 150, stillWinningCp 500, server analysis may differ in depth); (2) opening moves are played only when legal in the real position; (3) x-demo-token goes only on POST /api/games and only when DEMO_TOKEN is set, and no token can land in a tracked file or log; (4) every wait is on page state except named reading pauses; the Claude steps (question -> Hint -> Show me) wait on the right state, given how apps/web/src/game-state.ts and TutorPanel.tsx actually handle a hint reply and canReveal: they have not been run end-to-end (no API key), so trace that path carefully; (5) the demo is not collected by pnpm test, test:e2e or CI, and the engine is always quit. Findings blocking/major/minor; summary ends SHIP or NO-SHIP.",
+  "requirements": [
+    "FR-27",
+    "FR-28",
+    "FR-10"
+  ],
+  "contract": "FR-27: a guided demo plays a short game on a given app URL in a browser and records video: opening moves legal whatever the bot replies, then a mistake chosen by Stockfish from the actual position (loses ~2 pawns or more; never hard-coded, never by Claude), then the tutor's question, Hint and Show me. Captions fixed text. Not part of the test suite.\nFR-28: demo games carry x-demo-token (server: unset -> ignored; matching -> demo game; wrong -> 403).\nSpoke's local run (no key): opening + mistake worked (Bxc7, best 36, after -670, loss 706), stopped at tutor-unavailable as expected; video at apps/web/demo-output/demo.webm.\nKnown and accepted, do not re-report: Claude steps not run end-to-end (but do trace them in code); the demo is not in CI by design.\nGate on a735981 (coordinator): pnpm test 57 files, 1344 passed; typecheck clean. Spoke: e2e 9 passed.\nRead with git diff / git show <sha>:<path>; you start in a worktree at a735981.",
+  "scope": [],
+  "negative": [
+    "Read-only: do not edit, commit, or run anything that writes to the repo."
+  ],
+  "rubric": [
+    "Each finding cites file:line and evidence; reproduce blocking/major with a scratch test outside the repo.",
+    "Summary ends SHIP or NO-SHIP."
+  ],
+  "concurrency": "None: #63 already merged.",
+  "round": 1
+}
