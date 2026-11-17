@@ -224,6 +224,9 @@ importers:
         specifier: ^19.3.1
         version: 19.3.1(react@19.3.1)
     devDependencies:
+      '@chess-tutor/engine':
+        specifier: workspace:*
+        version: link:../../packages/engine
       '@playwright/test':
         specifier: ^1.65.0
         version: 1.65.0

@@ -13,7 +13,8 @@
     "spike:engine": "pnpm --filter @chess-tutor/engine spike",
     "demo:bot": "pnpm --filter @chess-tutor/chess-core demo:bot",
     "dev": "pnpm --parallel --filter \"./apps/*\" dev",
-    "eval": "pnpm --filter @chess-tutor/evals eval"
+    "eval": "pnpm --filter @chess-tutor/evals eval",
+    "demo": "pnpm --filter @chess-tutor/web demo"
   },
   "devDependencies": {
     "@types/node": "^26.6.6",
