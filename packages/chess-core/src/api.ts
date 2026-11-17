@@ -241,3 +241,51 @@ export type GameEvent =
 export interface ApiError {
   error: string;
 }
+
+/**
+ * GET /ops/daily-stats?date=YYYY-MM-DD (FR-29, #60). A contract with the chess-tutor-dashboard
+ * repo: bump `version` on any breaking change (removed or renamed field, changed meaning).
+ *
+ * - Auth: header `authorization: Bearer <OPS_STATS_TOKEN>` (IR-10). OPS_STATS_TOKEN unset or blank:
+ *   the route is off and answers 404. Missing or wrong token: 401. Compare in constant time.
+ * - `date` is a UTC day; omitted means yesterday (UTC). Malformed or in the future: 400.
+ * - Counts only (NFR-15): no game ids, no PGN/FEN, no chat or tutor text, no log lines.
+ * - Comes from SQLite (IR-7), so it survives restarts and redeploys: games started from the games
+ *   table (created_at, source); everything else from the stored usage ledger (one row per tutor
+ *   ask and per bot failure: when, game source, kind, ok/failure category, ms, token usage, model).
+ */
+export interface DailyStats {
+  version: 1;
+  /** The UTC day counted, YYYY-MM-DD. */
+  date: string;
+  /** ISO timestamp when this answer was computed. */
+  generatedAt: string;
+  /** Real use (games with source "player"). */
+  player: UsageCounts;
+  /** The daily demo's games (source "demo", FR-28), kept apart from real use. */
+  demo: UsageCounts;
+}
+
+export interface UsageCounts {
+  gamesStarted: number;
+  /** Tutor asks (key moments and hints) that ended with a validated reply. */
+  tutorReplies: number;
+  /** Latency of those replies in ms (nearest-rank percentiles); null when there were none. */
+  tutorLatencyMs: { p50: number | null; p95: number | null };
+  /**
+   * Failures by category, zero counts left out. Keys: the tutor failure reasons
+   * ("invalid_reply", "unsupported_claim", "tool_rounds_exceeded", "refusal", "max_tokens",
+   * "rate_limited", "api_unavailable", ...) and "bot_failed" (the bot could not choose a move).
+   */
+  errors: Record<string, number>;
+  /** Summed over every Claude request that day, failed asks included (NFR-5). */
+  claude: {
+    requests: number;
+    inputTokens: number;
+    outputTokens: number;
+    cacheReadInputTokens: number;
+    cacheCreationInputTokens: number;
+    /** Priced from config/models.json pricingPerMTok for the model that served each ask; USD, 4 decimals. */
+    spendUsd: number;
+  };
+}

@@ -180,6 +180,7 @@ The reply is a schema-checked JSON object, so streaming raw tokens to the UI wou
 ### 3.8 Cost control, covering NFR-4, NFR-5 and NFR-9
 
 - `UsageLedger` records `usage` from every response (input, output, cache creation, cache read), along with the model ID and the game ID, and prices it from `config/models.json`.
+- The ledger is stored in SQLite (IR-7), one row per tutor ask and per bot failure, so it survives restarts. `GET /ops/daily-stats` (FR-29, #60) rolls it up per UTC day, player and demo apart; its response shape is `DailyStats` in `packages/chess-core/src/api.ts`, versioned as a contract with the dashboard repo. `BudgetGuard` (#9) reads the same rows.
 - `BudgetGuard` checks the month-to-date total before every tutor call. Once it reaches $25, coaching pauses and games carry on (NFR-9). The Console's $30 limit is the backstop; if the API rejects a call over that limit, the app takes the same path.
 - Errors are caught as typed SDK errors. A 429 pauses coaching for that moment. A 529 or 5xx shows "tutor unavailable." The SDK's default `maxRetries: 2` is the only retry layer.
 

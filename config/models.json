@@ -1,9 +1,26 @@
 {
   "$comment": "Model ID pinned per environment (IR-9). Change only through review, after running evals on the candidate model.",
-  "development": { "tutor": "claude-sonnet-5-5", "chat": "claude-opus-5-5" },
-  "eval": { "tutor": "claude-sonnet-5-5", "chat": "claude-opus-5-5" },
+  "development": {
+    "tutor": "claude-sonnet-5-5",
+    "chat": "claude-opus-5-5"
+  },
+  "eval": {
+    "tutor": "claude-sonnet-5-5",
+    "chat": "claude-opus-5-5"
+  },
   "pricingPerMTok": {
-    "claude-opus-5-5": { "input": 4.0, "output": 20.0, "cacheRead": 0.2 },
-    "claude-sonnet-5-5": { "input": 2.0, "output": 10.0, "cacheRead": 0.2 }
-  }
+    "claude-opus-5-5": {
+      "input": 4.0,
+      "output": 20.0,
+      "cacheRead": 0.2,
+      "cacheWrite": 5.0
+    },
+    "claude-sonnet-5-5": {
+      "input": 2.0,
+      "output": 10.0,
+      "cacheRead": 0.1,
+      "cacheWrite": 2.5
+    }
+  },
+  "$pricingComment": "USD per million tokens, Anthropic first-party rates (2026-11-16). cacheWrite is the 5-minute cache write (1.25x input). Used by the usage ledger (NFR-5, FR-29)."
 }
