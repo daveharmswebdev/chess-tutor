@@ -54,8 +54,14 @@ main {
 }
 
 @media (max-width: 760px) {
+  /* minmax(0, 1fr): the side panels' min-content (the controls row) must not widen the one column
+     past a 320 px screen and make the page scroll sideways (#54). */
   main {
-    grid-template-columns: 1fr;
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .controls {
+    flex-wrap: wrap;
   }
 }
 
@@ -248,10 +254,137 @@ button:disabled {
   font-variant-numeric: tabular-nums;
 }
 
+/* Move list with tutor notes (#54, FR-25). The layout follows the list's own width (a container
+   query), not the viewport: the side panel is only about 260 px wide on a 800-1000 px screen, too
+   narrow for a Tutor column, while a 700 px tablet in one column has room for it. Wide (360 px and
+   up): '#  White  Black  Tutor', each note one line with an ellipsis and '▸ more'. Narrow: no Tutor
+   column; a row with a note gets a ❝ button that opens the full note on its own line under it. */
+.move-list {
+  container-type: inline-size;
+  container-name: moves;
+  min-width: 0;
+}
+
+.moves-head,
 .moves li {
   display: grid;
-  grid-template-columns: 2.5em 1fr 1fr;
+  grid-template-columns: 2.5rem 4.5rem 4.5rem minmax(0, 1fr);
+  column-gap: 4px;
+  align-items: baseline;
+}
+
+.moves-head {
+  color: var(--muted);
+  font-size: 0.85rem;
+  padding-bottom: 2px;
+  border-bottom: 1px solid var(--border);
+  margin-bottom: 2px;
+}
+
+.moves li {
   padding: 2px 0;
+}
+
+.moves .ply {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.move-tutor {
+  grid-column: 4;
+  min-width: 0;
+  font-size: 0.9rem;
+}
+
+.move-note {
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+  min-width: 0;
+}
+
+.move-note + .move-note {
+  margin-top: 2px;
+}
+
+.note-short {
+  flex: 1 1 auto;
+  min-width: 0;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.note-full {
+  display: none;
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow-wrap: anywhere;
+  white-space: pre-line;
+}
+
+.move-note.expanded .note-short {
+  display: none;
+}
+
+.move-note.expanded .note-full {
+  display: block;
+}
+
+.note-more,
+.note-toggle {
+  flex: none;
+  padding: 0 6px;
+  border-radius: 4px;
+  font-size: 0.85rem;
+  line-height: 1.4;
+  white-space: nowrap;
+}
+
+.note-toggle {
+  display: none;
+}
+
+@container moves (max-width: 359px) {
+  .moves-head,
+  .moves li {
+    grid-template-columns: 2.5rem minmax(0, 1fr) minmax(0, 1fr) 2.5rem;
+  }
+
+  .moves-head-tutor {
+    display: none;
+  }
+
+  .note-toggle {
+    display: inline-block;
+    grid-column: 4;
+    justify-self: end;
+    min-width: 2.2rem;
+    font-size: 1rem;
+  }
+
+  .move-tutor {
+    display: none;
+    grid-column: 1 / -1;
+    margin: 4px 0 2px;
+    padding: 6px 8px;
+    border-left: 3px solid var(--accent);
+    background: var(--bg);
+    border-radius: 4px;
+  }
+
+  .move-row.note-open .move-tutor {
+    display: block;
+  }
+
+  .move-tutor .note-short,
+  .move-tutor .note-more {
+    display: none;
+  }
+
+  .move-tutor .note-full {
+    display: block;
+  }
 }
 
 .move-no {
