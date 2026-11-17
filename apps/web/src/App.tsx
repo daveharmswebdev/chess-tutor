@@ -2,6 +2,7 @@
 // and the tutor panel with its board arrows. FR-1, FR-4, IR-5, #23; #7: FR-8, FR-11, FR-12, NFR-9.
 // #47 (NFR-14): the address is the game (/games/<id>); popstate and the first render navigate.
 // #42 (FR-20): 'Bot' / 'You' rows above and below the board, with captured pieces and material.
+// #52 (FR-24): a graded try shows as a short pop-up over the 'Bot' row, not in the tutor panel.
 import type { Color, MoveView } from "@chess-tutor/chess-core";
 import { useEffect, useMemo, useState, useSyncExternalStore, type CSSProperties } from "react";
 import { Chessboard, type ChessboardOptions } from "react-chessboard";
@@ -13,6 +14,7 @@ import { createGameController } from "./controller.ts";
 import { GameActions } from "./GameActions.tsx";
 import { boardFen, gameReducer, initialGameState, isPlayersTurn, statusText } from "./game-state.ts";
 import { createStore } from "./store.ts";
+import { TryToast } from "./TryToast.tsx";
 import { chessboardArrows, TutorPanel } from "./TutorPanel.tsx";
 
 const SELECTED: CSSProperties = { background: "rgba(255, 213, 79, 0.55)" };
@@ -130,6 +132,7 @@ export function App() {
       </header>
       <main>
         <div className="board-column">
+          <TryToast result={state.tryResult} />
           <BoardSide fen={fen} playerColor={playerColor} side="top" />
           <section className="board" data-testid="board" data-locked={myTurn ? "false" : "true"} data-fen={fen}>
             <Chessboard options={options} />

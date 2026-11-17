@@ -4,6 +4,8 @@
 // path from GET /api/games/:id plus a new event stream. A network error, a 5xx or a dropped
 // stream is not "game not found": the state shows "Reconnecting…" and the controller retries
 // with backoff (GET, then a new EventSource). Only a 404 means the game is gone.
+// Try result (#52: FR-24): after a "tutor_attempt" puts up the pop-up, a TRY_RESULT_MS timer closes
+// it; a new graded try restarts the timer, and the player's next move closes it (and the timer) at once.
 import type { Color, GameEvent, GameView } from "@chess-tutor/chess-core";
 import { ApiRequestError, type ApiClient } from "./api.ts";
 import { fenAfter, isOwnPiece, moveToUci } from "./chess-rules.ts";
@@ -32,7 +34,7 @@ export interface GameControllerDeps {
   openEvents: (url: string) => EventSourceLike;
   dispatch: (action: GameAction) => void;
   getState: () => GameState;
-  /** For the reconnect backoff; defaults to the global timers. */
+  /** For the reconnect backoff and the try result's pop-up; defaults to the global timers. */
   timers?: Timers;
   /** history.pushState for a new game's address; defaults to doing nothing. */
   pushPath?: (path: string) => void;
@@ -48,6 +50,8 @@ const defaultTimers: Timers = {
   clearTimeout: (handle) => globalThis.clearTimeout(handle as ReturnType<typeof globalThis.setTimeout>),
 };
 
+/** How long the try result's pop-up stays up (#52, FR-24: "about 5 seconds"). */
+export const TRY_RESULT_MS = 5000;
 const FIRST_RETRY_MS = 500;
 const MAX_RETRY_MS = 10_000;
 
@@ -170,6 +174,23 @@ export function createGameController(deps: GameControllerDeps): GameController {
   /** The generation whose GET (open or reconnect) is in flight, or null. */
   let loadingGeneration: number | null = null;
   let attempt = 0;
+  let tryTimer: unknown = null;
+
+  function cancelTryTimer(): void {
+    if (tryTimer !== null) timers.clearTimeout(tryTimer);
+    tryTimer = null;
+  }
+
+  /** (Re)starts the pop-up's timer for the try result now shown (#52). */
+  function startTryTimer(): void {
+    cancelTryTimer();
+    const seq = getState().tryResult?.seq;
+    if (seq === undefined) return;
+    tryTimer = timers.setTimeout(() => {
+      tryTimer = null;
+      dispatch({ type: "try_result_expired", seq });
+    }, TRY_RESULT_MS);
+  }
 
   function closeSource(): void {
     source?.close();
@@ -185,6 +206,7 @@ export function createGameController(deps: GameControllerDeps): GameController {
   function leave(): void {
     generation++;
     cancelRetry();
+    cancelTryTimer();
     closeSource();
     currentId = null;
     attempt = 0;
@@ -265,7 +287,10 @@ export function createGameController(deps: GameControllerDeps): GameController {
         const event = parseEvent(ev.data);
         if (!event) return;
         attempt = 0; // the stream is live: the next drop starts the backoff again
+        const seqBefore = getState().tryResult?.seq;
         dispatch({ type: "server_event", event });
+        // A new try result (not an ignored attempt) restarts the pop-up's timer.
+        if (event.type === "tutor_attempt" && getState().tryResult?.seq !== seqBefore) startTryTimer();
       });
     }
   }
@@ -283,6 +308,7 @@ export function createGameController(deps: GameControllerDeps): GameController {
     const gen = generation;
     const ply = game.moves.length;
     dispatch({ type: "move_attempted", uci, fen: fenAfter(fen, uci) ?? fen });
+    cancelTryTimer(); // the move closed the try result's pop-up (#52)
     try {
       const reply = await api.playMove(game.id, uci);
       if (gen !== generation) return false; // the player left this game (#47)

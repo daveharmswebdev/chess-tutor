@@ -106,14 +106,16 @@ describe("tutor panel", () => {
     expect(button(out, "tutor-show-me")).toContain("disabled");
   });
 
-  it("shows the attempt result: correct, or not quite with the cp loss", () => {
+  // #52 (FR-24): the graded try shows as a pop-up near the board (TryToast), not in the panel.
+  it("does not show the attempt result: it goes to the pop-up near the board", () => {
     const q = ev({ type: "tutor_reply", question: question() });
     const good = html(at(afterD5(), q, ev({ type: "tutor_attempt", questionId: "q1", move: BF4, correct: true, cpLoss: 0 })));
-    expect(good).toContain('data-testid="tutor-attempt"');
-    expect(good).toContain("Correct: Bf4 is a good move.");
+    expect(good).not.toContain('data-testid="tutor-attempt"');
+    expect(good).not.toContain("correct");
     expect(good).not.toContain("tutor-show-me");
     const bad = html(at(afterD5(), q, ev({ type: "tutor_attempt", questionId: "q1", move: NF3, correct: false, cpLoss: 85 })));
-    expect(bad).toContain("Not quite: Nf3 loses 85 centipawns against the best move.");
+    expect(bad).not.toContain('data-testid="tutor-attempt"');
+    expect(bad).not.toContain("Not quite");
   });
 
   it("shows tutor_failed and a refused-request notice as plain messages", () => {

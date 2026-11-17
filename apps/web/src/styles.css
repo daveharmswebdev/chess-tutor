@@ -65,9 +65,51 @@ main {
 }
 
 .board-column {
+  position: relative;
   display: flex;
   flex-direction: column;
   gap: 4px;
+}
+
+/* The graded try (#52, FR-24): a short pop-up over the 'Bot' row above the board, so it never
+   covers a square, also at phone width. Out of the flow: the board does not move. */
+.try-toast-region {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  z-index: 5;
+  display: flex;
+  justify-content: center;
+  pointer-events: none;
+}
+
+.try-toast {
+  margin: 0;
+  max-width: 100%;
+  min-height: 1.6rem;
+  box-sizing: border-box;
+  padding: 2px 10px;
+  border-radius: 6px;
+  background: var(--panel);
+  border: 1px solid currentColor;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.25);
+  font-weight: 600;
+  text-align: center;
+}
+
+@media (max-width: 420px) {
+  .try-toast {
+    font-size: 0.85rem;
+  }
+}
+
+.try-toast.good {
+  color: var(--accent);
+}
+
+.try-toast.bad {
+  color: var(--error);
 }
 
 .board-side {
@@ -237,15 +279,6 @@ button:disabled {
   white-space: pre-line;
 }
 
-.tutor-attempt {
-  font-weight: 600;
-}
-
-.tutor-attempt.good {
-  color: var(--accent);
-}
-
-.tutor-attempt.bad,
 .tutor p.error {
   color: var(--error);
 }
