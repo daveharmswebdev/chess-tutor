@@ -1,12 +1,13 @@
 import Fastify, { type FastifyInstance, type FastifyServerOptions } from "fastify";
 import type { ServerResponse } from "node:http";
+import { timingSafeEqual } from "node:crypto";
 import fastifyStatic from "@fastify/static";
 import type { ApiError, GameEvent, SparringBot } from "@chess-tutor/chess-core";
 import type { CoachingDeps } from "./coaching.ts";
 import { createGameManager, GameError, type GameManager } from "./games.ts";
 import type { HealthProbe } from "./health.ts";
 import { checkWebDist, isApiPath } from "./static.ts";
-import type { GameStore } from "./store.ts";
+import type { GameSource, GameStore } from "./store.ts";
 
 export type { CoachingDeps } from "./coaching.ts";
 
@@ -28,6 +29,28 @@ export interface ServerDeps {
    * at / with an SPA fallback to index.html for non-/api GETs. Must hold index.html.
    */
   webDist?: string;
+  /**
+   * DEMO_TOKEN (IR-10, FR-28, #64). When set (not blank), POST /api/games with a matching
+   * `x-demo-token` header starts a demo game, and a wrong one is refused with 403. Unset or
+   * blank: the header is ignored and every game is a player game. Never logged or stored.
+   */
+  demoToken?: string;
+}
+
+export const DEMO_TOKEN_HEADER = "x-demo-token";
+
+/**
+ * The source of a new game from its x-demo-token header (FR-28). Returns null for a header that
+ * does not match a configured token. Constant-time comparison; unequal lengths do not match.
+ */
+export function demoSource(configured: string | undefined, header: string | string[] | undefined): GameSource | null {
+  if (configured === undefined || configured.trim() === "") return "player";
+  if (header === undefined) return "player";
+  if (typeof header !== "string") return null;
+  const expected = Buffer.from(configured, "utf8");
+  const given = Buffer.from(header, "utf8");
+  if (given.length !== expected.length) return null;
+  return timingSafeEqual(given, expected) ? "demo" : null;
 }
 
 const DEFAULT_KEEP_ALIVE_MS = 15_000;
@@ -110,7 +133,10 @@ export function buildServer(deps: ServerDeps): { app: FastifyInstance; games: Ga
     if (color !== "w" && color !== "b") {
       throw new GameError(400, 'playerColor must be "w" or "b"');
     }
-    return reply.status(201).send(games.create(color));
+    const source = demoSource(deps.demoToken, request.headers[DEMO_TOKEN_HEADER]);
+    // A wrong token fails loudly (no game, nothing abandoned) rather than count as a player game.
+    if (source === null) return reply.status(403).send(apiError("the demo token is not valid"));
+    return reply.status(201).send(games.create(color, { source }));
   });
 
   app.get<{ Params: { id: string } }>("/api/games/:id", async (request) => {

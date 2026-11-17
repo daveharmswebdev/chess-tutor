@@ -99,6 +99,8 @@ async function main(): Promise<void> {
       coaching: { analyzer, engine, ...tutor, thresholds, attemptToleranceCp, repertoire },
       health: createHealthProbe({ engine, store }),
       ...(webDist ? { webDist } : {}),
+      // IR-10, FR-28: unset or blank turns demo marking off (the header is then ignored).
+      ...(env["DEMO_TOKEN"] ? { demoToken: env["DEMO_TOKEN"] } : {}),
       logger: { level: env["LOG_LEVEL"] || "info" },
     });
     for (const w of warnings) app.log.warn(w);

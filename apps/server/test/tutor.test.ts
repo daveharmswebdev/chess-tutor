@@ -742,3 +742,47 @@ describe("availability (NFR-9)", () => {
     expect((res.body as unknown as GameView).tutor).toMatchObject({ available: false, reason: expect.any(String) });
   });
 });
+
+describe("tutor log lines carry the game's source (FR-28, #64)", () => {
+  function setupLogged(demoToken: string): string[] {
+    const lines: string[] = [];
+    bot = createFakeBot(["e7e5"]);
+    analyzer = createFakeAnalyzer();
+    tutor = createFakeTutor();
+    store = createSqliteGameStore(":memory:");
+    let n = 0;
+    ({ app, games } = buildServer({
+      bot,
+      store,
+      newId: () => `g${++n}`,
+      logger: { level: "info", stream: { write: (line: string) => void lines.push(line) } },
+      demoToken,
+      coaching: { analyzer, tutor },
+    }));
+    return lines;
+  }
+
+  async function hintLine(lines: string[], headers: Record<string, string>, msg: string) {
+    const res = await app.inject({ method: "POST", url: "/api/games", headers, payload: { playerColor: "w" } });
+    expect(res.statusCode, res.body).toBe(201);
+    const id = (res.json() as GameView).id;
+    const events = eventCollector();
+    games.subscribe(id, events.push);
+    expect((await post(`/api/games/${id}/tutor/hint`)).status).toBe(202);
+    await events.next(msg === "tutor reply" ? "tutor_reply" : "tutor_failed");
+    const entries = lines.map((l) => JSON.parse(l) as Record<string, unknown>);
+    return entries.find((e) => e["msg"] === msg && e["gameId"] === id);
+  }
+
+  it("a demo game's tutor reply and a player game's tutor failure", async () => {
+    const lines = setupLogged("tok-123");
+    tutor.auto = () => okOutcome({ kind: "hint" });
+    expect(await hintLine(lines, { "x-demo-token": "tok-123" }, "tutor reply")).toMatchObject({
+      source: "demo",
+      usage: expect.any(Object),
+    });
+    tutor.auto = () => failOutcome("api_unavailable");
+    expect(await hintLine(lines, {}, "tutor failed")).toMatchObject({ source: "player", usage: expect.any(Object) });
+    expect(lines.join("")).not.toContain("tok-123");
+  });
+});

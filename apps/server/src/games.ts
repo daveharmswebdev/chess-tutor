@@ -34,7 +34,7 @@ import {
 import { loadAttemptToleranceCp, loadKeyMomentThresholds } from "./config.ts";
 import { outcomeOf } from "./outcome.ts";
 import { toPgn } from "./pgn.ts";
-import type { GameStore, StoredGame } from "./store.ts";
+import type { GameSource, GameStore, StoredGame } from "./store.ts";
 
 /** An error with the HTTP status the contract gives it (400, 404, 409, 503). */
 export class GameError extends Error {
@@ -68,8 +68,12 @@ export interface GameManagerOptions {
 }
 
 export interface GameManager {
-  /** Abandons (and saves) any game still playing, then starts a new one. */
-  create(playerColor: Color): GameView;
+  /**
+   * Abandons (and saves) any game still playing, then starts a new one. `source` (FR-28, #64)
+   * marks a game started by the demo; it defaults to "player", is saved with the game, and is
+   * never part of the GameView.
+   */
+  create(playerColor: Color, opts?: { source?: GameSource }): GameView;
   /**
    * Any game ever created: from memory, or rebuilt from the store (finished, abandoned).
    * Undefined only when the store has no such game; a store read error is thrown (a 500).
@@ -102,6 +106,8 @@ export interface GameManager {
 interface Game {
   id: string;
   playerColor: Color;
+  /** Who started the game (FR-28): fixed at creation, kept across restarts. */
+  source: GameSource;
   chess: Chess;
   moves: MoveView[];
   /** Parallel to moves: a unique id per played move, so a detection for a taken-back move is dropped. */
@@ -474,10 +480,11 @@ export function createGameManager(opts: GameManagerOptions): GameManager {
     return g;
   }
 
-  function newGameRecord(id: string, playerColor: Color, createdAt: Date): Game {
+  function newGameRecord(id: string, playerColor: Color, createdAt: Date, source: GameSource): Game {
     return {
       id,
       playerColor,
+      source,
       chess: new Chess(),
       moves: [],
       moveIds: [],
@@ -514,7 +521,7 @@ export function createGameManager(opts: GameManagerOptions): GameManager {
    */
   function hydrate(row: StoredGame): { game: Game; ask: LiveState["tutor"]["ask"] } {
     const createdAt = new Date(row.createdAt);
-    const g = newGameRecord(row.id, row.playerColor, Number.isNaN(createdAt.getTime()) ? now() : createdAt);
+    const g = newGameRecord(row.id, row.playerColor, Number.isNaN(createdAt.getTime()) ? now() : createdAt, row.source);
     const state = parseLiveState(row);
     let moves: LiveState["moves"];
     try {
@@ -623,6 +630,7 @@ export function createGameManager(opts: GameManagerOptions): GameManager {
         pgn: toPgn(viewOf(g), g.createdAt),
         createdAt: g.createdAt.toISOString(),
         state: JSON.stringify(liveStateOf(g)),
+        source: g.source,
       };
       const key = JSON.stringify(row);
       if (key === g.lastSaved) return;
@@ -1019,7 +1027,8 @@ export function createGameManager(opts: GameManagerOptions): GameManager {
   }
 
   function finishAsk(g: Game, token: number, kind: TutorKind, attemptFen: string, outcome: TutorOutcome): void {
-    const meta = { gameId: g.id, kind, ok: outcome.ok, ms: outcome.ms, usage: outcome.usage };
+    // source (FR-28, #64): lets usage reporting (#60) split demo spend from real use.
+    const meta = { gameId: g.id, source: g.source, kind, ok: outcome.ok, ms: outcome.ms, usage: outcome.usage };
     if (g.ask?.token !== token) {
       log.info(meta, "tutor reply dropped: the question was replaced");
       return;
@@ -1184,14 +1193,15 @@ export function createGameManager(opts: GameManagerOptions): GameManager {
   }
 
   return {
-    create(playerColor) {
-      const g = newGameRecord(newId(), playerColor, now());
+    create(playerColor, opts = {}) {
+      const source = opts.source ?? "player";
+      const g = newGameRecord(newId(), playerColor, now(), source);
       // In the store before anything else changes (#47). If that fails, nothing has: the
       // reply is 500 and the old game stays playing, with no event (reviews 065, 068).
       save(g, { required: true });
       for (const other of games.values()) if (other.status === "playing") abandon(other);
       games.set(g.id, g);
-      log.info({ gameId: g.id, playerColor }, "new game");
+      log.info({ gameId: g.id, playerColor, source }, "new game");
       if (playerColor === "b") {
         startBot(g);
         save(g); // botThinking (informational: on load the bot is asked whenever it is its turn)
