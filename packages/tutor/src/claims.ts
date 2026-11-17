@@ -236,7 +236,7 @@ export function nowFramed(text: string, start: number, end: number): boolean {
   return NOW_WORD.test(text.slice(from, next ? next.index : text.length));
 }
 
-const SIDE_WORD ="white|black|your opponent|the opponent|opponent|you";
+const SIDE_WORD = "white|black|your opponent|the opponent|opponent|you";
 
 /** The text of the clause that ends at `index`: after the last sentence break (". ", "; ", "! ", "? ", newline). */
 function clauseBefore(text: string, index: number): string {
