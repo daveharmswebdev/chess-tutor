@@ -29,6 +29,9 @@ The user does not read code; this description is what they read. Keep the part o
 `<details>` short and plain:
 
 ```markdown
+## Client note
+<one plain sentence for a non-technical client: what they can now see or do, or what now works better; no IDs, no jargon>
+
 ## What changed
 <2-5 plain-language bullets: what you can now see or do, or what now works underneath>
 
@@ -51,7 +54,7 @@ contract_gaps / brief_defects: none | <list>
 Closes #<n>
 ```
 
-Requirement IDs go in **What changed**. End the description with the PR attribution line
+Requirement IDs go in **What changed**, never in **Client note**: the client dashboard prints that sentence word for word, and the `Client note` CI check (NFR-16) fails a PR without one. End the description with the PR attribution line
 from your session instructions.
 
 ## 3. Merge (CI must be green)

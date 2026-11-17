@@ -1,0 +1,27 @@
+name: Client note
+
+# NFR-16: every PR carries one plain sentence for the client, printed word for word
+# on the client dashboard (#57). Re-runs when the description is edited.
+on:
+  pull_request:
+    types: [opened, edited, synchronize, reopened]
+
+jobs:
+  client-note:
+    name: PR has a client note
+    runs-on: ubuntu-latest
+    timeout-minutes: 2
+    steps:
+      - name: Check the "## Client note" section
+        env:
+          BODY: ${{ github.event.pull_request.body }}
+        run: |
+          note=$(printf '%s\n' "$BODY" | tr -d '\r' \
+            | awk '/^## Client note[[:space:]]*$/ {f=1; next} /^## / {f=0} f' \
+            | sed -e 's/<!--.*-->//g' \
+            | grep -v '^[[:space:]]*$' || true)
+          if [ -z "$note" ]; then
+            echo "::error::Add one plain sentence under '## Client note' in the PR description (NFR-16)."
+            exit 1
+          fi
+          echo "Client note: $note"
