@@ -11,7 +11,9 @@
 // short pop-up near the board, `tryResult`. It comes only from live events (never from a GameView,
 // so opening or reloading a game shows none), names the best move only from the server's
 // "tutor_reveal" for the same question, and closes at the player's next move (move_attempted) or
-// when the controller's timer dispatches try_result_expired with its seq.
+// when the controller's timer dispatches try_result_expired with its seq. Only the grade of the
+// player's latest move opens it (`tryMove`): the server grades after the bot's reply, so a grade that
+// arrives after the player's next move is stale and opens nothing (review 086); its question still closes.
 // Panel follows the board (#51: FR-24, FR-8): the player's move (move_attempted) clears the panel
 // at once, keeping only the tutor's progress. The question it left is never shown again (late
 // tutor_attempt / tutor_reveal, or a later GameView still carrying it as shown); the panel shows a
@@ -91,6 +93,11 @@ export interface GameState {
   tryResult: TryResult | null;
   /** seq of the latest try result, kept after it closes. */
   trySeq: number;
+  /**
+   * The player's latest move and the question it left, if any: the only try whose grade may open the
+   * pop-up (#52). Set by every move_attempted, so a later move makes an earlier try's grade stale.
+   */
+  tryMove: { questionId: string; uci: string } | null;
   /** The latest "tutor_reveal" answer move, for a try graded after its reveal arrived. */
   lastRevealMove: { questionId: string; move: MoveView | null } | null;
 }
@@ -148,6 +155,7 @@ export const initialGameState: GameState = {
   tutorBeforeMove: null,
   tryResult: null,
   trySeq: 0,
+  tryMove: null,
   lastRevealMove: null,
 };
 
@@ -267,6 +275,16 @@ function patchTutor(game: GameView, patch: Partial<TutorStatus>): GameView {
   return { ...game, tutor: { ...(game.tutor ?? NO_TUTOR), ...patch } };
 }
 
+/**
+ * The question the player's move `uci` is a try at: the one on the panel, or one the server holds that
+ * an earlier move did not already leave (#51); a question left before is never tried again.
+ */
+function triedQuestion(state: GameState, uci: string): GameState["tryMove"] {
+  const held = state.game?.tutor?.question?.id ?? null;
+  const id = state.tutor.question?.id ?? (held !== state.tutor.left ? held : null);
+  return id === null ? null : { questionId: id, uci };
+}
+
 /** A wrong try's pop-up with the reveal's move for the same question as its best move (#52, FR-10). */
 function bestFromReveal(r: TryResult | null, questionId: string, move: MoveView | null): TryResult | null {
   if (!r || r.correct || r.questionId !== questionId || r.best?.uci === move?.uci) return r;
@@ -325,11 +343,18 @@ function tutorEvent(state: GameState, game: GameView, event: TutorEvent): GameSt
       const known = t.question?.id === questionId || t.left === questionId || game.tutor?.question?.id === questionId;
       if (!known) return state;
       const closed = game.tutor?.question?.id === questionId ? patchTutor(game, { question: null }) : game;
+      // Only the grade of the player's latest move opens the pop-up (review 086, FR-24): one that
+      // arrives after the next move is stale. The question still closes as before.
+      const latest = state.tryMove?.questionId === questionId && state.tryMove.uci === move.uci;
+      if (!latest) {
+        const tutor = t.question?.id === questionId ? { ...t, open: false, notice: null } : t;
+        return closed === game && tutor === t ? state : { ...live, game: closed, tutor };
+      }
       const seq = state.trySeq + 1;
       const fresh: TryResult = { questionId, move, correct, cpLoss, best: null, seq };
       const r = state.lastRevealMove;
       const tryResult = r ? bestFromReveal(fresh, r.questionId, r.move) : fresh;
-      const base = { ...live, game: closed, tryResult, trySeq: seq };
+      const base = { ...live, game: closed, tryResult, trySeq: seq, tryMove: null };
       // The result is the pop-up's, never the panel's (#52, FR-24); the panel's question just closes.
       if (!t.question || t.question.id !== questionId) return base;
       return { ...base, tutor: { ...t, open: false, notice: null } };
@@ -358,8 +383,9 @@ export function gameReducer(state: GameState, action: GameAction): GameState {
         // FR-24: whatever the panel showed leaves it with the position (#51).
         tutor: leavePanel(state),
         tutorBeforeMove: state.tutor,
-        // The next move closes the try result's pop-up at once (#52).
+        // The next move closes the try result's pop-up at once (#52), and only its own grade may open one.
         tryResult: null,
+        tryMove: triedQuestion(state, action.uci),
       };
 
     case "move_accepted": {

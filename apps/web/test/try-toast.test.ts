@@ -75,6 +75,10 @@ describe("try result pop-up: reducer and render (#52)", () => {
     expect(out).toContain("Bf4, correct. The best move");
     expect(out).toContain('role="status"');
     expect(out).toContain('aria-live="polite"');
+    // The markup e2e/try-toast-layout.spec.ts measures, with the full text also in the title.
+    expect(out).toContain('<div class="try-toast-region" role="status" aria-live="polite"><p class="try-toast good"');
+    expect(out).toContain('title="Bf4, correct. The best move"');
+    expect(out).toContain('<span class="try-toast-mark" aria-hidden="true">✓</span>');
     const p = panel(s);
     expect(p).not.toContain("tutor-attempt");
     expect(p).not.toContain("Bf4, correct");
@@ -134,11 +138,56 @@ describe("try result pop-up: reducer and render (#52)", () => {
     expect(run(s, { type: "try_result_expired", seq: s.tryResult!.seq }).tryResult).toBeNull();
   });
 
-  it("a second try replaces the first with a new seq", () => {
+  it("a second try (another question, after a takeback) replaces the first with a new seq", () => {
     const first = run(started(), tryBf4, acceptedBf4, goodBf4(0));
-    const second = run(first, ev({ type: "tutor_attempt", questionId: "q1", move: NF3, correct: false, cpLoss: 85 }));
+    const back = run(first, ev({ type: "state", game: afterD5({ tutor: tutorStatus({ question: question({ id: "q2" }) }) }) }));
+    const second = run(back, tryNf3, acceptedNf3, ev({ type: "tutor_attempt", questionId: "q2", move: NF3, correct: false, cpLoss: 85 }));
     expect(tryResultText(second.tryResult!)).toBe("Nf3, not quite.");
     expect(second.tryResult!.seq).not.toBe(first.tryResult!.seq);
+  });
+
+  // Review 086 MAJOR 1 (FR-24): the server grades after the bot's reply and two analyses, so the
+  // player's next move can come first. The pop-up closes at that move; a grade arriving later is stale.
+  describe("a grade that arrives after the player's next move (slow path)", () => {
+    const AFTER_E6_FEN = "rnbqkbnr/ppp2ppp/4p3/3p4/3P4/5N2/PPP1PPPP/RNBQKB1R w KQkq - 0 3";
+    const AFTER_E6_BF4_FEN = "rnbqkbnr/ppp2ppp/4p3/3p4/3P1B2/5N2/PPP1PPPP/RN1QKB1R b KQkq - 1 3";
+    const E6 = { uci: "e7e6", san: "e6", by: "bot" } as const;
+    const nextBf4: GameAction = { type: "move_attempted", uci: "c1f4", fen: AFTER_E6_BF4_FEN };
+    const botE6 = (stillOpen: boolean) =>
+      ev({
+        type: "bot_move",
+        move: E6,
+        game: view({
+          fen: AFTER_E6_FEN,
+          moves: [D4, D5, NF3, E6],
+          // The server may still hold q1 while the grading is in flight.
+          tutor: tutorStatus({ question: stillOpen ? question() : null }),
+        }),
+      });
+
+    for (const stillOpen of [true, false]) {
+      it(`the reviewer's repro gives no pop-up (server still holds q1: ${stillOpen})`, () => {
+        const s = run(started(), tryNf3, acceptedNf3, botE6(stillOpen), nextBf4, badNf3, revealBf4);
+        expect(s.tryResult).toBeNull();
+        expect(toast(s)).not.toContain('data-testid="try-toast"');
+        // The question still closes as before.
+        expect(s.game?.tutor.question).toBeNull();
+        expect(panel(s)).not.toContain("not quite");
+      });
+
+      it(`a late tutor_reveal after the next move opens nothing, before or after the grade (still holds q1: ${stillOpen})`, () => {
+        const revealOnly = run(started(), tryNf3, acceptedNf3, botE6(stillOpen), nextBf4, revealBf4);
+        expect(revealOnly.tryResult).toBeNull();
+        expect(panel(revealOnly)).not.toContain('data-testid="tutor-reveal"');
+        const revealFirst = run(started(), tryNf3, acceptedNf3, botE6(stillOpen), nextBf4, revealBf4, badNf3);
+        expect(revealFirst.tryResult).toBeNull();
+      });
+    }
+
+    it("a grade overtaken only by the next move's request (not yet accepted) gives no pop-up either", () => {
+      const s = run(started(), tryNf3, acceptedNf3, botE6(true), nextBf4, goodBf4(0));
+      expect(s.tryResult).toBeNull();
+    });
   });
 
   it("opening or reloading a game shows no pop-up, even when its notes hold a graded try", () => {
@@ -271,14 +320,32 @@ describe("try result pop-up: timing in the controller (#52)", () => {
     await h.controller.newGame("w");
     await h.controller.play("c1", "f4");
     h.es().emit({ type: "tutor_attempt", questionId: "q1", move: BF4, correct: true, cpLoss: 0 });
-    h.timers.advance(3000);
-    h.es().emit({ type: "tutor_attempt", questionId: "q1", move: NF3, correct: false, cpLoss: 85 });
+    h.timers.advance(2000);
+    // A takeback-like state brings question q2 on the same position; the player tries Nf3.
+    h.es().emit({ type: "state", game: afterD5({ tutor: tutorStatus({ question: question({ id: "q2" }) }) }) });
+    await h.controller.play("g1", "f3");
+    h.timers.advance(1000);
+    h.es().emit({ type: "tutor_attempt", questionId: "q2", move: NF3, correct: false, cpLoss: 85 });
     expect(tryResultText(h.state().tryResult!)).toBe("Nf3, not quite.");
     h.timers.advance(3000); // 6 s after the first, 3 s after the second
     expect(h.state().tryResult).not.toBeNull();
     expect(h.timers.pending.size).toBe(1);
     h.timers.advance(2000);
     expect(h.state().tryResult).toBeNull();
+  });
+
+  it("a grade that arrives after the player's next move starts no timer (review 086)", async () => {
+    const AFTER_E6_FEN = "rnbqkbnr/ppp2ppp/4p3/3p4/3P4/5N2/PPP1PPPP/RNBQKB1R w KQkq - 0 3";
+    const E6 = { uci: "e7e6", san: "e6", by: "bot" } as const;
+    const h = harness();
+    await h.controller.newGame("w");
+    await h.controller.play("g1", "f3");
+    h.es().emit({ type: "bot_move", move: E6, game: view({ fen: AFTER_E6_FEN, moves: [D4, D5, NF3, E6], tutor: tutorStatus({ question: question() }) }) });
+    await h.controller.play("c1", "f4");
+    h.es().emit({ type: "tutor_attempt", questionId: "q1", move: NF3, correct: false, cpLoss: 85 });
+    h.es().emit({ type: "tutor_reveal", reveal: reveal() });
+    expect(h.state().tryResult).toBeNull();
+    expect(h.timers.pending.size).toBe(0);
   });
 
   it("a reveal after the try keeps the timer running from the try", async () => {

@@ -117,7 +117,7 @@ describe("tutor state: Show me", () => {
 });
 
 describe("tutor state: trying again", () => {
-  it("tutor_attempt (correct) closes the question, gives the pop-up the result and clears the arrows", () => {
+  it("tutor_attempt (correct) closes the question and clears the arrows", () => {
     const s = run(
       started(),
       ev({ type: "tutor_reply", question: question() }),
@@ -125,8 +125,8 @@ describe("tutor state: trying again", () => {
     );
     expect(s.tutor.open).toBe(false);
     expect(tutorStatusOf(s).question).toBeNull();
-    expect(s.tryResult).toMatchObject({ questionId: "q1", move: BF4, correct: true, cpLoss: 5, best: null });
-    expect(tryResultText(s.tryResult!)).toBe("Bf4, correct. Only 0.1 off the best move");
+    // No move was attempted on this page: the pop-up shows only the grade of the player's latest move (#52, try-toast.test.ts).
+    expect(s.tryResult).toBeNull();
     expect(tutorArrows(s)).toEqual([]);
     expect(canReveal(s)).toBe(false);
   });
@@ -138,7 +138,8 @@ describe("tutor state: trying again", () => {
       ev({ type: "tutor_attempt", questionId: "q1", move: NF3, correct: false, cpLoss: 85 }),
       ev({ type: "tutor_reveal", reveal: reveal() }),
     );
-    expect(tryResultText(s.tryResult!)).toBe("Nf3, not quite. Best was Bf4");
+    // No move was attempted on this page: the pop-up shows only the grade of the player's latest move (#52, try-toast.test.ts).
+    expect(s.tryResult).toBeNull();
     expect(s.tutor.reveal?.text).toBe(reveal().text);
     expect(tutorArrows(s)).toEqual([]);
   });
@@ -160,8 +161,8 @@ describe("tutor state: trying again", () => {
       ev({ type: "state", game: moved }),
       ev({ type: "tutor_attempt", questionId: "q1", move: BF4, correct: true, cpLoss: 0 }),
     );
-    // The result goes to the pop-up near the board (#52), not the panel.
-    expect(tryResultText(s.tryResult!)).toBe("Bf4, correct. The best move");
+    // The result never goes to the panel; with no move attempted here it opens no pop-up either (#52).
+    expect(s.tryResult).toBeNull();
     expect(s.tutor.question).toBeNull();
     expect(s.tutor.open).toBe(false);
     expect(tutorStatusOf(s).question).toBeNull();
@@ -315,8 +316,9 @@ describe("tutor state: the panel clears on the player's move (#51)", () => {
     expect(s.tutor.reveal).not.toBeNull();
     empty(run(s, tryBf4));
 
-    s = run(started(), ev({ type: "tutor_reply", question: question() }), ev({ type: "tutor_attempt", questionId: "q1", move: NF3, correct: false, cpLoss: 85 }));
+    s = run(started(), ev({ type: "tutor_reply", question: question() }), tryBf4, attemptQ1);
     expect(s.tryResult).not.toBeNull();
+    expect(tryResultText(s.tryResult!)).toBe("Bf4, not quite.");
     empty(run(s, tryBf4));
 
     s = run(started(), ev({ type: "tutor_thinking", kind: "hint" }), ev({ type: "tutor_failed", message: "The tutor could not answer." }));

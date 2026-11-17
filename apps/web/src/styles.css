@@ -72,7 +72,9 @@ main {
 }
 
 /* The graded try (#52, FR-24): a short pop-up over the 'Bot' row above the board, so it never
-   covers a square, also at phone width. Out of the flow: the board does not move. */
+   covers a square, also at phone width (review 086). Out of the flow: the board does not move.
+   One line, never taller than the 'Bot' row (min-height 1.6rem): a line too long for the width
+   ends in an ellipsis on screen, while the full text stays in the live region for screen readers. */
 .try-toast-region {
   position: absolute;
   top: 0;
@@ -87,20 +89,25 @@ main {
 .try-toast {
   margin: 0;
   max-width: 100%;
-  min-height: 1.6rem;
+  height: 1.6rem;
   box-sizing: border-box;
-  padding: 2px 10px;
+  padding: 0 10px;
   border-radius: 6px;
   background: var(--panel);
   border: 1px solid currentColor;
   box-shadow: 0 2px 6px rgba(0, 0, 0, 0.25);
   font-weight: 600;
-  text-align: center;
+  line-height: calc(1.6rem - 2px);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 @media (max-width: 420px) {
   .try-toast {
-    font-size: 0.85rem;
+    padding: 0 6px;
+    font-size: 0.8rem;
+    letter-spacing: -0.01em;
   }
 }
 
