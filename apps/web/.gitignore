@@ -1,2 +1,4 @@
+# Playwright output (e2e and the guided demo, #59) and the demo video copy.
 test-results/
 playwright-report/
+demo-output/
