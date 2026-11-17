@@ -17,3 +17,9 @@ The client dashboard (Epic #57) shows open incidents and those closed in the las
 - Facts only. Say what is not known yet rather than guessing.
 - No blame, and no user data (no PGN, no chat text, nothing a player typed).
 - Times with a time zone.
+
+## Rolling back a deploy
+
+Redeploying an older commit is the fastest fix, with one trap: the game database refuses to open if its schema version is newer than the code knows (`apps/server/src/store.ts`, the `SCHEMA_VERSION` guard). So rolling back past a commit that raised `SCHEMA_VERSION` fails at startup.
+
+So far every schema change has only added a column with a default, so older code can read and write the newer table. To roll back past one, set the version back on the Render disk before starting the older commit, for example `sqlite3 <DB_PATH> 'PRAGMA user_version = 2'` to go back past v3 (#64). Note it under *What we did*. A change that is not purely additive needs its own rollback plan, written in its PR.
