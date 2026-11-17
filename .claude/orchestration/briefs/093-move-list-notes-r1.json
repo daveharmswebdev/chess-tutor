@@ -1,0 +1,40 @@
+{
+  "brief_id": "093-move-list-notes-r1",
+  "agent": "web-agent",
+  "issue": 54,
+  "base_sha": "c83a98c",
+  "scratch_dir": "/private/tmp/claude-501/-Users-daveharms-personal-workspace-chess-tutor/fd4461e5-e778-4c30-94e6-073f2f740535/scratchpad/093-move-list-notes-r1",
+  "objective": "Show the tutor's notes (GameView.notes, TutorNote[], already sent by the server since #53) in the move list in apps/web. Wide screens: a third 'Tutor' column; each note shortened to one line with a '▸ more' control that expands the full note in place (and collapses it). Narrow screens (the existing @media (max-width: 760px) breakpoint or a better one you justify): no third column; a move that carries a note gets a quote button (❝, accessible name e.g. 'Tutor note for move 5. O-O') that opens the full note directly under that move row; tapping again closes it. Notes come back after a refresh because they are part of GameView (NFR-14): verify that, don't build storage. Success: unit tests for the note-to-row mapping and the note text, component tests for both layouts, and a Playwright e2e that shows a note in the move list after reload.",
+  "requirements": [
+    "FR-25",
+    "NFR-14",
+    "FR-10",
+    "FR-8"
+  ],
+  "contract": "Issue #54 done-when (approved by the owner):\n- Wide screens: a third \"Tutor\" column, notes shortened with \"▸ more\" that opens the full note (FR-25)\n- Narrow screens: a ❝ button on moves with a note, which opens the note under that move (FR-25)\n- Notes come back after a refresh (NFR-14)\n- Tests pass in CI, including an E2E check that a note appears after moving on\nOwner decision 2026-11-15: phone option (a), inline under the move. Jumping the board to the note's position is NOT in this issue.\nMockup from the issue:\n  #   White     Black     Tutor\n  2.  Bf4       g6        Black left your book. What does ...g6 change?\n  5.  Be2       O-O       Be2 lets ...Nh5 hit your bishop. Best was h3  ▸ more\n\nFR-25: \"Tutor text that leaves the panel is kept as a note on the move it was about: the question, the answer if shown, the attempt result, and, once the player has moved on, the engine's best move ('best was …', from Stockfish, checked legal; FR-10), even if the player never asked for it. Notes appear only on moves the tutor stopped on (key moments and hints), not on every move. ... On a wide screen the move list shows them in a third column, shortened with a 'more' control; on a narrow screen a move with a note gets a quote button that opens the note under that move.\"\n\nData (see api.ts inline below: TutorNote, GameView.notes, the 'Tutor notes' block comment): a note sits on moves[note.ply] (ply === moves.length means after the last move). A row is a full move (white ply 2k, black ply 2k+1), so a row shows the notes of both its plies; more than one note can sit on the same ply or row: show all, in GameView order. Full note content: message; then reveal if not null; then the attempt if not null (e.g. 'You tried Nf3: correct' or 'You tried Nf3: about 1.2 pawns worse', cpLoss/100 rounded to 0.1, reuse or follow the try wording helper at apps/web/src/game-state.ts:621-631 (e.g. \"Nf3, correct. Only 0.4 off the best move\"); for a wrong try say it lost about N pawns); then 'Best was <bestMove.san>' when bestMove is not null and differs from the try. Every move name and number shown comes from the note's fields (FR-10): never parse moves out of text, never compute an evaluation. The shortened line is the message, truncated with CSS (text-overflow) or a pure function; '▸ more' appears only when there is more than fits or more than the message.\n\nWhere things are at c83a98c: MoveList is in apps/web/src/App.tsx:29 (ol.moves, data-testid=move-list, cells data-testid=move-item with data-ply / data-by); styles in apps/web/src/styles.css (.moves at :242, breakpoints @media (max-width: 760px) :56 and (max-width: 420px) :106). The state's GameView is state.game (game-state.ts:68), updated from 'state' / HTTP replies / bot_move / game_over; notes arrive only inside GameView. Keep existing test IDs working (e2e and the demo use move-item, move-list). Add test IDs: move-note (one per note, data-ply), move-note-more, move-note-toggle (the ❝ button).\n\nE2E: the e2e server runs with ANTHROPIC_API_KEY \"\" (apps/web/playwright.config.ts:26), so no real tutor note can be produced end to end (#75 tracks a fake tutor; out of scope). For the e2e, stub the API with page.route: serve a GameView fixture that has moves and notes on GET /api/games/<id> and the events stream (check how controller.ts / api.ts load a game and open the SSE stream; a fulfilled text/event-stream body with one 'state' event works), then check the note in the wide layout, reload and check it again (NFR-14 at the client boundary), and check the ❝ toggle at a 375 px viewport. Name it e.g. apps/web/e2e/move-notes.spec.ts. Say in the return that the real move-on flow is covered by server tests (#53) and unit tests here, not e2e.\n\nGate at base c83a98c (run by the coordinator): pnpm test -> Test Files 58 passed, Tests 1354 passed (1354); pnpm typecheck clean.",
+  "contract_files": [
+    "packages/chess-core/src/api.ts"
+  ],
+  "scope": [
+    "apps/web/**"
+  ],
+  "negative": [
+    "Do not edit files outside scope, docs, config, .github, root files or the lockfile.",
+    "No new dependencies.",
+    "Do not change apps/server, packages/*, the shared API types (api.ts) or the server contract; if the contract lacks something you need, report it in contract_gaps.",
+    "No board jump to the note's position (a later feature).",
+    "No move, evaluation or best move from anywhere except the note's own fields (FR-10).",
+    "Do not change TryToast behaviour or the tutor panel flow."
+  ],
+  "rubric": [
+    "Tests first (red then green): pure mapping of notes to rows (white ply, black ply, ply === moves.length after the last move, two notes on one ply, a takeback that shortens moves and the notes with it).",
+    "Tests for the full note text: message only; message + reveal; correct try; wrong try with cpLoss; best move shown only when not null and not equal to the try; no text invented when fields are null.",
+    "Component tests (the existing web test setup) for the wide layout (Tutor column, '▸ more' expands and collapses) and the narrow layout (❝ only on moves with a note, opens under its row, second tap closes, aria-expanded set).",
+    "e2e apps/web/e2e/*.spec.ts with a page.route stub: note visible, survives reload, ❝ works at 375 px. `pnpm --filter @chess-tutor/web test:e2e` (or the project's e2e command) passes, existing specs included.",
+    "No horizontal scroll at 320 px and 375 px with a long note (e2e or a layout check).",
+    "pnpm test and pnpm typecheck clean from the repo root.",
+    "files_changed lists every file changed in c83a98c..your head. Commit message references FR-25, NFR-14 and #54."
+  ],
+  "concurrency": "#41 runs at the same time in another worktree (tutor-agent: prompts/, packages/tutor/, evals/). No file overlap. The coordinator may also commit a contract type for #44 to packages/chess-core/src (not api.ts's GameView/TutorNote). Don't rebase; the coordinator does that at ship.",
+  "round": 1
+}

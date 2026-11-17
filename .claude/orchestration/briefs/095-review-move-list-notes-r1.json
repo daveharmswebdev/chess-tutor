@@ -1,0 +1,25 @@
+{
+  "brief_id": "095-review-move-list-notes-r1",
+  "agent": "reviewer",
+  "issue": 54,
+  "base_sha": "643e207",
+  "scratch_dir": "/private/tmp/claude-501/-Users-daveharms-personal-workspace-chess-tutor/fd4461e5-e778-4c30-94e6-073f2f740535/scratchpad/095-review-move-list-notes-r1",
+  "objective": "Review #54 round 1: `git diff 7d13541..643e207` (web-agent: tutor notes in the move list, apps/web only) against FR-25, NFR-14, FR-10 and the issue's done-when. Focus: (1) note-to-row mapping in apps/web/src/move-notes.ts matches TutorNote.ply semantics in packages/chess-core/src/api.ts (note on moves[ply], ply === moves.length after the last move, takebacks shrink notes); (2) note text uses only the note's fields (no move or evaluation invented, FR-10), try wording consistent with game-state.ts:621; (3) wide layout ('Tutor' column, '▸ more' expand/collapse) and narrow layout (❝ under the row, toggles, aria-expanded/controls) both actually work in a browser, including the container-query breakpoint (narrow below 360 px list width) at common viewport widths 320, 375, 768, 1024, 1440; (4) the styles.css change for the 320 px horizontal scroll (main track minmax(0,1fr), wrapping .controls) doesn't break other layouts or the TryToast spec; (5) the e2e stub (page.route GameView + one SSE state) really tests reload; (6) no regressions to move-item/move-list test IDs used by e2e and apps/web/demo.",
+  "requirements": [
+    "FR-25",
+    "NFR-14",
+    "FR-10"
+  ],
+  "contract": "Issue #54 done-when: wide screens a third 'Tutor' column, notes shortened with '▸ more' that opens the full note; narrow screens a ❝ button on moves with a note, opening it under that move; notes come back after refresh; tests pass in CI including an E2E check. Owner decision: phone option inline under the move; no board jump.\nSpoke design choices to judge: container query on the list's width instead of the 760 px media query (spoke: at 800-1000 px viewports the side panel is ~260 px, too narrow for a column); both layouts in markup, CSS picks; the stubbed e2e page shows 'Reconnecting…' because the stub stream closes.\nKnown and accepted, do not re-report: no real tutor-produced note in e2e (no Claude key; #75 tracks a fake tutor).\nCoordinator's gate at 643e207: pnpm test 60 files, 1383 passed; typecheck clean; CI=1 pnpm --filter @chess-tutor/web test:e2e 12 passed.",
+  "scope": [],
+  "negative": [
+    "Read-only: do not edit, commit, or run anything that writes to the repo.",
+    "Do not run the live eval or anything that calls the Claude API."
+  ],
+  "rubric": [
+    "Each finding cites file:line and evidence; reproduce blocking/major with a scratch test outside the repo (in your scratch dir).",
+    "Severities: blocking / major / minor. Summary ends SHIP or NO-SHIP."
+  ],
+  "concurrency": "Another reviewer checks the other pick of this cycle in parallel. Read with git diff / git show; don't touch other worktrees.",
+  "round": 1
+}

@@ -1,0 +1,38 @@
+{
+  "brief_id": "094-plan-after-book-r1",
+  "agent": "tutor-agent",
+  "issue": 41,
+  "base_sha": "c83a98c",
+  "scratch_dir": "/private/tmp/claude-501/-Users-daveharms-personal-workspace-chess-tutor/fd4461e5-e778-4c30-94e6-073f2f740535/scratchpad/094-plan-after-book-r1",
+  "objective": "Stop the tutor's opponent_left_book replies from failing the claims check (unsupported_claim) by naming plan moves it was not given. Either give it the plan as tool evidence (for example get_repertoire_context returning, when the game has left book, the repertoire's own next moves from the last in-book position and/or a short engine line, each registered with ctx.evidence so the claims check accepts them), or change the prompt so the plan is worded without naming moves that are not in this turn's tool results (pawn structure, piece placement, 'aim for a pawn break in the centre'), or both. Your call, justified in the return. The claims check (packages/tutor/src/claims.ts) is right and must not be loosened. Success: unit tests for any tool change; the eval cases lb-kid-nf3-move2 and lb-kid-e4 have a deterministic or recorded check that the reply is not rejected; a prompt change ships as a new version file with a CHANGELOG entry; and the live eval is ready for the coordinator to run.",
+  "requirements": [
+    "FR-10",
+    "FR-8",
+    "FR-9",
+    "NFR-10"
+  ],
+  "contract": "Issue #41: When the opponent leaves the opening book, the tutor sometimes explains the usual plan (\"...d6 and ...e5\", \"develop the knight to f6\"). Those moves aren't in what Stockfish or the opening explorer gave it for this turn, so its own claims check correctly throws the answer out (FR-10). The player gets \"the tutor couldn't answer\" instead of a hint.\nEvidence: eval reports lb-kid-e4 in PR #35's run (GitHub Actions run 42864019702) and lb-kid-nf3-move2 in PR #40's gated run (43716378888), both FAIL unsupported_claim. Corrections: lb-kid-nf3-move2: \"reveal mentions d6, which does not appear in this turn's tool results or the key-moment data. reveal mentions e5 ...\"; lb-kid-e4: \"reveal mentions knight to f6 ... e5 ... c5\".\nDone when (owner-approved):\n- Plan advice after the opponent leaves book is either backed by a tool result (e.g. the repertoire's next moves or an engine line), or worded without naming moves the tutor wasn't given (FR-10, FR-8)\n- lb-kid-* cases return a reply in two live eval runs in a row\n- Tests pass in CI\nFacts at c83a98c:\n- prompts/tutor-system.v2.md:72: \"opponent_left_book (FR-9): name the opponent's deviation in message ..., and ask how to respond. In reveal, explain the usual plan against it in terms of pawn structure and piece placement (where the pieces belong, which pawn break to aim for), not long lines.\" :28 get_repertoire_context use.\n- packages/tutor/src/tools.ts:276 repertoireContext: in book -> { in_repertoire: true, line, next_moves (registered via ctx.evidence.addMove), end_of_line }; out of book -> { in_repertoire: false, last_book_line, left_book_with (registered), move_number } and NO next moves. ctx.repertoire.continuations(hist, color) gives the moves of the repertoire from a position in book.\n- Note on lb-kid-nf3-move2 (history d4 Nf6 Nf3, player Black, KID): the repertoire's KID moves after 1.d4 Nf6 are ...g6, ...Bg7, ...d6, ...O-O, ...e5 against c4/Bf4; the moves the tutor wanted (d6, e5, Nf6) are the KID setup. A repertoire 'setup' (the player's own next moves of the last in-book line, which stay sensible after most deviations) is one candidate; but a repertoire move may be illegal or bad in the new position, so check legality (evidence.addMove already returns null for illegal) and say in the tool result that these are the usual setup, not engine-checked best moves.\n- Prompt and schema rules (CLAUDE.md): prompts are release artifacts. A prompt change = new file prompts/tutor-system.v3.md (v2 stays on disk), the default switched where v2 is selected today (grep 'tutor-system.v2'), and a prompts/CHANGELOG.md line in the existing style. Tool description or result-shape changes go in the CHANGELOG line too. config/models.json is coordinator-owned: do not edit it.\n- Live evals cost money and need ANTHROPIC_API_KEY, which you may not have: do not run them. The coordinator runs evals.yml on the PR (it runs the live eval). Do run the offline eval tests and any regrade of recorded results under evals/.\n- #29 (eval grader holes, CI gate) is not part of this; don't change graders in evals/src/graders.ts unless a test of yours needs a fixture.\nGate at base c83a98c (run by the coordinator): pnpm test -> Test Files 58 passed, Tests 1354 passed (1354); pnpm typecheck clean.",
+  "scope": [
+    "packages/tutor/**",
+    "prompts/**",
+    "evals/**"
+  ],
+  "negative": [
+    "Do not edit files outside scope, docs, config, .github, root files or the lockfile.",
+    "No new dependencies.",
+    "Do not loosen packages/tutor/src/claims.ts: a move not in this turn's evidence stays rejected (FR-10).",
+    "Do not edit config/, docs/, .github/ or other packages.",
+    "Do not run the live eval (cost). Never write a key into a tracked file.",
+    "Never let the model invent a move: any plan move must come from the repertoire or the engine through ctx.evidence."
+  ],
+  "rubric": [
+    "Tests first (red then green) for any tool change: out-of-book result lists the last in-book line's next moves for the player, legal ones only, registered as evidence (claims check accepts them in a reveal); an illegal repertoire move is dropped; in-book behaviour unchanged.",
+    "A claims-check test with the exact failing reveals from lb-kid-nf3-move2 / lb-kid-e4 (or their shape): rejected without the new evidence, accepted with it (or, for a prompt-only fix, a test that the v3 prompt contains the new rule).",
+    "Prompt change, if any: prompts/tutor-system.v3.md, default switched, CHANGELOG entry naming #41 and FR-10/FR-8; v2 unchanged.",
+    "pnpm test and pnpm typecheck clean from the repo root; offline eval tests pass.",
+    "Return lists the exact command the coordinator should run for the live eval on lb-kid-* (and the full suite), with the expected cost.",
+    "files_changed lists every file changed in c83a98c..your head. Commit message references FR-10, FR-8 and #41."
+  ],
+  "concurrency": "#54 runs at the same time in another worktree (web-agent: apps/web/ only). No file overlap. The coordinator may commit a contract type for #44 (exchange_on_square result) to packages/chess-core/src; #44's tutor work comes after you, next round. Don't rebase; the coordinator does that at ship.",
+  "round": 1
+}

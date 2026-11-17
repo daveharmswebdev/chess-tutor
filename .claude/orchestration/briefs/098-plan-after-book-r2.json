@@ -1,0 +1,36 @@
+{
+  "brief_id": "098-plan-after-book-r2",
+  "agent": "tutor-agent",
+  "issue": 41,
+  "base_sha": "8624084",
+  "scratch_dir": "/private/tmp/claude-501/-Users-daveharms-personal-workspace-chess-tutor/fd4461e5-e778-4c30-94e6-073f2f740535/scratchpad/098-plan-after-book-r2",
+  "objective": "Round 2 of #41 on your branch (head 8624084 = your fee11f5 rebased onto main 7d13541 + coordinator fixup switching apps/server DEFAULT_PROMPT_PATH and docs/architecture.md to v3). Fix review 096's two majors so that code, not the prompt, enforces FR-10/FR-8, and the claims check and the eval NFR-6 grader agree. (1) A usual_setup move must never back revealMove (or any 'the best move is' / answer claim that the claims check treats as the answer): keep setup moves in a separate plan-evidence set that move mentions may use but backsMove(revealFen, …) for revealMove does not consult. This tightens claims.ts' acceptance for the new evidence only; existing evidence behaviour is unchanged (not a loosening). (2) Make the claims check and evals/src/graders.ts agree on setup mentions: replay usual_setup with turn passes in the grader's toolLinePositions (graders.ts:383) so the grader accepts exactly what the claims check accepts from that result, and/or tighten the claims check so a setup move named alone is accepted only where it is legal in the real position or the earlier setup moves are named before it. Your call; justify it. Either way, add tests with the reviewer's probe phrasings showing both sides give the same verdict.",
+  "requirements": [
+    "FR-10",
+    "FR-8",
+    "NFR-6"
+  ],
+  "contract": "Review 096 (reviewer, at 8624084), verbatim:\n- MAJOR packages/tutor/src/tools.ts:338: the first usual_setup move is registered with evidence.addMove(input.fen, ...), and input.fen is the focus/reveal position for an opponent_left_book key moment or a hint. checkClaims (claims.ts:370) then accepts it as revealMove with no analyze_position or evaluate_move. Probe: scripted session, lb-kid-e4, after get_repertoire_context: reply {reveal: 'The best move is ...Nf6, attacking e4.', revealMove: 'g8f6'} -> ok=true engineCalls=0. The case's engineBest is e7e5. 'The best move here is ...e5.' is also accepted with 0 engine calls. The doc comment ('Bg7 is not backed in fen itself') hides that setup[0] is backed there.\n- MAJOR packages/tutor/src/tools.ts:352: turn-passed setup positions become shown positions with backed moves, so checkClaims (claims.ts:329-342) accepts a setup move named alone even when illegal in the real position. The eval grader's toolLinePositions (evals/src/graders.ts:383) reads only best, moves and next_moves; gradeMoves chains only moves named in the text. Probes: lb-kid-e4 'Put your bishop on g7 with ...Bg7 and castle.' -> claims ok=true, grader NFR-6 pass=false [Bg7]; lb-kid-e4 'Play ...g6, ...Bg7, ...d6 and ...O-O, then ...e5.' (no ...Nf6) -> claims ok=true, grader pass=false [O-O]; lb-kid-nf3-move2 bishop-first reveal -> claims ok=true, grader pass=false [Bg7]. 'Play ...Bg7 right now' (illegal now) accepted. Your NF3_REPLY and E4_REPLY reveals pass the grader.\n- Accepted as is: prompt v3 diff, CHANGELOG, defaults, tests drive the real session/claims, IR-6 one-time cache miss.\n- Not in this round (go to triage): the walk ignores play since leaving book (e.g. pending recapture after 3.Bxf6 gives usual_setup [d6]); first-line choice among shared positions.\nIf you tighten 'Play ...Bg7 right now' (a setup move framed as playable now but illegal now), reuse whatever 'now' framing the claims check / grader already have rather than inventing new regexes.\nCoordinator gate at 8624084: pnpm test 59 files, 1368 passed; typecheck clean.\nevals/src/graders.ts is in your scope; this round needs it (the brief 094 restriction is lifted for this fix only).",
+  "scope": [
+    "packages/tutor/**",
+    "prompts/**",
+    "evals/**"
+  ],
+  "negative": [
+    "Do not edit files outside scope, docs, config, .github, root files or the lockfile.",
+    "No new dependencies.",
+    "Do not loosen claims.ts for any existing evidence.",
+    "Do not run the live eval (cost).",
+    "Don't touch apps/server (the coordinator already switched its default)."
+  ],
+  "rubric": [
+    "Red then green: with get_repertoire_context's usual_setup only (no engine call), revealMove = a setup move is rejected (unsupported_claim or the existing revealMove reason); with analyze_position/evaluate_move backing it, accepted.",
+    "Red then green: the three reviewer probe phrasings get the same verdict from checkClaims and from the NFR-6 grader (gradeMoves) on the same tool results; your NF3_REPLY/E4_REPLY still pass both.",
+    "In-book behaviour and existing evidence unchanged (existing claims and grader tests green).",
+    "If the prompt text changes, it stays v3 (not yet released) with the CHANGELOG line updated; say so.",
+    "pnpm test and pnpm typecheck clean from the repo root.",
+    "files_changed lists every file changed in 8624084..your head. Commit message references FR-10, FR-8, NFR-6 and #41."
+  ],
+  "concurrency": "#54 round 2 runs in another worktree (apps/web only). No overlap. Don't rebase.",
+  "round": 2
+}

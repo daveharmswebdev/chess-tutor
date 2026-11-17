@@ -1,0 +1,25 @@
+{
+  "brief_id": "096-review-plan-after-book-r1",
+  "agent": "reviewer",
+  "issue": 41,
+  "base_sha": "8624084",
+  "scratch_dir": "/private/tmp/claude-501/-Users-daveharms-personal-workspace-chess-tutor/fd4461e5-e778-4c30-94e6-073f2f740535/scratchpad/096-review-plan-after-book-r1",
+  "objective": "Review #41 round 1: `git diff 7d13541..8624084` (tutor-agent fee11f5 + coordinator fixup 8624084) against FR-10, FR-8, FR-9 and the issue's done-when. Focus: (1) FR-10 soundness of the new get_repertoire_context `usual_setup` in packages/tutor/src/tools.ts: the player's moves are played in order skipping the opponent's turns, and each is registered as evidence only in the position it is played from. Can this let the claims check accept a move that is illegal or not on the board in the real game position, or let a setup move become the revealMove / answer without engine backing (FR-8 give-away, FR-10)? Check how claims.ts consumes the evidence (positions vs SAN-only matching). (2) Is the first-repertoire-line choice sensible when several lines share the last book position? (3) prompts/tutor-system.v3.md: the diff from v2 is only the plan rule, and it doesn't conflict with the give-away rules; CHANGELOG entry style; v2 unchanged; the eval default (evals/src/config.ts) and the server default (apps/server/src/main.ts DEFAULT_PROMPT_PATH) both point at v3. (4) the deterministic tests in packages/tutor/test/left-book-plan.test.ts really exercise the real session and claims check (not mocked away), and the reconstructed reveals fairly represent the issue's corrections. (5) prompt-cache effect of the tool description change (IR-6).",
+  "requirements": [
+    "FR-10",
+    "FR-8",
+    "FR-9"
+  ],
+  "contract": "Issue #41: after the opponent leaves book, the tutor named plan moves (d6, e5, Nf6, c5) not in that turn's tool results; the claims check correctly rejected them (unsupported_claim). Done-when: plan advice is backed by a tool result or worded without naming moves not given (FR-10, FR-8); lb-kid-* cases return a reply in two live eval runs in a row (coordinator runs the live eval on the PR); tests pass in CI. Constraint: claims.ts must not be loosened.\nSpoke summary: tool and prompt both changed; usual_setup = up to 6 of the player's next moves from the first repertoire line through the last book position, played in order with the opponent's turn skipped, illegal ones dropped, walk stops after a check; empty when the opponent is to move; usual_setup_note says not engine-checked. Prompt v3: in opponent_left_book call get_repertoire_context; name a plan move only if in usual_setup, an engine line or the explorer; a setup move never becomes revealMove without analyze_position/evaluate_move.\nKnown and accepted, do not re-report: the reconstructed reveals are not the recorded replies (results are gitignored).\nCoordinator's gate at 8624084: pnpm test 59 files, 1368 passed; typecheck clean.",
+  "scope": [],
+  "negative": [
+    "Read-only: do not edit, commit, or run anything that writes to the repo.",
+    "Do not run the live eval or anything that calls the Claude API."
+  ],
+  "rubric": [
+    "Each finding cites file:line and evidence; reproduce blocking/major with a scratch test outside the repo (in your scratch dir).",
+    "Severities: blocking / major / minor. Summary ends SHIP or NO-SHIP."
+  ],
+  "concurrency": "Another reviewer checks the other pick of this cycle in parallel. Read with git diff / git show; don't touch other worktrees.",
+  "round": 1
+}

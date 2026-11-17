@@ -1,0 +1,34 @@
+{
+  "brief_id": "097-move-list-notes-r2",
+  "agent": "web-agent",
+  "issue": 54,
+  "base_sha": "643e207",
+  "scratch_dir": "/private/tmp/claude-501/-Users-daveharms-personal-workspace-chess-tutor/fd4461e5-e778-4c30-94e6-073f2f740535/scratchpad/097-move-list-notes-r2",
+  "objective": "Round 2 of #54 on your branch (head 643e207, already rebased by the coordinator onto main 7d13541): fix review 095's findings. (1) MAJOR: in the wide layout '▸ more' must be offered whenever the one-line note is cut off or there is more than the message, not by a 60-character count (move-notes.ts:76 SHORT_NOTE_CHARS). Either always render the control in the wide layout and hide it with CSS/measurement when nothing is cut, or measure overflow (scrollWidth > clientWidth, re-checked on resize). A 26-60 character message with reveal/bestMove/attempt null at a 1440 px viewport must be fully readable. (2) minor: apply the .controls wrap fix at every width so 761-820 px viewports don't scroll sideways ('New game' overflows the 260 px side column by ~19 px). (3) minor: a correct try with cpLoss <= 0 whose move differs from bestMove must not say 'correct, the best move. Best was X.' — drop 'Best was' for a correct try (or say 'Also best: X'; pick one, test it). (4) minor: stale open/expanded state — clear or re-key openRows/expanded so a note that arrives on a row after a takeback doesn't show already open (key by questionId, or prune keys not in the current notes).",
+  "requirements": [
+    "FR-25",
+    "NFR-14",
+    "FR-10"
+  ],
+  "contract": "Review 095 (reviewer, at 643e207) findings, verbatim evidence:\n- MAJOR apps/web/src/move-notes.ts:76: noteHasMore = noteParts(note).length > 1 || note.message.length > SHORT_NOTE_CHARS (60). Tutor column is ~140-200 px (~25-30 chars at 0.9rem). Probe at 1440x900, note {ply:2, message:'Why does Bf4 come before e3 here, do you think?' (48 chars), reveal:null, bestMove:null, attempt:null}: .note-short scrollWidth 330 > clientWidth 202, no .note-more. Done-when: 'notes shortened with ▸ more that opens the full note'.\n- minor apps/web/src/styles.css:56: .controls flex-wrap only below 760px; at 768/780/800 documentElement.scrollWidth 787/799/819; BUTTON.primary ('New game') overflows; main columns '456px 260px'.\n- minor apps/web/src/move-notes.ts:62: noteParts adds 'Best was <san>.' whenever bestMove.uci !== attempt.move.uci, regardless of attempt.correct; attemptLine says 'correct, the best move.' for cpLoss <= 0 -> contradictory. tryResultText (game-state.ts:621) never names a best move for a correct try.\n- minor apps/web/src/MoveList.tsx:123: openRows: Set<number> keyed by move number, never cleared; expanded keys index:questionId reused.\nMeasured breakpoint behaviour (accepted, keep): narrow ❝ layout at 320/375/768/1024 (list widths 258/313/230/342), Tutor column at 1440 (398).\nCoordinator gate at 643e207: pnpm test 60 files, 1383 passed; typecheck clean; CI=1 e2e 12 passed.",
+  "scope": [
+    "apps/web/**"
+  ],
+  "negative": [
+    "Do not edit files outside scope, docs, config, .github, root files or the lockfile.",
+    "No new dependencies.",
+    "Do not change apps/server, packages/*, api.ts.",
+    "No move or evaluation from anywhere except the note's fields (FR-10).",
+    "Keep the container-query breakpoint and existing test IDs."
+  ],
+  "rubric": [
+    "Red then green: an e2e (or layout check in a real browser) at 1440 px with the 48-char message-only note: '▸ more' present and opens the full text; a short note that fits shows no control (or a hidden one).",
+    "e2e or layout check: no horizontal scroll at 768, 780 and 800 px.",
+    "Unit test: correct try with cpLoss 0 and a different bestMove gives no contradictory 'Best was'.",
+    "Unit/component test: after a takeback removes a note and a new note lands on the same row, it renders closed.",
+    "pnpm test, pnpm typecheck and CI=1 pnpm --filter @chess-tutor/web test:e2e clean.",
+    "files_changed lists every file changed in 643e207..your head. Commit message references FR-25 and #54."
+  ],
+  "concurrency": "#41 is in review in another worktree (packages/tutor, prompts, evals, one line in apps/server/src/main.ts). No overlap. Don't rebase.",
+  "round": 2
+}
