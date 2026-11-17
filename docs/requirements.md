@@ -2,7 +2,7 @@
 
 | | |
 |---|---|
-| Status | Accepted v0.2 (amendments A1 and A2 applied 2026-11-07, A3, A4, A5 and A6 2026-11-15) |
+| Status | Accepted v0.2 (amendments A1 and A2 applied 2026-11-07, A3, A4, A5 and A6 2026-11-15, A7 2026-11-16) |
 | Date | 2026-11-04 |
 | Owner | Dave Harms |
 
@@ -16,6 +16,8 @@ A web app for one intermediate player (about 1000 on Chess.com) who plays the **
 
 The project has three goals: get better at chess, build a portfolio-quality piece of software, and practice the skills on the CCDV-F exam.
 
+Since A7 (2026-11-16) the app also supports a separate client-transparency dashboard (`chess-tutor-dashboard`, Epic #57), built as if for a paying client: the app exposes hard facts about itself, and the dashboard turns them into a daily report without AI-written status.
+
 ## 2. Business requirements
 
 | ID | Requirement |
@@ -25,6 +27,7 @@ The project has three goals: get better at chess, build a portfolio-quality piec
 | BR-3 | The project must use Claude's tool use against a real chess engine (no custom-trained model) to serve as CCDV-F exam practice and as a portfolio piece. |
 | BR-4 | Running costs must stay a small fraction of the owner's monthly AI budget. |
 | BR-5 | The tool must never be usable for help in live rated games on other sites (Chess.com fair play). |
+| BR-6 | A client must be able to see, every day, what changed, whether the app is up, the app working, and what it costs, from hard data only (APIs, committed files, scripts), never from AI-written status. Communication is cheap; losing a client to uncertainty is expensive. *Added by A7, 2026-11-16.* |
 
 ## 3. Functional requirements
 
@@ -78,6 +81,18 @@ The project has three goals: get better at chess, build a portfolio-quality piec
 | FR-22 | At a key moment where a capture is involved (the best move, the player's move or the opponent's threat is a capture), the tutor's Socratic question can ask the player to **count**: how many pieces attack and defend the square, and whether taking wins material. The player answers in the UI (two numbers and yes or no). Code grades the answer against FR-21, and the tutor explains any difference. No extra model call is made outside key moments (FR-7). *Added by A4, 2026-11-15.* | BR-2 |
 | FR-23 | When the player has two or more captures available at a key moment, the tutor can ask the player to rank them before moving. Code grades the ranking with FR-21's exchange result for each capture and a Stockfish check (FR-17). When the two disagree (a pin, an in-between check, a hanging piece elsewhere), the tutor explains why the count alone was misleading. *Added by A4, 2026-11-15.* | BR-2, BR-3 |
 
+### 3.6 Transparency support
+
+*Added by A7, 2026-11-16.* These serve the client dashboard (BR-6), which lives in its own repo. The response shapes below are contracts between the two repos.
+
+| ID | Requirement | Source |
+|---|---|---|
+| FR-26 | `GET /api/health` reports the commit the server is running, so an outside consumer can confirm which deploy is live. When no commit is known (local runs), it says so instead of failing. (#58) | BR-6 |
+| FR-27 | A guided demo plays a short game on a given app URL in a browser and records it as video: opening moves that stay legal whatever the bot replies, then a mistake **chosen by Stockfish from the actual position** (loses about 2 pawns or more; FR-10 applies: never hard-coded, never chosen by Claude), then the tutor's question, Hint and Show me. Captions are fixed text. It is not part of the test suite. (#59) | BR-6 |
+| FR-28 | Games started by the demo are marked as demo games on the server. The marker needs a secret (IR-10), so a player cannot set it by accident. Usage reporting shows demo games and their Claude spend apart from real usage. (#64) | BR-6, BR-4 |
+| FR-29 | `GET /ops/daily-stats` returns counts for a day: games started, tutor replies, tutor latency p50 and p95, errors by category, and Claude spend from the usage ledger (NFR-5), with demo usage reported separately (FR-28). It requires a shared secret (IR-10). (#60) | BR-6, BR-4 |
+| FR-30 | The demo has several scenarios (at least London as White and KID as Black, with different kinds of mistake) chosen by date or explicitly. (#62) | BR-6 |
+
 ## 4. Non-functional requirements
 
 | ID | Requirement | Source |
@@ -96,6 +111,8 @@ The project has three goals: get better at chess, build a portfolio-quality piec
 | NFR-12 **Secrets** | The API key is never committed. It comes only from a runtime environment variable or a credential helper. | BR-3 |
 | NFR-13 **Portability** | Runs locally with a single command. All configuration (model ID, thresholds, rating band) comes from versioned config plus environment variables, so the app can be deployed later without code changes. | BR-3 |
 | NFR-14 **Game survival** | A game in progress, with the tutor's messages and chat, survives a page refresh, a server restart and a redeploy. Every move and tutor message is saved before it is acknowledged; on startup the server resumes games still in progress instead of abandoning them. The game's address (`/games/<id>`) reopens it. While the server can't be reached, the UI says it is reconnecting and keeps retrying, and it offers a new game only when the server says the game doesn't exist. *Added by A5, 2026-11-15.* | BR-1 |
+| NFR-15 **Operational privacy** | Anything the app exposes for the dashboard (FR-26, FR-29) holds versions and counts only: no log lines, no PGN or FEN, no chat text, nothing a player typed. *Added by A7, 2026-11-16.* | BR-6, BR-5 |
+| NFR-16 **Change and incident visibility** | Every merged PR carries a one-sentence client note in plain language, checked by CI (#61). Every production incident gets an issue with the `incident` label and four plain sections: what happened, who was affected, what was done, what prevents a repeat (#65). *Added by A7, 2026-11-16.* | BR-6 |
 
 ## 5. Infrastructure requirements
 
@@ -112,6 +129,7 @@ These follow from the functional requirements plus the proposed architecture: a 
 | IR-7 | Local persistent storage (a single SQLite file) for games, the usage ledger, and a cache of Lichess explorer responses. | FR-5, NFR-5, FR-18 |
 | IR-8 | Outbound HTTPS access to the Lichess explorer API, authenticated with a personal token (`LICHESS_TOKEN`, a runtime secret), with responses cached and respecting Lichess's rate limits. | FR-2, FR-18, NFR-12 |
 | IR-9 | The model ID is set per environment in versioned config and pinned to an exact model ID. | NFR-10, NFR-13 |
+| IR-10 | Dashboard secrets: `OPS_STATS_TOKEN` (FR-29) and `DEMO_TOKEN` (FR-28) are runtime environment variables on the server; a feature whose secret is unset is off. A push to `main` sends a `repository_dispatch` with the merged commit to the dashboard repo, using a token stored only in Actions secrets (#63). *Added by A7, 2026-11-16.* | FR-28, FR-29, NFR-12, NFR-16 |
 
 ## 6. Constraints and assumptions
 
@@ -125,7 +143,7 @@ These follow from the functional requirements plus the proposed architecture: a 
 
 ## 7. Out of scope (v1)
 
-- Multiple users, authentication, and hosted deployment (the architecture shouldn't rule them out).
+- Multiple users and player accounts (the architecture shouldn't rule them out). *Amended by A7, 2026-11-16:* the app is deployed on Render, and its only access control is the shared secrets of IR-10.
 - Importing and reviewing Chess.com games after they're played. This is a strong candidate for v2.
 - Opening drills and spaced repetition, including calculation drills built from the player's past games (v2, decided 2026-11-15).
 - Voice, mobile-native apps, and running a Maia (human-like engine) model locally.
@@ -147,5 +165,6 @@ These follow from the functional requirements plus the proposed architecture: a 
 | BR-1 Handle deviations | FR-1–6, 9, 11, 13, 14, 18, 19, 20, 24, 25 | NFR-1, 2, 3, 9, 14 | IR-2, 3, 5, 7, 8 |
 | BR-2 Build understanding | FR-4, 7, 8, 12, 21–25 | NFR-7 | — |
 | BR-3 Claude + engine, exam prep | FR-10, 15–19, 21, 23 | NFR-6, 8, 10, 12, 13 | IR-1, 2, 6, 9 |
-| BR-4 Cost | FR-6, 7 | NFR-4, 5, 9 | IR-4, 6 |
-| BR-5 Fair play | — | NFR-11 | — |
+| BR-4 Cost | FR-6, 7, 28, 29 | NFR-4, 5, 9 | IR-4, 6 |
+| BR-5 Fair play | — | NFR-11, 15 | — |
+| BR-6 Client transparency | FR-26–30 | NFR-15, 16 | IR-10 |
