@@ -279,6 +279,9 @@ export interface UsageCounts {
    * Failures by category, zero counts left out. Keys: the tutor failure reasons
    * ("invalid_reply", "unsupported_claim", "tool_rounds_exceeded", "refusal", "max_tokens",
    * "rate_limited", "api_unavailable", ...) and "bot_failed" (the bot could not choose a move).
+   * An ask the server cancelled itself (the player moved on, the question was replaced, the game
+   * ended, shutdown) is not an error: it is stored with reason "cancelled", left out of `errors`,
+   * and its tokens still count in `claude`.
    */
   errors: Record<string, number>;
   /** Summed over every Claude request that day, failed asks included (NFR-5). */
