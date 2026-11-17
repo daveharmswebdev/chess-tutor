@@ -69,9 +69,10 @@ export interface GameManagerOptions {
 
 export interface GameManager {
   /**
-   * Abandons (and saves) any game still playing, then starts a new one. `source` (FR-28, #64)
-   * marks a game started by the demo; it defaults to "player", is saved with the game, and is
-   * never part of the GameView.
+   * Abandons (and saves) any game of the same source still playing, then starts a new one.
+   * `source` (FR-28, #64) marks a game started by the demo; it defaults to "player", is saved
+   * with the game, and is never part of the GameView. A player game and a demo game can be
+   * playing at once (FR-28 amended, #71): starting one never ends the other kind.
    */
   create(playerColor: Color, opts?: { source?: GameSource }): GameView;
   /**
@@ -1200,7 +1201,9 @@ export function createGameManager(opts: GameManagerOptions): GameManager {
       // In the store before anything else changes (#47). If that fails, nothing has: the
       // reply is 500 and the old game stays playing, with no event (reviews 065, 068).
       save(g, { required: true });
-      for (const other of games.values()) if (other.status === "playing") abandon(other);
+      // Only games of the same source end (FR-28 amended, #71): a demo start never abandons a
+      // player game in progress, and a player start never abandons a demo game.
+      for (const other of games.values()) if (other.status === "playing" && other.source === source) abandon(other);
       games.set(g.id, g);
       log.info({ gameId: g.id, playerColor, gameSource: source }, "new game");
       if (playerColor === "b") {

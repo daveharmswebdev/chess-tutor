@@ -245,6 +245,107 @@ describe("demo games (FR-28, IR-10, #64)", () => {
   });
 });
 
+describe("games of each source (FR-28 amended, #71)", () => {
+  const TOKEN = "s3cret-demo-token";
+
+  async function newDemoGame(playerColor: "w" | "b") {
+    const res = await app.inject({
+      method: "POST",
+      url: "/api/games",
+      headers: { "x-demo-token": TOKEN },
+      payload: { playerColor },
+    });
+    expect(res.statusCode, res.body).toBe(201);
+    const view = res.json() as GameView;
+    expect(store.get(view.id)?.source).toBe("demo");
+    return view;
+  }
+
+  it("a demo start leaves a player game in progress playing, and its moves are still accepted", async () => {
+    setup(["e7e5", "d7d5", "g8f6"], { demoToken: TOKEN });
+    const player = await newGame("w");
+    await play(player.id, "e2e4");
+    const events = eventCollector();
+    games.subscribe(player.id, events.push);
+
+    const demo = await newDemoGame("w");
+    expect(games.view(player.id)?.status).toBe("playing");
+    expect(store.get(player.id)).toMatchObject({ status: "playing", source: "player" });
+    expect(events.events.filter((e) => e.type === "game_over")).toEqual([]);
+
+    await play(demo.id, "d2d4");
+    expect(ucis(await play(player.id, "g1f3"))).toEqual(["e2e4", "e7e5", "g1f3", "g8f6"]);
+    expect(ucis(games.view(demo.id)!)).toEqual(["d2d4", "d7d5"]);
+  });
+
+  it("a player start leaves a demo game in progress playing, and its moves are still accepted", async () => {
+    setup(["e7e5", "d7d5", "g8f6"], { demoToken: TOKEN });
+    const demo = await newDemoGame("w");
+    await play(demo.id, "e2e4");
+    const events = eventCollector();
+    games.subscribe(demo.id, events.push);
+
+    const player = await newGame("w");
+    expect(games.view(demo.id)?.status).toBe("playing");
+    expect(store.get(demo.id)).toMatchObject({ status: "playing", source: "demo" });
+    expect(events.events.filter((e) => e.type === "game_over")).toEqual([]);
+
+    await play(player.id, "d2d4");
+    expect(ucis(await play(demo.id, "g1f3"))).toEqual(["e2e4", "e7e5", "g1f3", "g8f6"]);
+    expect(ucis(games.view(player.id)!)).toEqual(["d2d4", "d7d5"]);
+  });
+
+  it("a player start still abandons the previous player game, not the demo game", async () => {
+    setup([], { demoToken: TOKEN });
+    const first = await newGame("w");
+    const demo = await newDemoGame("w");
+    const events = eventCollector();
+    games.subscribe(first.id, events.push);
+    const second = await newGame("w");
+
+    expect(await events.next("game_over")).toMatchObject({ game: { id: first.id, status: "abandoned" } });
+    expect(store.get(first.id)).toMatchObject({ status: "abandoned", endReason: "abandoned", source: "player" });
+    expect(games.view(demo.id)?.status).toBe("playing");
+    expect(games.view(second.id)?.status).toBe("playing");
+  });
+
+  it("a demo start still abandons the previous demo game, not the player game", async () => {
+    setup([], { demoToken: TOKEN });
+    const first = await newDemoGame("w");
+    const player = await newGame("w");
+    const events = eventCollector();
+    games.subscribe(first.id, events.push);
+    const second = await newDemoGame("w");
+
+    expect(await events.next("game_over")).toMatchObject({ game: { id: first.id, status: "abandoned" } });
+    expect(store.get(first.id)).toMatchObject({ status: "abandoned", endReason: "abandoned", source: "demo" });
+    expect(games.view(player.id)?.status).toBe("playing");
+    expect(games.view(second.id)?.status).toBe("playing");
+  });
+
+  it("both games get their bot move when both wait on the one bot (IR-3)", async () => {
+    setup(["d2d4", "e2e4"], { demoToken: TOKEN });
+    bot.hold();
+    const player = await newGame("b");
+    const demo = await newDemoGame("b");
+    expect(games.view(player.id)?.botThinking).toBe(true);
+    expect(games.view(demo.id)?.botThinking).toBe(true);
+    const pEvents = eventCollector();
+    const dEvents = eventCollector();
+    games.subscribe(player.id, pEvents.push);
+    games.subscribe(demo.id, dEvents.push);
+
+    bot.release();
+    await pEvents.next("bot_move");
+    await dEvents.next("bot_move");
+    await games.idle(player.id);
+    await games.idle(demo.id);
+    expect(games.view(player.id)).toMatchObject({ status: "playing", botThinking: false, moves: [{ uci: "d2d4", by: "bot" }] });
+    expect(games.view(demo.id)).toMatchObject({ status: "playing", botThinking: false, moves: [{ uci: "e2e4", by: "bot" }] });
+    expect(bot.calls).toEqual([START, START]);
+  });
+});
+
 describe("GET /api/games/:id", () => {
   it("returns the game view", async () => {
     setup();
