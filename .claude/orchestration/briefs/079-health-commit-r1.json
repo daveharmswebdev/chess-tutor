@@ -1,0 +1,35 @@
+{
+  "brief_id": "079-health-commit-r1",
+  "agent": "server-agent",
+  "issue": 58,
+  "base_sha": "a2f2b19",
+  "scratch_dir": "/private/tmp/claude-501/-Users-daveharms-personal-workspace-chess-tutor/f001ac75-54d7-4577-8c9a-29bf8834f61e/scratchpad/079-health-commit-r1",
+  "objective": "GET /api/health reports the commit the server is running (FR-26, #58), in both the healthy and the unhealthy response, so the client dashboard can confirm which deploy is live. Success: a health response carries `commit` (the SHA string) when one is known and `commit: null` when none is, the status code rules (200 ok / 503 not ok) are unchanged, and the probe still does no extra engine work.",
+  "requirements": [
+    "FR-26",
+    "NFR-13",
+    "NFR-15"
+  ],
+  "contract": "FR-26 (docs/requirements.md, A7): `GET /api/health` reports the commit the server is running, so an outside consumer can confirm which deploy is live. When no commit is known (local runs), it says so instead of failing.\nNFR-15: the response holds versions and counts only (no other new data).\nDecisions (coordinator):\n- Add `commit: string | null` to BOTH variants of `HealthStatus` in apps/server/src/health.ts: `{ ok: true; engine: \"ready\"; commit: string | null } | { ok: false; reason: string; commit: string | null }`. The no-probe fallback in apps/server/src/app.ts:102-105 does not need to change (it is only used when no probe is configured); leave app.ts alone.\n- `createHealthProbe` gets an optional `commit?: string | null` dep. When the dep is absent, default to `process.env.RENDER_GIT_COMMIT`, treating unset or empty/whitespace as null. Trim it. Do not shorten it.\n- Render sets RENDER_GIT_COMMIT on the running service (the full 40-char SHA, to the coordinator's understanding); nothing else reads it today.\n- Read the env once when the probe is created, not per request.\nTests: existing health tests live in apps/server/test/deploy.test.ts. Add yours there or in a new apps/server/test/health-commit.test.ts. Cases: dep given -> ok response carries it; dep null -> commit null; env var set/unset/blank when dep absent (restore process.env after); unhealthy (engine timeout or store error) response also carries commit; HTTP: 200 and 503 bodies both include commit.\nGate at base a2f2b19 (run by the coordinator): `pnpm test` -> Tests 1200 passed (1200); `pnpm typecheck` clean.",
+  "contract_files": [
+    "apps/server/src/health.ts"
+  ],
+  "scope": [
+    "apps/server/src/health.ts",
+    "apps/server/test/deploy.test.ts",
+    "apps/server/test/health-commit.test.ts"
+  ],
+  "negative": [
+    "Do not edit files outside scope, docs, config, .github, root files or the lockfile.",
+    "No new dependencies.",
+    "Do not edit apps/server/src/app.ts, main.ts, games.ts or store.ts (a parallel spoke owns them this round).",
+    "Do not make the health probe call the engine more than it does today."
+  ],
+  "rubric": [
+    "Tests first (red then green) for: commit from dep, null dep, env set / unset / blank, commit present on an unhealthy response, and both HTTP status bodies.",
+    "pnpm test and pnpm typecheck clean from the repo root.",
+    "files_changed lists every file changed in a2f2b19..your head. Commit message references FR-26 and #58."
+  ],
+  "concurrency": "#64 runs at the same time in another server-agent (demo-game marker: store.ts, games.ts, app.ts, main.ts and their tests, not health.ts or deploy.test.ts). No file overlap. Don't rebase; the coordinator does that at ship.",
+  "round": 1
+}

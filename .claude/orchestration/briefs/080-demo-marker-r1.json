@@ -1,0 +1,35 @@
+{
+  "brief_id": "080-demo-marker-r1",
+  "agent": "server-agent",
+  "issue": 64,
+  "base_sha": "a2f2b19",
+  "scratch_dir": "/private/tmp/claude-501/-Users-daveharms-personal-workspace-chess-tutor/f001ac75-54d7-4577-8c9a-29bf8834f61e/scratchpad/080-demo-marker-r1",
+  "objective": "Games started by the daily demo are marked as demo games on the server (FR-28, #64): a POST /api/games carrying the right demo token is stored with source \"demo\", every other game with source \"player\"; the marker survives restarts; and every tutor reply log line carries the game's source so the later stats endpoint (#60) can report demo usage apart from real usage. Success: the cases in the rubric pass, existing databases migrate cleanly, and a player cannot set the marker by accident.",
+  "requirements": [
+    "FR-28",
+    "IR-10",
+    "NFR-14",
+    "NFR-12"
+  ],
+  "contract": "FR-28 (A7): Games started by the demo are marked as demo games on the server. The marker needs a secret (IR-10), so a player cannot set it by accident. Usage reporting shows demo games and their Claude spend apart from real usage.\nIR-10 (A7): `DEMO_TOKEN` is a runtime environment variable on the server; a feature whose secret is unset is off.\nScope note: usage is not stored in the database today (it is only logged, e.g. games.ts finishAsk: `const meta = { gameId: g.id, kind, ok: outcome.ok, ms: outcome.ms, usage: outcome.usage }`). The separate reporting is #60's job. This round only (1) stores the marker and (2) adds `source` to the tutor log meta, so #60 can split on it.\nDecisions (coordinator, also on issue #64):\n- Header `x-demo-token` on `POST /api/games` (apps/server/src/app.ts:107-114, which today calls `games.create(color)`).\n- DEMO_TOKEN unset or blank: the header is ignored entirely; the game is \"player\".\n- DEMO_TOKEN set, header absent: \"player\".\n- DEMO_TOKEN set, header present and equal (compare with node:crypto timingSafeEqual on equal-length buffers; unequal lengths = mismatch): \"demo\".\n- DEMO_TOKEN set, header present but wrong: 403 with the app's usual error body, no game created. (The demo should fail loudly, not quietly count as a player game.)\n- The token never appears in logs, responses or the database.\n- Store: SCHEMA_VERSION 2 -> 3; add `source TEXT NOT NULL DEFAULT 'player'` to games (ALTER TABLE, following the v2 pattern in migrate(): check PRAGMA table_info first so it is idempotent). Old rows read back as \"player\". Load it on hydrate so a restored game keeps its source (NFR-14).\n- `GameManager.create(playerColor, opts?: { source?: \"player\" | \"demo\" })`; default \"player\".\n- Do not add `source` to the GameView API contract or the web app this round. It is a server-side fact.\n- Read DEMO_TOKEN in main.ts (process.env, as main.ts:63 already does for other vars) and pass it into the app deps; app.ts tests inject it directly.\nTests go in apps/server/test/ (games-api.test.ts, game-survival.test.ts, outcome-pgn-store.test.ts are the existing homes for routes, restarts and the store). Do not edit deploy.test.ts (the parallel spoke uses it).\nGate at base a2f2b19 (run by the coordinator): `pnpm test` -> Tests 1200 passed (1200); `pnpm typecheck` clean.",
+  "contract_files": [
+    "apps/server/src/store.ts"
+  ],
+  "scope": [
+    "apps/server/**"
+  ],
+  "negative": [
+    "Do not edit files outside scope, docs, config, .github, root files or the lockfile.",
+    "No new dependencies.",
+    "Do not edit apps/server/src/health.ts or apps/server/test/deploy.test.ts (a parallel spoke owns them this round).",
+    "Do not change apps/web or the shared API types.",
+    "Never log or persist the token value."
+  ],
+  "rubric": [
+    "Tests first (red then green) for each case: token unset + header -> player; set + no header -> player; set + right header -> demo (201); set + wrong header -> 403, no game stored; wrong-length header -> 403; source survives a restart; a v2 database migrates to v3 with old rows as player; tutor log meta includes source.",
+    "pnpm test and pnpm typecheck clean from the repo root.",
+    "files_changed lists every file changed in a2f2b19..your head. Commit message references FR-28 and #64."
+  ],
+  "concurrency": "#58 runs at the same time in another server-agent (health.ts and deploy.test.ts / a new health-commit.test.ts only). No file overlap. Don't rebase; the coordinator does that at ship.",
+  "round": 1
+}

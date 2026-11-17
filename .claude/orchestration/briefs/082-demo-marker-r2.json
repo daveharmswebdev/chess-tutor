@@ -1,0 +1,29 @@
+{
+  "brief_id": "082-demo-marker-r2",
+  "agent": "server-agent",
+  "issue": 64,
+  "base_sha": "096ee33",
+  "scratch_dir": "/private/tmp/claude-501/-Users-daveharms-personal-workspace-chess-tutor/f001ac75-54d7-4577-8c9a-29bf8834f61e/scratchpad/082-demo-marker-r2",
+  "objective": "Round 2 of #64 on your branch (base 096ee33, your rebased round-1 commit): two small fixes from review 081. (1) Trim DEMO_TOKEN once so a value with leading/trailing whitespace (e.g. pasted with a trailing newline into Render's env UI) still matches the header, which Node always delivers trimmed; a value that is blank after trimming stays 'off'. (2) Rename the new log key on the tutor reply / tutor failed / dropped lines and the 'new game' line from `source` to `gameSource`, leaving `source` (book/engine) on the 'bot move' line unchanged, so the stats endpoint (#60) can split on one unambiguous key.",
+  "requirements": [
+    "FR-28",
+    "IR-10"
+  ],
+  "contract": "Review 081 verdict: SHIP; minors addressed here.\nEvidence for (1): demoSource(\"tok\\n\",\"tok\") -> null and demoSource(\"tok \",\"tok\") -> null today; a raw header 'x-demo-token:   tok   ' arrives as 'tok'. app.ts:47 trims for the blank check but compares the untrimmed value. Decision: trim inside demoSource (so every caller is safe) and also in main.ts before passing it; compare the trimmed configured value.\nEvidence for (2): games.ts ~1158 `log.info({ gameId: g.id, ms, source: botMove.source, ... }, \"bot move\")` vs the new `const meta = { gameId: g.id, source: g.source, kind, ... }`. Decision: key `gameSource`. The stored column and the GameSource type keep the name `source`.\nGate on 096ee33 (coordinator): pnpm test 1224 passed, typecheck clean.",
+  "scope": [
+    "apps/server/**"
+  ],
+  "negative": [
+    "Do not edit files outside scope, docs, config, .github, root files or the lockfile.",
+    "No new dependencies.",
+    "Do not edit apps/server/src/health.ts or the store schema.",
+    "Never log or persist the token value."
+  ],
+  "rubric": [
+    "Tests first (red then green): configured token with trailing newline and with surrounding spaces matches the trimmed header -> demo; whitespace-only token -> off (player); tutor and new-game log lines carry gameSource and no longer carry source; the bot move line still carries source.",
+    "pnpm test and pnpm typecheck clean from the repo root.",
+    "files_changed lists every file changed in 096ee33..your head. Commit message references FR-28 and #64."
+  ],
+  "concurrency": null,
+  "round": 2
+}

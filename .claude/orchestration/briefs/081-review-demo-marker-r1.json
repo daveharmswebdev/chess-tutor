@@ -1,0 +1,25 @@
+{
+  "brief_id": "081-review-demo-marker-r1",
+  "agent": "reviewer",
+  "issue": 64,
+  "base_sha": "096ee33",
+  "scratch_dir": "/private/tmp/claude-501/-Users-daveharms-personal-workspace-chess-tutor/f001ac75-54d7-4577-8c9a-29bf8834f61e/scratchpad/081-review-demo-marker-r1",
+  "objective": "Review #64 round 1: `git diff 92ff9ea..096ee33` (server-agent, demo-game marker, rebased onto main 92ff9ea) against FR-28, IR-10, NFR-12, NFR-14 and the coordinator decisions below. Focus: (1) the token check cannot be bypassed or leaked (timing, header arrays, logging, error bodies); (2) the v2->v3 migration is safe on a real v2 database with games in progress, and on a fresh database; (3) a restored game keeps its source; (4) nothing else in game creation regressed. Findings blocking/major/minor; summary ends SHIP or NO-SHIP.",
+  "requirements": [
+    "FR-28",
+    "IR-10",
+    "NFR-12",
+    "NFR-14"
+  ],
+  "contract": "FR-28 (docs/requirements.md A7): Games started by the demo are marked as demo games on the server. The marker needs a secret (IR-10), so a player cannot set it by accident. Usage reporting shows demo games apart from real usage (the reporting itself is #60, not this change).\nIR-10: DEMO_TOKEN is a runtime environment variable; a feature whose secret is unset is off. NFR-12: secrets never committed. NFR-14: games survive restarts and redeploys.\nCoordinator decisions given to the spoke: header x-demo-token on POST /api/games; DEMO_TOKEN unset/blank -> header ignored, player; set + no header -> player; set + matching (timingSafeEqual, unequal length = mismatch) -> demo, 201; set + wrong -> 403, usual error body, no game created; token never in logs, responses or DB; schema 2->3 adds `source TEXT NOT NULL DEFAULT 'player'` via idempotent ALTER; GameManager.create(color, {source}); source not in GameView or apps/web; DEMO_TOKEN read in main.ts.\nKnown and accepted, do not re-report: the log key `source` on tutor/new-game lines collides with the existing `source` (book/engine) on the 'bot move' line (games.ts ~1158). The coordinator will decide a rename in round 2; you may say which name you'd use.\nGate on 096ee33 (coordinator): pnpm test 1224 passed, typecheck clean.\nRead with git diff / git show <sha>:<path>; you start in a worktree at 096ee33.",
+  "scope": [],
+  "negative": [
+    "Read-only: do not edit, commit, or run anything that writes to the repo."
+  ],
+  "rubric": [
+    "Each finding cites file:line and evidence; reproduce blocking/major with a scratch test outside the repo.",
+    "Summary ends SHIP or NO-SHIP."
+  ],
+  "concurrency": null,
+  "round": 1
+}
