@@ -181,7 +181,7 @@ describe("GET /api/health (NFR-13, #12)", () => {
   function setup(engine: HealthEngine, timeoutMs = 5000) {
     const store = createSqliteGameStore(":memory:");
     stores.push(store);
-    const health = createHealthProbe({ engine, store, timeoutMs });
+    const health = createHealthProbe({ engine, store, timeoutMs, commit: null });
     const { app } = buildServer({ bot: createFakeBot(), store, logger: false, health });
     return { app, store };
   }
@@ -196,7 +196,7 @@ describe("GET /api/health (NFR-13, #12)", () => {
     });
     const res = await app.inject({ method: "GET", url: "/api/health" });
     expect(res.statusCode).toBe(200);
-    expect(res.json()).toEqual({ ok: true, engine: "ready" });
+    expect(res.json()).toEqual({ ok: true, engine: "ready", commit: null });
     expect(calls).toEqual([{ fen: START_FEN, opts: { depth: 1 } }]);
     await app.close();
   });
@@ -205,7 +205,7 @@ describe("GET /api/health (NFR-13, #12)", () => {
     const { app } = setup({ analyze: async () => Promise.reject(new Error("engine exited")) });
     const res = await app.inject({ method: "GET", url: "/api/health" });
     expect(res.statusCode).toBe(503);
-    expect(res.json()).toEqual({ ok: false, reason: "engine error: engine exited" });
+    expect(res.json()).toEqual({ ok: false, reason: "engine error: engine exited", commit: null });
     await app.close();
   });
 
@@ -217,7 +217,7 @@ describe("GET /api/health (NFR-13, #12)", () => {
     });
     const res = await app.inject({ method: "GET", url: "/api/health" });
     expect(res.statusCode).toBe(503);
-    expect(res.json()).toEqual({ ok: false, reason: "engine error: engine is closed" });
+    expect(res.json()).toEqual({ ok: false, reason: "engine error: engine is closed", commit: null });
     await app.close();
   });
 
@@ -227,7 +227,7 @@ describe("GET /api/health (NFR-13, #12)", () => {
     const res = await app.inject({ method: "GET", url: "/api/health" });
     expect(performance.now() - t0).toBeLessThan(1000);
     expect(res.statusCode).toBe(503);
-    expect(res.json()).toEqual({ ok: false, reason: "engine did not answer a depth-1 search within 30 ms" });
+    expect(res.json()).toEqual({ ok: false, reason: "engine did not answer a depth-1 search within 30 ms", commit: null });
     await app.close();
   });
 
@@ -323,10 +323,10 @@ describe("GET /api/health (NFR-13, #12)", () => {
     try {
       const store = createSqliteGameStore(":memory:");
       stores.push(store);
-      const health = createHealthProbe({ engine: { analyze: async () => ANALYSIS }, store });
+      const health = createHealthProbe({ engine: { analyze: async () => ANALYSIS }, store, commit: null });
       const { app } = buildServer({ bot: createFakeBot(), store, logger: false, health, webDist: dist });
       const res = await app.inject({ method: "GET", url: "/api/health" });
-      expect(res.json()).toEqual({ ok: true, engine: "ready" });
+      expect(res.json()).toEqual({ ok: true, engine: "ready", commit: null });
       await app.close();
     } finally {
       rmSync(dist, { recursive: true, force: true });
@@ -340,7 +340,7 @@ describe("GET /api/health (NFR-13, #12)", () => {
       const t0 = performance.now();
       const res = await app.inject({ method: "GET", url: "/api/health" });
       const ms = performance.now() - t0;
-      expect(res.json()).toEqual({ ok: true, engine: "ready" });
+      expect(res.json()).toEqual({ ok: true, engine: "ready", commit: null });
       expect(ms).toBeLessThan(2000);
       await app.close();
     } finally {
