@@ -246,15 +246,18 @@ describe("get_repertoire_context (FR-19)", () => {
       expect(r.usual_setup_note).toMatch(/not engine-checked/);
     });
 
-    it("registers each setup move as evidence in the position it is played from", async () => {
+    it("registers each setup move as plan evidence in the position it is played from, never as backed moves (review 096)", async () => {
       const c = black();
       await runTool("get_repertoire_context", { fen }, c);
-      expect(c.evidence.backsMove(fen, "g7g6")).toBe(true); // the first one, in the game position
-      // Bg7 is not legal in the game position itself, so it is not backed there.
-      expect(c.evidence.backsMove(fen, "f8g7")).toBe(false);
+      expect(c.evidence.backsPlan(fen, "g7g6")).toBe(true); // the first one, in the game position
+      // Plan evidence never backs a move as such: revealMove checks backsMove only.
+      expect(c.evidence.backsMove(fen, "g7g6")).toBe(false);
+      // Bg7 is not legal in the game position itself, so it is not plan evidence there.
+      expect(c.evidence.backsPlan(fen, "f8g7")).toBe(false);
       // The opponent's replies are left out: after ...g6 it is Black's turn again.
       const afterG6 = fenAfter(history).replace("pppppppp/5n2/8", "pppppp1p/5np1/8");
-      expect(c.evidence.backsMove(afterG6, "f8g7")).toBe(true);
+      expect(c.evidence.backsPlan(afterG6, "f8g7")).toBe(true);
+      expect(c.evidence.backsMove(afterG6, "f8g7")).toBe(false);
     });
 
     it("stops after a setup move that gives check (no position with the side not to move in check)", async () => {
@@ -279,8 +282,8 @@ describe("get_repertoire_context (FR-19)", () => {
       const r = (await runTool("get_repertoire_context", { fen: fenAfter(h) }, c)) as any;
       expect(r).toMatchObject({ in_repertoire: false, left_book_with: { san: "Bg5" } });
       expect(r.usual_setup).toEqual([{ san: "d6", uci: "d7d6" }]);
-      expect(c.evidence.backsMove(fenAfter(h), "d7d6")).toBe(true);
-      expect(c.evidence.backsMove(fenAfter(h), "f6h5")).toBe(false);
+      expect(c.evidence.backsPlan(fenAfter(h), "d7d6")).toBe(true);
+      expect(c.evidence.backsPlan(fenAfter(h), "f6h5")).toBe(false);
       // The player's own move left the book: the opponent is to move, so no setup is given.
       const own = ["d2d4", "g8f6", "c2c4", "e7e6"];
       const r2 = (await runTool("get_repertoire_context", { fen: fenAfter(own) }, ctx({ repertoire: line, history: own, playerColor: "b" }))) as any;

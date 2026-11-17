@@ -1,5 +1,5 @@
 import type { Color, KeyMoment } from "@chess-tutor/chess-core";
-import { moverOf, TutorReply } from "@chess-tutor/tutor";
+import { moverOf, nowFramed, TutorReply } from "@chess-tutor/tutor";
 import { board, findMentions, flipTurn, historyFens, isSquare, playUci, resolve, uciOf, type Mention } from "./notation.ts";
 
 /**
@@ -332,9 +332,6 @@ const PLACE_IMPERATIVE = /^(?:put|place|bring|plant|post|get|reroute|send)\s/i;
 /** Before it in its clause: nothing but a sequencing word (an instruction), or a plan frame ("the plan is to"). */
 const PLAN_HEAD =
   /^\s*(?:(?:then|first|next|and|also|later|eventually|after\s+that)\s+)*$|\b(?:plan|idea|aim|goal)\s+(?:is|was|would\s+be)\s+to\s+$|\b(?:plan|aim|want|wants|intend|intends|hope|hopes)\s+to\s+$/i;
-/** A clause that puts the move now is not a plan: "Put the bishop on g7 now". */
-const NOW_WORD = /\b(?:now|right\s+away|immediately|this\s+move)\b/i;
-
 /**
  * A plan sentence (#29, lb-kid-e4): "Put the bishop on g7.", "The plan is to bring the knight to
  * d5." names where a piece goes over several moves, not a move claimed now, so gradeMoves skips it
@@ -342,9 +339,9 @@ const NOW_WORD = /\b(?:now|right\s+away|immediately|this\s+move)\b/i;
  */
 function planSentence(text: string, m: Mention): boolean {
   if (!m.pieceTo || !PLACE_IMPERATIVE.test(m.raw)) return false;
-  const start = clauseStart(text, m.start);
-  if (NOW_WORD.test(text.slice(start, clauseEnd(text, m.end)))) return false;
-  return PLAN_HEAD.test(text.slice(start, m.start));
+  // A clause that puts the move now is not a plan: "Put the bishop on g7 now" (the claims check's reading).
+  if (nowFramed(text, m.start, m.end)) return false;
+  return PLAN_HEAD.test(text.slice(clauseStart(text, m.start), m.start));
 }
 
 const ucis = (moves: unknown): string[] =>
@@ -384,6 +381,36 @@ export function toolLinePositions(t: ToolResultRecord): string[] {
   return out;
 }
 
+/**
+ * The positions get_repertoire_context's usual_setup is played from (#41, review 096), replayed
+ * as the tool plays it: each setup move from the asked position in order, the turn passed back
+ * to the player after each, stopping after a check. A mention may be legal there as a plan move,
+ * but not in a clause that puts it now (nowFramed): the same reading as the claims check.
+ */
+export function toolSetupPositions(t: ToolResultRecord): string[] {
+  if (t.isError || t.name !== "get_repertoire_context") return [];
+  const fen = (t.input as { fen?: unknown } | null)?.fen;
+  if (typeof fen !== "string" || !board(fen)) return [];
+  let data: Record<string, unknown>;
+  try {
+    data = JSON.parse(t.content) as Record<string, unknown>;
+  } catch {
+    return [];
+  }
+  const out: string[] = [];
+  let at = fen;
+  for (const uci of ucis(data["usual_setup"])) {
+    const next = playUci(at, uci);
+    if (!next) continue;
+    if (/[+#]$/.test(next.move.san)) break;
+    const passed = flipTurn(next.fen);
+    if (!passed) break;
+    out.push(passed);
+    at = passed;
+  }
+  return out;
+}
+
 function unique(list: string[]): string[] {
   return [...new Set(list)];
 }
@@ -407,6 +434,7 @@ const MAX_POSITIONS = 400;
 export function gradeMoves(input: GradeInput): MovesGrade {
   const mentions: MentionGrade[] = [];
   const current = currentPositions(input);
+  const setup = unique(input.toolResults.flatMap(toolSetupPositions));
   const history = historyFens(input.history);
   const lastFen = lastMovePosition(input.history);
   const lastUci = input.history[input.history.length - 1];
@@ -425,7 +453,9 @@ export function gradeMoves(input: GradeInput): MovesGrade {
       const past = !named.lastMove && isPastMention(text, m.start, m.end, ctx);
       ctx.prev = { end: m.end, past };
       const reached: string[] = [];
-      for (const fen of past ? all : now) {
+      // usual_setup positions hold plan moves: open to a mention outside a "now" clause only (#41).
+      const pool = past ? all : nowFramed(text, m.start, m.end) ? now : unique([...now, ...setup]);
+      for (const fen of pool) {
         for (const variant of [fen, flipTurn(fen)]) {
           if (!variant) continue;
           for (const mv of resolve(variant, m.spec)) reached.push(mv.after);

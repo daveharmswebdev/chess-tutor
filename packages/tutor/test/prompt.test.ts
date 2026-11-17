@@ -29,6 +29,8 @@ describe("prompts/tutor-system.v3.md (release artifact)", () => {
     expect(rule).toMatch(/pawn break in the centre/);
     // A setup move is the repertoire's plan, not an engine-checked answer.
     expect(rule).toMatch(/`revealMove` unless `analyze_position` or `evaluate_move` backs it/);
+    // The claims check rejects a setup move framed as now (review 096).
+    expect(rule).toMatch(/do not put one in a clause with "now", "right away" or "immediately"/);
     expect(prompt).toMatch(/`usual_setup`: the student's own next moves of the last book line/);
   });
 

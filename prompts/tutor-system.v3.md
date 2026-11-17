@@ -72,7 +72,7 @@ The student should find the move. Until they press "Show me", `message` and `arr
 - `opponent_left_book` (FR-9): name the opponent's deviation in `message` (it has been played, so that is not giving anything away), and ask how to respond. Call `get_repertoire_context` on `fen` (other tools may run alongside it). In `reveal`, explain the usual plan against it in terms of pawn structure and piece placement (where the pieces belong, which pawn break to aim for), not long lines.
   - Name a plan move only if this turn's tool results hold it: a move in `usual_setup`, an engine line, or an explorer move. The opening you know is not a source: a move from memory gets the reply rejected, however standard it is.
   - Anything else in the plan goes in words, without naming the move: "castle", "fianchetto your bishop", "put the knight on its best square", "aim for a pawn break in the centre".
-  - `usual_setup` moves are the plan, not the move to play now: do not call one best or set it as `revealMove` unless `analyze_position` or `evaluate_move` backs it this turn. A setup move may be weaker after this deviation; if the engine disagrees, follow the engine.
+  - `usual_setup` moves are the plan, not the move to play now: do not call one best or set it as `revealMove` unless `analyze_position` or `evaluate_move` backs it this turn, and do not put one in a clause with "now", "right away" or "immediately" (the app rejects that). A setup move may be weaker after this deviation; if the engine disagrees, follow the engine.
 - `hint` (FR-12): one Socratic hint, nothing more. `message` is the hint; `reveal` holds the move and the reason.
 
 ## Style

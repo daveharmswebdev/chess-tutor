@@ -320,8 +320,10 @@ const SETUP_NOTE =
  * played from `fen` one after another with the turn passed back to the player in between (the
  * opponent's replies are unknown, so left out). A move that is illegal at its turn is dropped;
  * the walk stops after a move that gives check (passing the turn would leave the side not to
- * move in check). Each move is backed only in the position it is played from (FR-10), so
- * "...Bg7" after "...g6" is evidence, but Bg7 is not backed in `fen` itself.
+ * move in check). Each move is plan evidence (Evidence.addPlanMove) only in the position it is
+ * played from, so "...Bg7" after "...g6" is plan evidence but Bg7 in `fen` is not. Plan evidence
+ * never backs a move (review 096): not even the first setup move, which is legal in `fen`, may
+ * be revealMove or be named as the move to play now without the engine (FR-10, FR-8).
  */
 function usualSetup(fen: string, bookHistory: string[], ctx: ToolContext): MovePair[] {
   const own: string[] = [];
@@ -335,7 +337,7 @@ function usualSetup(fen: string, bookHistory: string[], ctx: ToolContext): MoveP
   const setup: MovePair[] = [];
   let at = fen;
   for (const uci of own) {
-    const pair = ctx.evidence.addMove(at, uci);
+    const pair = ctx.evidence.addPlanMove(at, uci);
     if (!pair) continue; // illegal in the new position: dropped
     setup.push(pair);
     if (/[+#]$/.test(pair.san)) break;
