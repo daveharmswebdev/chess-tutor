@@ -55,14 +55,14 @@ export interface ServerDeps {
 export const DEMO_TOKEN_HEADER = "x-demo-token";
 
 /**
- * True when an authorization header carries exactly `Bearer <configured>` (IR-10). The
- * configured token must be non-blank (trimmed). Constant-time comparison of equal-length
- * buffers; unequal lengths do not match.
+ * True when an authorization header carries `Bearer <configured>` (IR-10). The scheme is
+ * case-insensitive (RFC 7235), the token is not. The configured token must be non-blank
+ * (trimmed). Constant-time comparison of equal-length buffers; unequal lengths do not match.
  */
 export function bearerMatches(configured: string, header: string | string[] | undefined): boolean {
   const token = configured.trim();
   if (token === "" || typeof header !== "string") return false;
-  const match = /^Bearer (.+)$/.exec(header);
+  const match = /^Bearer (.+)$/i.exec(header);
   if (!match) return false;
   const expected = Buffer.from(token, "utf8");
   const given = Buffer.from(match[1]!, "utf8");
@@ -167,7 +167,7 @@ export function buildServer(deps: ServerDeps): { app: FastifyInstance; games: Ga
   // Daily usage counts for the ops dashboard (FR-29, #60; IR-10, NFR-15). Counts only.
   const opsToken = deps.opsStatsToken?.trim() ?? "";
   let pricing: Pricing | undefined = deps.pricing;
-  const warnedModels = new Set<string>();
+  const warnedModels = new Set<string | null>();
   app.get("/ops/daily-stats", async (request, reply) => {
     if (opsToken === "") return reply.status(404).send(apiError(`no route ${request.method} ${request.url}`));
     if (!bearerMatches(opsToken, request.headers.authorization)) {
@@ -185,7 +185,11 @@ export function buildServer(deps: ServerDeps): { app: FastifyInstance; games: Ga
         warnUnknownModel: (model) => {
           if (warnedModels.has(model)) return;
           warnedModels.add(model);
-          request.log.warn({ model }, "usage stats: no price for this model; its tokens count at 0 spend");
+          if (model === null) {
+            request.log.warn("usage stats: rows with an unknown model (none recorded); their tokens count at 0 spend");
+          } else {
+            request.log.warn({ model }, "usage stats: no price for this model; its tokens count at 0 spend");
+          }
         },
       }),
     );

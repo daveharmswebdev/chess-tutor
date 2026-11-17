@@ -55,6 +55,12 @@ export interface GameLog {
 
 const SILENT_LOG: GameLog = { info() {}, warn() {}, error() {} };
 
+/**
+ * Ledger reason for an ask the server cancelled itself (#60, review 088): not an error, but its
+ * tokens still count (NFR-5).
+ */
+export const CANCELLED_REASON = "cancelled";
+
 export type GameListener = (event: GameEvent) => void;
 
 export interface GameManagerOptions {
@@ -1064,15 +1070,27 @@ export function createGameManager(opts: GameManagerOptions): GameManager {
         const usage = { requests: 0, inputTokens: 0, outputTokens: 0, cacheReadInputTokens: 0, cacheCreationInputTokens: 0 };
         return { ok: false, reason: "api_unavailable", message: String(err), usage, ms: 0 };
       })
-      .then((o) => finishAsk(g, token, kind, attemptFen, o));
+      .then((o) => finishAsk(g, token, kind, attemptFen, o, controller.signal));
   }
 
-  function finishAsk(g: Game, token: number, kind: TutorKind, attemptFen: string, outcome: TutorOutcome): void {
+  function finishAsk(
+    g: Game,
+    token: number,
+    kind: TutorKind,
+    attemptFen: string,
+    outcome: TutorOutcome,
+    signal?: AbortSignal,
+  ): void {
     // source (FR-28, #64): lets usage reporting (#60) split demo spend from real use.
     // Key gameSource, not source: the "bot move" line already uses source for book/engine (review 081).
     const meta = { gameId: g.id, gameSource: g.source, kind, ok: outcome.ok, ms: outcome.ms, usage: outcome.usage };
-    // Every finished ask is in the ledger (#60), dropped ones too: their tokens were spent.
-    recordUsage(g, { kind, ok: outcome.ok, reason: outcome.ok ? null : outcome.reason, ms: outcome.ms, usage: outcome.usage, model: coaching?.model ?? null });
+    // Every finished ask is in the ledger (#60), dropped ones too: their tokens were spent. An ask
+    // the server cancelled itself (moved on, replaced, game over, auth-off, shutdown) is not an
+    // error: the session answers an abort with api_unavailable, stored as "cancelled" (review 088).
+    // A validated reply that arrives after a cancel stays ok.
+    const cancelled = !outcome.ok && (signal?.aborted === true || g.ask?.token !== token);
+    const reason = outcome.ok ? null : cancelled ? CANCELLED_REASON : outcome.reason;
+    recordUsage(g, { kind, ok: outcome.ok, reason, ms: outcome.ms, usage: outcome.usage, model: coaching?.model ?? null });
     if (g.ask?.token !== token) {
       log.info(meta, "tutor reply dropped: the question was replaced");
       return;

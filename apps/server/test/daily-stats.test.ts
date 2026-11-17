@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
-import { mkdtempSync, rmSync } from "node:fs";
+import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { DatabaseSync } from "node:sqlite";
@@ -61,7 +61,7 @@ afterEach(async () => {
   rmSync(dir, { recursive: true, force: true });
 });
 
-function setup(opts: { token?: string | undefined; model?: string; pricing?: Pricing } = {}) {
+function setup(opts: { token?: string | undefined; model?: string; pricing?: Pricing; webDist?: string } = {}) {
   bot = createFakeBot(["e7e5", "b8c6", "g8f6", "d7d6"]);
   tutor = createFakeTutor();
   store = createSqliteGameStore(dbPath);
@@ -78,8 +78,20 @@ function setup(opts: { token?: string | undefined; model?: string; pricing?: Pri
     coaching: { analyzer: createFakeAnalyzer(), tutor, model: opts.model ?? SONNET },
     pricing: opts.pricing ?? PRICING,
     ...(token === undefined ? {} : { opsStatsToken: token }),
+    ...(opts.webDist ? { webDist: opts.webDist } : {}),
   }));
 }
+
+/** A built web app (index.html only) in the test's temp dir. */
+function webDist(): string {
+  const web = join(dir, "web");
+  mkdirSync(web);
+  writeFileSync(join(web, "index.html"), "<!doctype html><title>spa</title>");
+  return web;
+}
+
+/** The ledger rows of 2026-11-15. */
+const day15 = () => store.usageBetween("2026-11-15T00:00:00.000Z", "2026-11-16T00:00:00.000Z");
 
 /** `auth` null sends no authorization header. */
 async function stats(query = "", auth: string | null = `Bearer ${TOKEN}`) {
@@ -192,6 +204,147 @@ describe("GET /ops/daily-stats auth (IR-10)", () => {
   it("a configured token with surrounding whitespace is trimmed", async () => {
     setup({ token: `  ${TOKEN}\n` });
     expect((await stats()).status).toBe(200);
+  });
+});
+
+describe("review 088 (round 2): routing and the auth scheme", () => {
+  for (const token of [undefined, "  "]) {
+    it(`token ${JSON.stringify(token)} with webDist set: still the JSON 404, not the SPA`, async () => {
+      setup({ token, webDist: webDist() });
+      const res = await app.inject({ method: "GET", url: "/ops/daily-stats" });
+      expect(res.statusCode).toBe(404);
+      expect(res.headers["content-type"]).toMatch(/application\/json/);
+      expect(res.json()).toEqual({ error: "no route GET /ops/daily-stats" });
+    });
+  }
+
+  for (const url of ["/ops/daily-stats/", "/ops/other", "/ops", "/ops/"]) {
+    it(`${url} with webDist set: JSON 404, not index.html`, async () => {
+      setup({ webDist: webDist() });
+      const res = await app.inject({ method: "GET", url, headers: { authorization: `Bearer ${TOKEN}` } });
+      expect(res.statusCode).toBe(404);
+      expect(res.headers["content-type"]).toMatch(/application\/json/);
+      expect(res.json()).toEqual({ error: expect.any(String) });
+    });
+  }
+
+  it("other paths still get the SPA fallback (e.g. /games/x, /opsx)", async () => {
+    setup({ webDist: webDist() });
+    for (const url of ["/games/abc", "/opsx"]) {
+      const res = await app.inject({ method: "GET", url });
+      expect(res.statusCode, url).toBe(200);
+      expect(res.body).toContain("<title>spa</title>");
+    }
+  });
+
+  for (const scheme of ["bearer", "BEARER", "BeArEr"]) {
+    it(`the scheme is case-insensitive: "${scheme} <token>" -> 200`, async () => {
+      setup();
+      expect((await stats("?date=2026-11-15", `${scheme} ${TOKEN}`)).status).toBe(200);
+    });
+  }
+
+  it("the token itself stays case-sensitive", async () => {
+    setup();
+    expect((await stats("", `Bearer ${TOKEN.toUpperCase()}`)).status).toBe(401);
+  });
+});
+
+describe("review 088 (round 2): asks the server cancelled are not errors", () => {
+  /** The real session's answer to an aborted ask (packages/tutor session.ts). */
+  const aborted = (u: Partial<TutorUsage>) => ({ ...failOutcome("api_unavailable", "aborted"), usage: usage(u), ms: 30 });
+
+  it("player moves while the tutor thinks: stored as cancelled, not in errors, tokens in claude", async () => {
+    setup();
+    const g = await newGame();
+    await app.inject({ method: "POST", url: `/api/games/${g.id}/tutor/hint` });
+    const ask = await tutor.ask(0);
+    const moved = await app.inject({ method: "POST", url: `/api/games/${g.id}/moves`, payload: { uci: "d2d4" } });
+    expect(moved.statusCode).toBe(200);
+    await games.idle(g.id);
+    expect(ask.signal?.aborted).toBe(true);
+    ask.resolve(aborted({ inputTokens: 1_000_000 }));
+    await new Promise((r) => setTimeout(r, 5));
+    expect(day15().map((r) => [r.ok, r.reason])).toEqual([[false, "cancelled"]]);
+    const s = (await stats("?date=2026-11-15")).body.player;
+    expect(s.errors).toEqual({});
+    expect(s.tutorReplies).toBe(0);
+    expect(s.claude).toMatchObject({ requests: 1, inputTokens: 1_000_000, spendUsd: 2 });
+  });
+
+  it("game end (resign) while the tutor thinks: cancelled, not an error", async () => {
+    setup();
+    const g = await newGame();
+    await app.inject({ method: "POST", url: `/api/games/${g.id}/tutor/hint` });
+    const ask = await tutor.ask(0);
+    expect((await app.inject({ method: "POST", url: `/api/games/${g.id}/resign` })).statusCode).toBe(200);
+    expect(ask.signal?.aborted).toBe(true);
+    ask.resolve(aborted({ outputTokens: 100_000 }));
+    await new Promise((r) => setTimeout(r, 5));
+    expect(day15().map((r) => r.reason)).toEqual(["cancelled"]);
+    const s = (await stats("?date=2026-11-15")).body.player;
+    expect(s.errors).toEqual({});
+    expect(s.claude).toMatchObject({ outputTokens: 100_000, spendUsd: 1 });
+  });
+
+  it("game end by a new game of the same source (abandon): cancelled", async () => {
+    setup();
+    const g = await newGame();
+    await app.inject({ method: "POST", url: `/api/games/${g.id}/tutor/hint` });
+    const ask = await tutor.ask(0);
+    await newGame();
+    expect(ask.signal?.aborted).toBe(true);
+    ask.resolve(aborted({ inputTokens: 5 }));
+    await new Promise((r) => setTimeout(r, 5));
+    expect(day15().map((r) => r.reason)).toEqual(["cancelled"]);
+    expect((await stats("?date=2026-11-15")).body.player.errors).toEqual({});
+  });
+
+  it("shutdown while the tutor thinks: cancelled", async () => {
+    setup();
+    const g = await newGame();
+    await app.inject({ method: "POST", url: `/api/games/${g.id}/tutor/hint` });
+    const first = await tutor.ask(0);
+    // Shutdown also cancels: close the manager, then the aborted ask answers.
+    games.close();
+    expect(first.signal?.aborted).toBe(true);
+    first.resolve(aborted({ inputTokens: 7 }));
+    await new Promise((r) => setTimeout(r, 5));
+    expect(day15().map((r) => r.reason)).toEqual(["cancelled"]);
+  });
+
+  it("a genuine api_unavailable on an ask nobody cancelled still counts as an error", async () => {
+    setup();
+    const g = await newGame();
+    await hintWith(g.id, aborted({ inputTokens: 3 }));
+    expect(day15().map((r) => r.reason)).toEqual(["api_unavailable"]);
+    const s = (await stats("?date=2026-11-15")).body.player;
+    expect(s.errors).toEqual({ api_unavailable: 1 });
+    expect(s.claude.inputTokens).toBe(3);
+  });
+
+  it("a validated reply that arrives after its ask was cancelled stays ok (counted as a reply)", async () => {
+    setup();
+    const g = await newGame();
+    await app.inject({ method: "POST", url: `/api/games/${g.id}/tutor/hint` });
+    const ask = await tutor.ask(0);
+    await app.inject({ method: "POST", url: `/api/games/${g.id}/moves`, payload: { uci: "d2d4" } });
+    await games.idle(g.id);
+    ask.resolve(okOutcome({ kind: "hint" }));
+    await new Promise((r) => setTimeout(r, 5));
+    expect(day15().map((r) => [r.ok, r.reason])).toEqual([[true, null]]);
+  });
+
+  it("computeDailyStats: cancelled rows add tokens, never errors or replies", () => {
+    const s = computeDailyStats({
+      date: "2026-11-15",
+      generatedAt: "2026-11-16T01:00:00.000Z",
+      gamesStarted: { player: 0, demo: 0 },
+      events: [row({ ok: false, reason: "cancelled", inputTokens: 1_000_000, ms: 5 })],
+      pricing: PRICING,
+    });
+    expect(s.player.errors).toEqual({});
+    expect(s.player).toMatchObject({ tutorReplies: 0, tutorLatencyMs: { p50: null, p95: null }, claude: { requests: 1, spendUsd: 2 } });
   });
 });
 
@@ -407,11 +560,23 @@ describe("computeDailyStats (pure)", () => {
   });
 
   it("an unknown model: tokens counted, 0 spend, one warning per model", () => {
-    const warned: string[] = [];
+    const warned: (string | null)[] = [];
     const events = [row({ model: "claude-mystery-1", inputTokens: 1_000_000 }), row({ model: "claude-mystery-1", inputTokens: 5 }), row({ model: null, inputTokens: 1 })];
     const s = computeDailyStats({ ...base, events, pricing: PRICING, warnUnknownModel: (m) => warned.push(m) });
     expect(s.player.claude).toMatchObject({ requests: 3, inputTokens: 1_000_006, spendUsd: 0 });
-    expect(warned).toEqual(["claude-mystery-1", "null"]);
+    // A row with no model is reported as such (null), not as a model named "null" (review 088).
+    expect(warned).toEqual(["claude-mystery-1", null]);
+  });
+
+  it("the route words a row with no model as an unknown model, once", async () => {
+    setup();
+    store.recordUsage(row({ model: null, inputTokens: 10 }));
+    expect((await stats("?date=2026-11-15")).body.player.claude).toMatchObject({ inputTokens: 10, spendUsd: 0 });
+    await stats("?date=2026-11-15");
+    const lines = logLines.filter((l) => l.includes("usage stats"));
+    expect(lines).toHaveLength(1);
+    expect(lines[0]).toContain("unknown model");
+    expect(lines[0]).not.toContain('"null"');
   });
 
   it("the route warns once per unknown model across requests", async () => {

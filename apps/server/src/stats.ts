@@ -38,6 +38,8 @@ export interface UsageCounts {
 export type Pricing = Record<string, ModelPrice>;
 
 export const BOT_FAILED = "bot_failed";
+/** Same value as games.ts CANCELLED_REASON: a ledger row for an ask the server cancelled. */
+export const CANCELLED = "cancelled";
 
 /** Nearest-rank percentile: the value at rank ceil(p * n) of the sorted values; null when empty. */
 export function nearestRank(values: readonly number[], p: number): number | null {
@@ -88,8 +90,8 @@ export interface DailyStatsInput {
   events: readonly UsageEvent[];
   gamesStarted: Record<GameSource, number>;
   pricing: Pricing;
-  /** Called for each model (String(model)) with no price, once per call; its tokens add 0 spend. */
-  warnUnknownModel?: (model: string) => void;
+  /** Called once per call for each model with no price (null: rows with no model recorded); their tokens add 0 spend. */
+  warnUnknownModel?: (model: string | null) => void;
 }
 
 /**
@@ -105,7 +107,7 @@ export function computeDailyStats(input: DailyStatsInput): DailyStats {
   };
   const latencies: Record<GameSource, number[]> = { player: [], demo: [] };
   const spend: Record<GameSource, number> = { player: 0, demo: 0 };
-  const unknown = new Set<string>();
+  const unknown = new Set<string | null>();
 
   for (const e of input.events) {
     const source: GameSource = e.source === "demo" ? "demo" : "player";
@@ -117,7 +119,8 @@ export function computeDailyStats(input: DailyStatsInput): DailyStats {
     if (e.ok) {
       c.tutorReplies++;
       latencies[source].push(e.ms);
-    } else {
+    } else if (e.reason !== CANCELLED) {
+      // An ask the server cancelled itself is not an error; its tokens still count below (review 088).
       const reason = e.reason ?? "unknown";
       c.errors[reason] = (c.errors[reason] ?? 0) + 1;
     }
@@ -128,7 +131,7 @@ export function computeDailyStats(input: DailyStatsInput): DailyStats {
     c.claude.cacheCreationInputTokens += e.cacheCreationInputTokens;
     const price = e.model === null ? undefined : Object.hasOwn(input.pricing, e.model) ? input.pricing[e.model] : undefined;
     if (!price) {
-      unknown.add(String(e.model));
+      unknown.add(e.model);
       continue;
     }
     spend[source] +=
@@ -151,7 +154,7 @@ export function computeDailyStats(input: DailyStatsInput): DailyStats {
 /** The day's stats straight from the ledger (SQLite, IR-7). */
 export function dailyStatsFromLedger(
   ledger: UsageLedger,
-  opts: { date: string; now: Date; pricing: Pricing; warnUnknownModel?: (model: string) => void },
+  opts: { date: string; now: Date; pricing: Pricing; warnUnknownModel?: (model: string | null) => void },
 ): DailyStats {
   const { from, to } = dayRange(opts.date);
   return computeDailyStats({

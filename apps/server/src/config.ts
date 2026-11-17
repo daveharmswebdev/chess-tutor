@@ -84,7 +84,7 @@ export function loadPricing(path: string = MODELS_CONFIG_PATH): Record<string, M
   return out;
 }
 
-const EFFORTS =new Set(["low", "medium", "high", "xhigh", "max"]);
+const EFFORTS = new Set(["low", "medium", "high", "xhigh", "max"]);
 
 /**
  * The tutor's settings: model from config/models.json for `appEnv` (IR-9), effort and
