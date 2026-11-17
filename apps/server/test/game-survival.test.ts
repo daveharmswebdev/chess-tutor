@@ -531,6 +531,66 @@ describe("a demo game across a restart (FR-28, NFR-14)", () => {
     expect((await post(b, `/api/games/${id}/resign`)).status).toBe(200);
     expect(onDisk(id)).toMatchObject({ status: "finished", source: "demo" });
   });
+
+  it("a player game and a demo game both in progress: a restart restores both, each with its own moves and tutor state (#71)", async () => {
+    const a = boot("a", ["d7d5", "e7e6", "e7e5"], { demoToken: "tok" });
+    scriptBlunderAfterD4D5(a.analyzer);
+    a.analyzer.set(START, 0, "d2d4");
+    a.analyzer.set(fenAfter(["e2e4"]), -300);
+    a.analyzer.set(fenAfter(["e2e4", "e7e5"]), -300);
+
+    // The player game: 1. d4 d5 2. e4? e6, with the tutor's question open.
+    const player = await newGame(a);
+    await play(a, player.id, "d2d4");
+    await play(a, player.id, "e2e4");
+    (await a.tutor.ask(0)).resolve(okOutcome({ reveal: "Nf3 develops and keeps e4 for later.", revealMove: "g1f3" }));
+    const reply = await player.events.next("tutor_reply");
+    if (reply.type !== "tutor_reply") throw new Error("unreachable");
+    await a.games.idle(player.id);
+
+    // The demo game: 1. e4? e5, with the tutor still thinking at shutdown.
+    const res = await a.app.inject({
+      method: "POST",
+      url: "/api/games",
+      headers: { "x-demo-token": "tok" },
+      payload: { playerColor: "w" },
+    });
+    expect(res.statusCode, res.body).toBe(201);
+    const demoId = (res.json() as GameView).id;
+    await play(a, demoId, "e2e4");
+    const demoAsk = await a.tutor.ask(1);
+
+    const playerBefore = (await get(a, player.id)).view;
+    const demoBefore = (await get(a, demoId)).view;
+    expect(playerBefore).toMatchObject({ status: "playing", tutor: { thinking: false, question: reply.question } });
+    expect(demoBefore).toMatchObject({ status: "playing", tutor: { thinking: true, question: null } });
+    expect(ucis(playerBefore)).toEqual(["d2d4", "d7d5", "e2e4", "e7e6"]);
+    expect(ucis(demoBefore)).toEqual(["e2e4", "e7e5"]);
+    await a.close();
+    expect(onDisk(player.id)).toMatchObject({ status: "playing", source: "player" });
+    expect(onDisk(demoId)).toMatchObject({ status: "playing", source: "demo" });
+
+    const b = boot("b");
+    expect(b.store.listPlaying().map((r) => [r.id, r.source])).toEqual([
+      [player.id, "player"],
+      [demoId, "demo"],
+    ]);
+    // Only the demo game's ask is re-run; the player game's question stays as it was.
+    const askB = await b.tutor.ask(0);
+    expect(askB.request).toEqual(demoAsk.request);
+    expect(b.tutor.sessions.map((s) => s.id)).toEqual([demoId]);
+    expect((await get(b, player.id)).view).toEqual(playerBefore);
+    expect((await get(b, demoId)).view).toMatchObject({ status: "playing", moves: demoBefore.moves, tutor: { thinking: true, question: null } });
+    expect(b.tutor.asks).toHaveLength(1);
+
+    // The demo game's reply lands on the demo game only.
+    const demoEvents = eventCollector();
+    b.games.subscribe(demoId, demoEvents.push);
+    askB.resolve(okOutcome({ reveal: "d4 holds the centre.", revealMove: "d2d4" }));
+    expect(await demoEvents.next("tutor_reply")).toMatchObject({ question: { attemptFen: START } });
+    expect((await get(b, demoId)).view.tutor).toMatchObject({ thinking: false, question: { attemptFen: START } });
+    expect((await get(b, player.id)).view).toEqual(playerBefore);
+  });
 });
 
 describe("schema version guard", () => {
