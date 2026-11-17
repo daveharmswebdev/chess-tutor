@@ -3,7 +3,8 @@
 // #47 (NFR-14): the address is the game (/games/<id>); popstate and the first render navigate.
 // #42 (FR-20): 'Bot' / 'You' rows above and below the board, with captured pieces and material.
 // #52 (FR-24): a graded try shows as a short pop-up over the 'Bot' row, not in the tutor panel.
-import type { Color, MoveView } from "@chess-tutor/chess-core";
+// #54 (FR-25): the move list shows the tutor's notes (MoveList.tsx).
+import type { Color } from "@chess-tutor/chess-core";
 import { useEffect, useMemo, useState, useSyncExternalStore, type CSSProperties } from "react";
 import { Chessboard, type ChessboardOptions } from "react-chessboard";
 import { BoardSide } from "./BoardSide.tsx";
@@ -12,6 +13,7 @@ import { isOwnPiece, legalTargets, moveToUci } from "./chess-rules.ts";
 import { ConnectionNotice } from "./ConnectionNotice.tsx";
 import { createGameController } from "./controller.ts";
 import { GameActions } from "./GameActions.tsx";
+import { MoveList } from "./MoveList.tsx";
 import { boardFen, gameReducer, initialGameState, isPlayersTurn, statusText } from "./game-state.ts";
 import { createStore } from "./store.ts";
 import { TryToast } from "./TryToast.tsx";
@@ -25,33 +27,6 @@ const TARGET: CSSProperties = {
 const CAPTURE_TARGET: CSSProperties = {
   background: "radial-gradient(circle, transparent 58%, rgba(0, 0, 0, 0.25) 60%)",
 };
-
-function MoveList({ moves }: { moves: MoveView[] }) {
-  const rows: Array<{ n: number; white: MoveView | undefined; black: MoveView | undefined; ply: number }> = [];
-  for (let i = 0; i < moves.length; i += 2) {
-    rows.push({ n: i / 2 + 1, white: moves[i], black: moves[i + 1], ply: i });
-  }
-  if (rows.length === 0) return <p className="muted">No moves yet.</p>;
-  const cell = (m: MoveView | undefined, ply: number) =>
-    m ? (
-      <span className={`ply ${m.by}`} data-testid="move-item" data-ply={ply} data-by={m.by} title={m.by === "bot" ? "Bot" : "You"}>
-        {m.san}
-      </span>
-    ) : (
-      <span className="ply" />
-    );
-  return (
-    <ol className="moves" data-testid="move-list">
-      {rows.map((r) => (
-        <li key={r.n}>
-          <span className="move-no">{r.n}.</span>
-          {cell(r.white, r.ply)}
-          {cell(r.black, r.ply + 1)}
-        </li>
-      ))}
-    </ol>
-  );
-}
 
 export function App() {
   const store = useMemo(() => createStore(gameReducer, initialGameState), []);
@@ -181,7 +156,7 @@ export function App() {
 
           <div className="panel">
             <h2>Moves</h2>
-            <MoveList moves={game?.moves ?? []} />
+            <MoveList moves={game?.moves ?? []} notes={game?.notes ?? []} />
             <GameActions state={state} controller={controller} />
           </div>
 
