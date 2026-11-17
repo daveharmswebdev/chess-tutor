@@ -1,0 +1,33 @@
+{
+  "brief_id": "084-try-toast-r1",
+  "agent": "web-agent",
+  "issue": 52,
+  "base_sha": "4ec6772",
+  "scratch_dir": "/private/tmp/claude-501/-Users-daveharms-personal-workspace-chess-tutor/fdb44069-058e-4dbd-a0ef-259f8b7043c2/scratchpad/084-try-toast-r1",
+  "objective": "When the engine grades the player's try, the result shows as a short pop-up near the board instead of in the tutor panel (FR-24, #52), and closes after about 5 seconds or at the player's next move, whichever comes first. A wrong try names the best move from the server's data, never made up (FR-10). Success: every rubric case has a test that was red before and is green after, and the panel no longer shows the attempt line.",
+  "requirements": [
+    "FR-24",
+    "FR-8",
+    "FR-10"
+  ],
+  "contract": "FR-24: \"The tutor panel only shows text about the position on the board. When the player makes a move, whatever the panel showed leaves it. When the engine grades the player's attempt (FR-8), the result (\"correct\", or \"not quite, best was ...\") appears as a short notice near the board that closes after about 5 seconds or at the player's next move, whichever comes first.\" Decided with the owner 2026-11-15.\nText (from the issue, approved by the owner):\n  ✓  Nf3, correct. Only 0.1 off the best move   (cpLoss in pawns, one decimal; when cpLoss is 0 write \"Nf3, correct. The best move\")\n  ✗  Be2, not quite. Best was h3\nSources (api.ts is inlined): SSE \"tutor_attempt\" {questionId, move, correct, cpLoss}. On a wrong try the server sends \"tutor_attempt\" first, then \"tutor_reveal\" {reveal: {questionId, move: MoveView|null, ...}}. \"Best was\" uses reveal.move.san for the same questionId. If the reveal move is null, show the wrong-try line without \"Best was\". Never invent a move.\nToday: apps/web/src/game-state.ts reducer case \"tutor_attempt\" (~line 291) stores tutor.attempt; tutorAttemptText (~line 550) formats it; TutorPanel.tsx:61-63 renders it as data-testid=\"tutor-attempt\". Move the result out of the panel into a pop-up near the board (BoardSide.tsx or App.tsx area, your call) with its own testid. The pop-up comes only from live events: opening or reloading a game shows no old try result.\nTimers: controller.ts already has injectable Timers (deps.timers with setTimeout/clearTimeout). Use injectable timers so tests don't sleep. The next move (move_attempted) closes it at once. A new graded try replaces it and restarts the timer.\nAccessibility: role=\"status\" / aria-live polite. Keep it from covering board squares at phone width if you can (styles.css).\nE2E: apps/web/e2e has Playwright specs. Add one if a try can be set up reliably; otherwise say why in your return.\nGate at base 4ec6772 (run by the coordinator): pnpm test -> Test Files 52 passed, Tests 1227 passed (1227); pnpm typecheck clean.",
+  "contract_files": [
+    "packages/chess-core/src/api.ts"
+  ],
+  "scope": [
+    "apps/web/**"
+  ],
+  "negative": [
+    "Do not edit files outside scope, docs, config, .github, root files or the lockfile.",
+    "No new dependencies.",
+    "Do not change the shared API types (packages/chess-core/src/api.ts) or apps/server.",
+    "No move or evaluation text that does not come from the server's events."
+  ],
+  "rubric": [
+    "Tests first (red then green) for: a correct try shows the ✓ line in the pop-up and nothing in the panel; a wrong try shows ✗ with \"Best was <reveal.move.san>\" once tutor_reveal arrives; a wrong try whose reveal move is null names no best move; the pop-up closes after ~5 s (fake timers); it closes at the next move_attempted; a second try replaces the first and restarts the timer; opening or reloading a game shows no pop-up; cpLoss 0 and cpLoss 10 format as in the contract.",
+    "pnpm test and pnpm typecheck clean from the repo root; e2e passes, or the return explains why it couldn't run.",
+    "files_changed lists every file changed in 4ec6772..your head. Commit message references FR-24, FR-10 and #52."
+  ],
+  "concurrency": "#71 runs at the same time in server-agent (apps/server/** only). No file overlap. Don't rebase; the coordinator does that at ship.",
+  "round": 1
+}

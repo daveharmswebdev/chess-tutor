@@ -1,0 +1,24 @@
+{
+  "brief_id": "086-review-try-toast-r1",
+  "agent": "reviewer",
+  "issue": 52,
+  "base_sha": "1642c19",
+  "scratch_dir": "/private/tmp/claude-501/-Users-daveharms-personal-workspace-chess-tutor/fdb44069-058e-4dbd-a0ef-259f8b7043c2/scratchpad/086-review-try-toast-r1",
+  "objective": "Review #52 round 1: `git diff 1d1b413..1642c19` (web-agent, graded try as a pop-up near the board, rebased onto main 1d1b413) against FR-24, FR-8, FR-10 and the decisions below. Focus: (1) the best move named on a wrong try can only come from tutor_reveal.move for the same questionId, never invented or taken from another question (FR-10); (2) the pop-up closes after ~5 s or at the next move, a new try replaces it and restarts the timer, and timers are cleared when leaving a game (no stale pop-up on another game, no leaked timer); (3) opening or reloading a game never shows an old result; (4) the tutor panel lost the attempt line without breaking anything #51 built (panel clears on move, rejection restore, reconnect); (5) layout: covers no board squares at phone width. Findings blocking/major/minor; summary ends SHIP or NO-SHIP.",
+  "requirements": [
+    "FR-24",
+    "FR-8",
+    "FR-10"
+  ],
+  "contract": "FR-24: the tutor panel only shows text about the position on the board; the graded attempt's result appears as a short notice near the board that closes after about 5 seconds or at the player's next move, whichever comes first (owner decision 2026-11-15).\nApproved text: '✓  Nf3, correct. Only 0.1 off the best move' (cpLoss in pawns, one decimal; cpLoss 0 -> 'Nf3, correct. The best move'), '✗  Be2, not quite. Best was h3'. Null reveal move -> no 'Best was'.\nServer order on a wrong try: tutor_attempt, then tutor_reveal. Events can arrive before the move's HTTP reply.\nKnown and accepted, do not re-report: no new e2e (the e2e server runs with no API key, so no tutor question can exist); a correct try with 1-4 cp loss reads 'Less than 0.1 off the best move' (spoke's choice, coordinator accepts, owner to confirm in the PR).\nGate on 1642c19 (coordinator): pnpm test 53 files, 1253 passed; typecheck clean; e2e 4 passed.\nRead with git diff / git show <sha>:<path>; you start in a worktree at 1642c19.",
+  "scope": [],
+  "negative": [
+    "Read-only: do not edit, commit, or run anything that writes to the repo."
+  ],
+  "rubric": [
+    "Each finding cites file:line and evidence; reproduce blocking/major with a scratch test outside the repo.",
+    "Summary ends SHIP or NO-SHIP."
+  ],
+  "concurrency": "#60 (server-agent, apps/server/**) runs at the same time; unrelated.",
+  "round": 1
+}

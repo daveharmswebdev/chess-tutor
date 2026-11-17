@@ -310,3 +310,31 @@
 {"ts":"2026-11-17T01:24:11.082Z","event":"coordinator_verdict","brief_id":"082-demo-marker-r2","agent":"server-agent","verdict":"accepted","reason":"files match (5); rebased onto 2f6db95: 1227 passed, typecheck clean","tokens":86096,"duration_ms":160282}
 {"ts":"2026-11-17T01:24:11.082Z","event":"coordinator_verdict","brief_id":"081-review-demo-marker-r1","agent":"reviewer","verdict":"review","reason":"cost","tokens":33209,"duration_ms":86022}
 {"ts":"2026-11-17T01:24:11.082Z","event":"shipped","issue":64,"pr":70}
+{"ts":"2026-11-17T01:59:32.776Z","event":"dispatch","subagent_type":"server-agent","brief_id":"083-games-by-source-r1","base_sha":"4ec6772","spoke":true}
+{"ts":"2026-11-17T01:59:35.196Z","event":"dispatch_denied","subagent_type":"web-agent","reason":"Dispatch to web-agent needs a rendered brief. Write .claude/orchestration/briefs/<id>.json and run: node .claude/hooks/delegation.ts render-brief <file>"}
+{"ts":"2026-11-17T01:59:39.571Z","event":"agent_complete","subagent_type":"server-agent","brief_id":"083-games-by-source-r1","agent_id":"a22affb8f86840882","status":"async_launched","contract":"pending"}
+{"ts":"2026-11-17T01:59:47.819Z","event":"dispatch","subagent_type":"web-agent","brief_id":"084-try-toast-r1","base_sha":"4ec6772","spoke":true}
+{"ts":"2026-11-17T01:59:48.611Z","event":"agent_complete","subagent_type":"web-agent","brief_id":"084-try-toast-r1","agent_id":"a0bf43098e71dce25","status":"async_launched","contract":"pending"}
+{"ts":"2026-11-17T02:03:00.935Z","event":"return_valid","agent_id":"a22affb8f86840882","agent_type":"server-agent","via":"handback"}
+{"ts":"2026-11-17T02:03:58.299Z","event":"coordinator_verdict","brief_id":"083-games-by-source-r1","agent":"server-agent","verdict":"accepted","reason":"3 files match; rebased on f246551 -> a7987ad, 1233 passed, typecheck clean; reviewer skipped (one-line filter + 6 tests read by coordinator)","tokens":51101,"duration_ms":201745}
+{"ts":"2026-11-17T02:05:46.079Z","event":"shipped","issue":71,"pr":72}
+{"ts":"2026-11-17T02:06:34.878Z","event":"return_valid","agent_id":"a0bf43098e71dce25","agent_type":"web-agent","via":"handback"}
+{"ts":"2026-11-17T02:07:15.751Z","event":"dispatch","subagent_type":"server-agent","brief_id":"085-daily-stats-r1","base_sha":"1d1b413","spoke":true}
+{"ts":"2026-11-17T02:07:16.269Z","event":"agent_complete","subagent_type":"server-agent","brief_id":"085-daily-stats-r1","agent_id":"af85355a7b23679bc","status":"async_launched","contract":"pending"}
+{"ts":"2026-11-17T02:08:32.020Z","event":"dispatch","subagent_type":"reviewer","brief_id":"086-review-try-toast-r1","base_sha":"1642c19","spoke":true}
+{"ts":"2026-11-17T02:08:32.320Z","event":"agent_complete","subagent_type":"reviewer","brief_id":"086-review-try-toast-r1","agent_id":"a84a61c463ce3180f","status":"async_launched","contract":"pending"}
+{"ts":"2026-11-17T02:08:39.009Z","event":"coordinator_verdict","brief_id":"084-try-toast-r1","agent":"web-agent","verdict":"accepted","reason":"10 files match; rebased on 1d1b413 -> 1642c19, 1253 passed, typecheck clean, e2e 4/4; brief defect (1-4 cp wording) accepted, owner to confirm in PR; review 086 launched","tokens":94251,"duration_ms":406644}
+{"ts":"2026-11-17T02:11:41.657Z","event":"return_valid","agent_id":"a84a61c463ce3180f","agent_type":"reviewer","via":"handback"}
+{"ts":"2026-11-17T02:12:08.043Z","event":"coordinator_verdict","brief_id":"086-review-try-toast-r1","agent":"reviewer","verdict":"review","reason":"NO-SHIP: 2 major (late grade after next move shows; phone-width overlap), 1 minor -> r2 brief 087","tokens":55852,"duration_ms":189715}
+{"ts":"2026-11-17T02:17:04.916Z","event":"return_valid","agent_id":"a0bf43098e71dce25","agent_type":"web-agent","via":"handback"}
+{"ts":"2026-11-17T02:17:21.241Z","event":"return_valid","agent_id":"af85355a7b23679bc","agent_type":"server-agent","via":"handback"}
+{"ts":"2026-11-17T02:18:27.732Z","event":"coordinator_verdict","brief_id":"087-try-toast-r2","agent":"web-agent","verdict":"accepted","reason":"7 files match; rebased on 1d1b413 -> 8dafd27, 1259 passed, typecheck clean, e2e 9/9; fixes review 086 majors; no further review (targeted diff)","tokens":127894,"duration_ms":289694}
+{"ts":"2026-11-17T02:20:25.025Z","event":"shipped","issue":52,"pr":73}
+{"ts":"2026-11-17T02:21:34.333Z","event":"coordinator_verdict","brief_id":"085-daily-stats-r1","agent":"server-agent","verdict":"accepted","reason":"11 files match; contract gap (index exports) fixed on main 61b3d00; rebased cc25961 + coordinator fixup bea4ae7 drops mirror types; 1300 passed, typecheck clean; review 088 next","tokens":120932,"duration_ms":605313}
+{"ts":"2026-11-17T02:21:55.961Z","event":"dispatch","subagent_type":"reviewer","brief_id":"088-review-daily-stats-r1","base_sha":"bea4ae7","spoke":true}
+{"ts":"2026-11-17T02:21:56.351Z","event":"agent_complete","subagent_type":"reviewer","brief_id":"088-review-daily-stats-r1","agent_id":"a66c104c651f30512","status":"async_launched","contract":"pending"}
+{"ts":"2026-11-17T02:24:19.133Z","event":"return_valid","agent_id":"a66c104c651f30512","agent_type":"reviewer","via":"handback"}
+{"ts":"2026-11-17T02:24:29.650Z","event":"coordinator_verdict","brief_id":"088-review-daily-stats-r1","agent":"reviewer","verdict":"review","reason":"NO-SHIP: 1 major (self-cancelled asks counted as api_unavailable) + 5 minor -> contract note + r2 brief 089"}
+{"ts":"2026-11-17T02:28:26.499Z","event":"return_valid","agent_id":"af85355a7b23679bc","agent_type":"server-agent","via":"handback"}
+{"ts":"2026-11-17T02:29:33.624Z","event":"coordinator_verdict","brief_id":"089-daily-stats-r2","agent":"server-agent","verdict":"accepted","reason":"6 files match; rebased on 0f4dd1a + fixup re-applied -> e817b63; 1319 passed, typecheck clean; coordinator read games.ts/static.ts diff; no further review","tokens":146191,"duration_ms":211248}
+{"ts":"2026-11-17T02:31:16.010Z","event":"shipped","issue":60,"pr":74}

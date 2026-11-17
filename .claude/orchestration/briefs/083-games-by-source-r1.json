@@ -1,0 +1,33 @@
+{
+  "brief_id": "083-games-by-source-r1",
+  "agent": "server-agent",
+  "issue": 71,
+  "base_sha": "4ec6772",
+  "scratch_dir": "/private/tmp/claude-501/-Users-daveharms-personal-workspace-chess-tutor/fdb44069-058e-4dbd-a0ef-259f8b7043c2/scratchpad/083-games-by-source-r1",
+  "objective": "Starting a game ends only games of the same source (FR-28 amended, #71): a demo game never abandons a player game in progress and a player game never abandons a demo game. A player game and a demo game can both be playing at once, both survive a restart, and each keeps its own moves and tutor state. Success: every rubric case has a test that was red before the change and is green after.",
+  "requirements": [
+    "FR-28",
+    "NFR-14",
+    "IR-3"
+  ],
+  "contract": "FR-28 (amended 4ec6772): \"Starting a demo game never ends a player game in progress, and starting a player game never ends a demo game; each only ends games of its own kind.\"\nNFR-14: games in progress survive a restart.\nWhere: apps/server/src/games.ts create() (around lines 1196-1210):\n  const source = opts.source ?? \"player\";\n  const g = newGameRecord(newId(), playerColor, now(), source);\n  save(g, { required: true });\n  for (const other of games.values()) if (other.status === \"playing\") abandon(other);\nThe fix is to filter by other.source === source. g.source comes from #64 (schema v3, stored column source, hydrated at games.ts:524).\nCheck every other place in apps/server that assumes one playing game, and fix or prove each with a test: startup restore (store.listPlaying() at games.ts:1181 must restore both a playing demo game and a playing player game), the shutdown log count (games.ts:1327, fine as a count), and anything else you find. The engine is shared and runs one search at a time, queued (IR-3): two games' bot moves and analyses just queue; a test that both games get their bot move when both are waiting is enough.\nWeb: apps/web does not pick a \"current game\" at / (controller.navigate shows no game when the path has no id; a game is opened by /games/:id), so no web change is needed. Do not touch apps/web.\nStore: no schema change expected. If you think one is needed, stop and report it as a contract_gap instead.\nHelpers: apps/server/test/helpers.ts. Existing homes: games-api.test.ts (routes, incl. the demo token from #64), game-survival.test.ts (restarts).\nGate at base 4ec6772 (run by the coordinator): pnpm test -> Test Files 52 passed, Tests 1227 passed (1227); pnpm typecheck clean.",
+  "contract_files": [
+    "apps/server/src/store.ts"
+  ],
+  "scope": [
+    "apps/server/**"
+  ],
+  "negative": [
+    "Do not edit files outside scope, docs, config, .github, root files or the lockfile.",
+    "No new dependencies.",
+    "Do not change the shared API types (packages/chess-core/src/api.ts) or apps/web.",
+    "No schema version change."
+  ],
+  "rubric": [
+    "Tests first (red then green) for: demo start leaves a playing player game playing (its moves still accepted); player start leaves a playing demo game playing; player start still abandons the previous player game; demo start still abandons the previous demo game; with one of each playing, a restart restores both with their own moves and tutor state; both games get their bot move when both wait on the one engine.",
+    "pnpm test and pnpm typecheck clean from the repo root.",
+    "files_changed lists every file changed in 4ec6772..your head. Commit message references FR-28, NFR-14 and #71."
+  ],
+  "concurrency": "#52 runs at the same time in web-agent (apps/web/** only). No file overlap. Don't rebase; the coordinator does that at ship.",
+  "round": 1
+}

@@ -1,0 +1,29 @@
+{
+  "brief_id": "087-try-toast-r2",
+  "agent": "web-agent",
+  "issue": 52,
+  "base_sha": "dea8324",
+  "scratch_dir": "/private/tmp/claude-501/-Users-daveharms-personal-workspace-chess-tutor/fdb44069-058e-4dbd-a0ef-259f8b7043c2/scratchpad/087-try-toast-r2",
+  "objective": "Round 2 of #52 on your branch (from dea8324): fix the reviewer's two major findings and the minor one. Success: a grade that arrives after the player's next move never opens the pop-up, the pop-up never covers board squares at 320-412 px width, and each fix has a test that was red before and green after.",
+  "requirements": [
+    "FR-24",
+    "FR-10"
+  ],
+  "contract": "Review 086 (NO-SHIP), all three to fix:\nMAJOR 1, apps/web/src/game-state.ts:322: FR-24 says the result closes at the player's next move, but a tutor_attempt that arrives after the next move still opens the pop-up and starts a new 5 s timer. The server emits tutor_attempt only after `await botTurn` and two analyses (apps/server/src/games.ts:1095-1118), so the player can move first. The `known` check accepts it because leavePanel keeps the question id in `left`. Fix: drop a tutor_attempt (and do not start the timer) once a later player move has been attempted. E.g. check that event.move.uci is the player's latest move in state.game.moves and no newer move is pending (pendingFen / tutorBeforeMove), or record the try's ply. Your choice; the question must still close as before (only the pop-up is suppressed). A late tutor_reveal for that question must not open anything either.\nReviewer repro: game_started(q1) -> move_attempted g1f3 -> move_accepted -> bot_move e6 -> move_attempted c1f4 -> tutor_attempt q1 Nf3 wrong -> tutor_reveal Bf4 => tryResult is set; expected null.\nMAJOR 2, apps/web/src/styles.css:88: at phone width the toast wraps to two lines (~45 px) while the Bot row plus gap is ~29.6 px, so it covers the top of rank 8. Measured (Playwright, real styles.css): 320 px with 'Nf3, correct. Only 0.1 off the best move' and 360 px with '... Less than 0.1 off the best move' overlap; 375-412 ok. Fix so no text overlaps at 320-412 px (e.g. single line with nowrap + ellipsis plus a smaller font at narrow widths, or reserve the height above the board without moving the board when it appears/disappears). The full text must stay available to screen readers (aria-live region text not truncated).\nVerify layout with Playwright at 320, 360, 375, 390, 412 px for the longest texts. A layout check in apps/web/e2e is welcome if it can render the toast without a tutor (e.g. a test-only route is NOT allowed; a component-level check in vitest with computed widths is fine if feasible); otherwise measure in a scratch script and paste the numbers in your return.\nMINOR: add the slow-path order test (tutor_attempt after the next move_attempted) to apps/web/test/try-toast.test.ts.\nAccepted from round 1, keep: 'Less than 0.1 off the best move' for 1-4 cp; no e2e of a graded try.\nmain moved: the coordinator rebased your round 1 onto main as 1642c19 (no conflicts; main added server-only and api.ts type changes). Stay on your branch; the coordinator rebases again at ship.\nGate on 1642c19 (coordinator): pnpm test 53 files, 1253 passed; typecheck clean; e2e 4 passed.",
+  "scope": [
+    "apps/web/**"
+  ],
+  "negative": [
+    "Do not edit files outside scope, docs, config, .github, root files or the lockfile.",
+    "No new dependencies.",
+    "Do not change packages/chess-core or apps/server.",
+    "No test-only routes or server modes."
+  ],
+  "rubric": [
+    "Tests first (red then green): the reviewer's repro sequence gives tryResult null and starts no timer; a late tutor_reveal after the next move opens nothing; the normal (grade before next move) cases still pass; layout numbers at 320/360/375/390/412 px show no overlap.",
+    "pnpm test, pnpm typecheck and the e2e suite clean from the repo root.",
+    "files_changed lists every file changed in dea8324..your head. Commit message references FR-24 and #52."
+  ],
+  "concurrency": "#60 (server-agent, apps/server/**) runs at the same time. No overlap.",
+  "round": 2
+}

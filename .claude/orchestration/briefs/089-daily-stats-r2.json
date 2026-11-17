@@ -1,0 +1,31 @@
+{
+  "brief_id": "089-daily-stats-r2",
+  "agent": "server-agent",
+  "issue": 60,
+  "base_sha": "f16f311",
+  "scratch_dir": "/private/tmp/claude-501/-Users-daveharms-personal-workspace-chess-tutor/fdb44069-058e-4dbd-a0ef-259f8b7043c2/scratchpad/089-daily-stats-r2",
+  "objective": "Round 2 of #60 on your branch (from f16f311): fix review 088's major finding and its five minors. Success: an ask the server cancelled itself never shows in errors but its tokens still count; each fix has a test that was red before and green after.",
+  "requirements": [
+    "FR-29",
+    "NFR-5",
+    "IR-10"
+  ],
+  "contract": "Coordinator decision (api.ts doc updated on main, 0f4dd1a): an ask the server cancelled itself (the player moved on, the question was replaced, the game ended, auth-off, shutdown) is not an error. Store it with reason \"cancelled\", leave it out of `errors`, keep its tokens in `claude`. Not counted in tutorReplies either (it is not ok). A validated reply dropped after its ask ended ok still counts as a reply (unchanged).\nMAJOR (review 088), apps/server/src/games.ts:1075: finishAsk records outcome.reason before its drop check. The real TutorSession returns {ok:false, reason:'api_unavailable', detail:'aborted'} when its signal is aborted (packages/tutor/src/session.ts:77,121). cancelAsk aborts on a move that leaves the position (games.ts:929), a replaced question (1036), game end (661), auth-off (1113) and shutdown (1371). Fix: when the ask's controller signal was aborted by the server (or g.ask?.token !== token for a failed outcome), record reason 'cancelled'. Test with a fake that resolves the aborted ask as api_unavailable, as the real session does (the existing dropped-reply test at daily-stats.test.ts:305 resolves ok:true and cannot catch it). Cover at least: player moves while the tutor thinks, and game end. A genuine api_unavailable on an ask that was not aborted still counts as an error.\nMINOR 1, app.ts:172: /ops/daily-stats/ and other /ops/* paths fall through to the SPA (200 text/html). Treat /ops/ as an API prefix in isApiPath so they get the JSON 404.\nMINOR 2, app.ts:65: bearerMatches uses /^Bearer (.+)$/ (case-sensitive). The auth scheme is case-insensitive (RFC 7235): accept 'bearer', still constant-time on the token.\nMINOR 3, daily-stats.test.ts:145: add the regression test that an unset/blank token gives a JSON 404 with webDist set.\nMINOR 4, config.ts:87: `const EFFORTS =new Set(` lost its space.\nMINOR 5, stats.ts:104: a row with model null is warned as model 'null'; say the model is unknown.\nCoordinator fixup to know about: on the rebased branch the coordinator replaced the mirrored DailyStats/UsageCounts interfaces at the top of stats.ts with `import type { DailyStats, UsageCounts } from \"@chess-tutor/chess-core\"; export type { DailyStats, UsageCounts };` (bea4ae7; main now exports them, 61b3d00). Do NOT edit that mirror block yourself; the coordinator re-applies the fixup at ship.\nGate on bea4ae7 (coordinator): pnpm test 54 files, 1300 passed; typecheck clean.",
+  "scope": [
+    "apps/server/**"
+  ],
+  "negative": [
+    "Do not edit files outside scope, docs, config, .github, root files or the lockfile.",
+    "No new dependencies.",
+    "Do not change packages/* or apps/web.",
+    "Do not touch the mirrored type block at the top of apps/server/src/stats.ts.",
+    "Never log or return the token."
+  ],
+  "rubric": [
+    "Tests first (red then green) for: an aborted ask resolved as api_unavailable is stored as cancelled, absent from errors, present in claude usage (player moves while thinking; game end); a non-aborted api_unavailable still counts; /ops/daily-stats/ and /ops/other -> JSON 404; 'bearer <token>' -> 200; unset token + webDist -> JSON 404; null model warning wording.",
+    "pnpm test and pnpm typecheck clean from the repo root.",
+    "files_changed lists every file changed in f16f311..your head. Commit message references FR-29 and #60."
+  ],
+  "concurrency": null,
+  "round": 2
+}

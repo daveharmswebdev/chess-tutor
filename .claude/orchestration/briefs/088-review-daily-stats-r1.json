@@ -1,0 +1,27 @@
+{
+  "brief_id": "088-review-daily-stats-r1",
+  "agent": "reviewer",
+  "issue": 60,
+  "base_sha": "bea4ae7",
+  "scratch_dir": "/private/tmp/claude-501/-Users-daveharms-personal-workspace-chess-tutor/fdb44069-058e-4dbd-a0ef-259f8b7043c2/scratchpad/088-review-daily-stats-r1",
+  "objective": "Review #60: `git diff 61b3d00..bea4ae7` (server-agent round 1 rebased as cc25961, plus coordinator fixup bea4ae7 that imports the contract types) against FR-29, FR-28, NFR-5, NFR-15, IR-10, IR-7 and the contract in packages/chess-core/src/api.ts (DailyStats doc comment). Focus: (1) auth: the token cannot be bypassed, leaked (logs, error bodies, timing) or matched by a malformed header; unset/blank = JSON 404 even with webDist set; (2) privacy NFR-15: nothing in the response but counts (no game ids, PGN/FEN, text); (3) counting: UTC day boundaries, default yesterday, future/invalid dates, nearest-rank percentiles, errors by category, player vs demo split, spend priced per model incl. cacheWrite, dropped replies counted; (4) the v3->v4 migration is safe on a real v3 database with games in progress, and a ledger write failure never breaks a game; (5) nothing in game flow regressed (finishAsk ordering, botFailed). Findings blocking/major/minor; summary ends SHIP or NO-SHIP.",
+  "requirements": [
+    "FR-29",
+    "FR-28",
+    "NFR-5",
+    "NFR-15",
+    "IR-10",
+    "IR-7"
+  ],
+  "contract": "FR-29: GET /ops/daily-stats returns counts for a day: games started, tutor replies, tutor latency p50 and p95, errors by category, and Claude spend from the usage ledger (NFR-5), with demo usage reported separately (FR-28). It requires a shared secret (IR-10).\nNFR-15: anything exposed for the dashboard holds versions and counts only: no log lines, no PGN or FEN, no chat text, nothing a player typed.\nCoordinator rules given to the spoke: Bearer OPS_STATS_TOKEN, timingSafeEqual on equal-length buffers; unset/blank -> 404 JSON; missing/wrong -> 401; date UTC YYYY-MM-DD, default yesterday, malformed/future -> 400; schema v3->v4 adds a ledger table idempotently; one row per finished tutor ask (dropped replies included) and per bot failure; ledger write failure logged, game carries on; spend = tokens x config/models.json pricingPerMTok (input, output, cacheRead, cacheWrite)/1e6, 4 decimals; unknown model -> 0 spend + one warning; nearest-rank rank = ceil(p*n).\nDecided, do not re-report: tutorReplies counts validated replies even when dropped (api.ts doc updated in 61b3d00). The route returns 503 when no ledger is configured (only test wrappers).\nGate on bea4ae7 (coordinator): pnpm test 54 files, 1300 passed; typecheck clean.\nRead with git diff / git show <sha>:<path>; you start in a worktree at bea4ae7.",
+  "scope": [],
+  "negative": [
+    "Read-only: do not edit, commit, or run anything that writes to the repo."
+  ],
+  "rubric": [
+    "Each finding cites file:line and evidence; reproduce blocking/major with a scratch test outside the repo.",
+    "Summary ends SHIP or NO-SHIP."
+  ],
+  "concurrency": null,
+  "round": 1
+}

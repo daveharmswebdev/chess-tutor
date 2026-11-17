@@ -1,0 +1,38 @@
+{
+  "brief_id": "085-daily-stats-r1",
+  "agent": "server-agent",
+  "issue": 60,
+  "base_sha": "1d1b413",
+  "scratch_dir": "/private/tmp/claude-501/-Users-daveharms-personal-workspace-chess-tutor/fdb44069-058e-4dbd-a0ef-259f8b7043c2/scratchpad/085-daily-stats-r1",
+  "objective": "GET /ops/daily-stats returns one UTC day's usage counts as the DailyStats contract in packages/chess-core/src/api.ts (FR-29, #60): games started, tutor replies, tutor latency p50/p95, errors by category and Claude spend, player and demo apart (FR-28), behind the OPS_STATS_TOKEN secret (IR-10), with counts only (NFR-15). The numbers come from SQLite, so they survive restarts. Success: every rubric case has a test that was red before and is green after.",
+  "requirements": [
+    "FR-29",
+    "FR-28",
+    "NFR-5",
+    "NFR-15",
+    "IR-10",
+    "IR-7"
+  ],
+  "contract": "The response shape and route rules are fixed by the coordinator in packages/chess-core/src/api.ts (DailyStats, UsageCounts; inlined below; committed f246551). Read its doc comment as the spec: auth by `authorization: Bearer <OPS_STATS_TOKEN>` with a constant-time compare (node:crypto timingSafeEqual on equal-length buffers; unequal lengths = mismatch), unset or blank token = route off (404 with the app's usual JSON 404 body), missing or wrong = 401, `date` = UTC day YYYY-MM-DD, default yesterday UTC, malformed or in the future = 400. Do not change api.ts; report a contract_gap if it is wrong.\nArchitecture 3.8 (coordinator decision): the usage ledger is stored in SQLite (IR-7), one row per tutor ask and per bot failure, so it survives restarts; BudgetGuard (#9, later) reads the same rows. Store: SCHEMA_VERSION 3 -> 4, a new table (your naming; e.g. usage_events) created in migrate() idempotently, following the v2/v3 pattern; v3 databases migrate with their games intact. Add an index on the day/timestamp column. Update the schema comment at the top of store.ts.\nWhat a row holds: timestamp (ISO UTC, from the injectable now()), game source ('player' | 'demo'), kind ('tutor' asks with their TutorKind, or 'bot_failed'), ok, failure reason (TutorFailureReason: invalid_reply, unsupported_claim, tool_rounds_exceeded, refusal, max_tokens, rate_limited, api_unavailable, auth) or null, ms, the 5 TutorUsage counts, and the model id that served it. NO game id, PGN, FEN or text in the ledger is needed for this endpoint; keep the game id out of the response (a game id column is fine in the table for #9's per-game sums).\nWhere to record: games.ts finishAsk() (~line 1030) already builds `{ gameId, gameSource, kind, ok, ms, usage }` for the log; record one row per finished ask there, including asks whose reply is dropped (the tokens were spent). The 'tutor ask threw' path also arrives at finishAsk. botFailed(g, message) (~line 684) records a 'bot_failed' row (no usage). A store write failure must not break the game: log and carry on (like the non-required save()).\nModel id: the tutor's model comes from config/models.json for APP_ENV (apps/server/src/config.ts, tutor-setup.ts; packages/tutor session.ts uses deps.config.model). Pass it into the game manager / coaching deps so the row records it. Pricing: config/models.json pricingPerMTok (inlined) has input, output, cacheRead, cacheWrite per model, USD per million tokens. spendUsd = sum over rows of (input*in + output*out + cacheRead*cr + cacheCreation*cw)/1e6, rounded to 4 decimals at the end. A model with no price entry: count its tokens, add 0 spend, and log a warning once.\nCounting rules: gamesStarted from the games table (created_at on the UTC day, by source). tutorReplies = tutor rows with ok true. tutorLatencyMs over those rows' ms, nearest-rank p50 and p95 (rank = ceil(p*n)), null when n = 0. errors = count of failed tutor rows by reason, plus 'bot_failed' rows; leave zero counts out. claude sums every tutor row (failed included). `version: 1`, `generatedAt` from now().\nEnv: read OPS_STATS_TOKEN in main.ts (process.env, trimmed, like DEMO_TOKEN at main.ts:76) and pass it into buildServer deps; tests inject it. Never log it. The route lives in app.ts; put the roll-up query in store.ts (or a new apps/server/src/stats.ts) so it is testable without HTTP.\nPrivacy test (NFR-15): play a game with a tutor reply containing distinctive text and a FEN, then assert the stats JSON contains none of: the game id, the FEN, the reply text.\nTests homes: apps/server/test/games-api.test.ts (routes), outcome-pgn-store.test.ts (store and migrations), helpers.ts; a new apps/server/test/daily-stats.test.ts is fine.\nGate at base 1d1b413 (run by the coordinator on a7987ad, an identical tree): pnpm test -> Test Files 52 passed, Tests 1233 passed (1233); pnpm typecheck clean.",
+  "contract_files": [
+    "packages/chess-core/src/api.ts",
+    "apps/server/src/store.ts",
+    "config/models.json"
+  ],
+  "scope": [
+    "apps/server/**"
+  ],
+  "negative": [
+    "Do not edit files outside scope, docs, config, .github, root files or the lockfile.",
+    "No new dependencies.",
+    "Do not change packages/chess-core/src/api.ts, config/models.json or apps/web.",
+    "Never log or return the token; no game ids, PGN, FEN, chat or tutor text in the response."
+  ],
+  "rubric": [
+    "Tests first (red then green) for: token unset -> 404; set + no header -> 401; wrong token / wrong length -> 401; right token -> 200 DailyStats version 1; default date is yesterday UTC; bad or future date -> 400; player and demo counted apart (games started, replies, spend); p50/p95 nearest-rank with a known set of ms, null with none; errors by reason plus bot_failed, zero counts absent; dropped replies still count spend; spend priced per model incl. cacheWrite, unknown model 0 spend; rows survive a restart; v3 database migrates to v4 with games intact; privacy (no game id, FEN or reply text in the JSON).",
+    "pnpm test and pnpm typecheck clean from the repo root.",
+    "files_changed lists every file changed in the base..your head. Commit message references FR-29, NFR-5, NFR-15, IR-10 and #60."
+  ],
+  "concurrency": "#52 (web-agent, apps/web/** only) is being verified and shipped meanwhile. No file overlap. Don't rebase; the coordinator does that at ship.",
+  "round": 1
+}
