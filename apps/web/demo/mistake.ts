@@ -5,7 +5,7 @@
 // Black force mate, and never one after which White stays above maxPlayedCp (the server's
 // stillWinningCp: the tutor would stay quiet). Never hard-coded, never chosen by Claude.
 import { Chess } from "chess.js";
-import { scoreToCp } from "@chess-tutor/chess-core";
+import { MATE_CP, scoreToCp } from "@chess-tutor/chess-core";
 import type { AnalyzeOptions, Engine } from "@chess-tutor/engine";
 
 /** Loss against the best move that counts as a demo mistake (config/tutor.json blunderCp is 150). */
@@ -55,20 +55,24 @@ export async function evaluateMoves(
   if (chess.turn() !== "w") throw new Error(`pickMistake needs White to move, got ${fen}`);
   const out: MoveEval[] = [];
   for (const m of chess.moves({ verbose: true })) {
+    const base = { uci: m.from + m.to + (m.promotion ?? ""), san: m.san, from: m.from, to: m.to, piece: m.piece };
+    // A terminal position gets no line from Stockfish (mate 0 comes without a pv), so chess.js
+    // scores it: White's checkmate is the best move there is (never a mistake), a draw is 0.
+    const after = new Chess(m.after);
+    if (after.isCheckmate()) {
+      out.push({ ...base, cp: MATE_CP, matedAgainst: false });
+      continue;
+    }
+    if (after.isDraw() || after.isStalemate()) {
+      out.push({ ...base, cp: 0, matedAgainst: false });
+      continue;
+    }
     const analysis = await engine.analyze(m.after, analyze);
     const line = analysis.lines[0];
     if (!line) throw new Error(`engine returned no line for ${m.after}`);
     // Black is to move in the analysed position; the score is White's (engine contract).
     const cp = scoreToCp(line.score, "w", "b");
-    out.push({
-      uci: m.from + m.to + (m.promotion ?? ""),
-      san: m.san,
-      from: m.from,
-      to: m.to,
-      piece: m.piece,
-      cp,
-      matedAgainst: line.score.kind === "mate" && cp < 0,
-    });
+    out.push({ ...base, cp, matedAgainst: line.score.kind === "mate" && cp < 0 });
   }
   return out;
 }

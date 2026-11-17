@@ -2,6 +2,7 @@
 // after each legal White move, so the picker's rules are checked without Stockfish.
 import { Chess } from "chess.js";
 import { describe, expect, it } from "vitest";
+import { MATE_CP } from "@chess-tutor/chess-core";
 import type { Analysis, AnalyzeOptions, Engine, Score } from "@chess-tutor/engine";
 import { chooseMistake, evaluateMoves, pickMistake, type MoveEval } from "../demo/mistake.ts";
 
@@ -117,19 +118,50 @@ describe("chooseMistake", () => {
 });
 
 describe("evaluateMoves", () => {
-  it("scores a checkmating move as a mate for White and keeps the promotion piece in the UCI", async () => {
-    const fen = "k7/7P/1K6/8/8/8/8/8 w - - 0 1";
-    // h8=Q is mate: Black to move and mated, so the engine reports mate 0.
+  // The real WASM engine returns lines: [] for a terminal position (Stockfish sends "score mate 0"
+  // with no pv, and the UCI client keeps only info lines with a pv), so terminal positions are
+  // scored with chess.js and never sent to the engine.
+  const MATE_OR_STALEMATE = "k7/8/1K6/8/8/8/8/2Q5 w - - 0 1"; // Qc8# mates, Qc7 stalemates
+
+  function terminalBlindEngine(rest: Score) {
+    const calls: string[] = [];
     const engine: Engine = {
-      analyze: async (f) => analysis(f, new Chess(f).isCheckmate() ? { kind: "mate", value: 0 } : cp(800)),
+      analyze: async (f) => {
+        calls.push(f);
+        const c = new Chess(f);
+        return c.isGameOver() ? { ...analysis(f, rest), lines: [] } : analysis(f, rest);
+      },
       bestMove: async () => "",
       quit: async () => {},
     };
-    const evals = await evaluateMoves(engine, fen);
+    return { engine, calls };
+  }
+
+  it("does not throw when a White move mates or stalemates (engine gives no line there)", async () => {
+    const { engine, calls } = terminalBlindEngine(cp(300));
+    const evals = await evaluateMoves(engine, MATE_OR_STALEMATE);
+    const mate = evals.find((e) => e.san === "Qc8#");
+    const stalemate = evals.find((e) => e.san === "Qc7");
+    expect(mate?.cp).toBe(MATE_CP);
+    expect(mate?.matedAgainst).toBe(false);
+    expect(stalemate?.cp).toBe(0);
+    expect(stalemate?.matedAgainst).toBe(false);
+    for (const f of calls) expect(new Chess(f).isGameOver()).toBe(false);
+  });
+
+  it("never picks the mating move", async () => {
+    const { engine } = terminalBlindEngine(cp(300));
+    const m = await pickMistake(engine, MATE_OR_STALEMATE);
+    expect(m).not.toBeNull();
+    expect(m!.san).not.toBe("Qc8#");
+    expect(m!.bestCp).toBe(MATE_CP);
+  });
+
+  it("keeps the promotion piece in the UCI", async () => {
+    const { engine } = terminalBlindEngine(cp(800));
+    const evals = await evaluateMoves(engine, "k7/7P/1K6/8/8/8/8/8 w - - 0 1");
     const queen = evals.find((e) => e.san === "h8=Q#");
     expect(queen?.uci).toBe("h7h8q");
-    expect(queen?.cp).toBeGreaterThan(90_000);
-    expect(queen?.matedAgainst).toBe(false);
-    expect(evals.find((e) => e.san === "Kc7")?.cp).toBe(800);
+    expect(queen?.cp).toBe(MATE_CP);
   });
 });

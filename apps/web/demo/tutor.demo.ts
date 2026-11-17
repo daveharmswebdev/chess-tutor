@@ -11,6 +11,7 @@ import { expect, test, type Locator, type Page } from "@playwright/test";
 import { createEngineFromEnv } from "@chess-tutor/engine";
 import { demoTokenHeaders } from "./demo-token.ts";
 import { pickMistake, type Mistake } from "./mistake.ts";
+import { showMeProblem, teardown, tutorProblem } from "./steps.ts";
 import { FALLBACK_MOVES, OPENING_PLAN, fenFromSans, firstLegal, type PlannedMove } from "./opening.ts";
 
 // Reading pauses (the only fixed waits).
@@ -37,11 +38,11 @@ const CAPTIONS = {
   intro: "Chess Tutor: a sparring bot and a tutor that asks before it tells.",
   newGame: "We play White, with the London System.",
   opening: "The London: d4, then Bf4.",
-  mistake: "Now a real mistake. Stockfish chose it from this position: it loses about two pawns.",
+  mistake: "Now a real mistake. Stockfish chose it from this position: it loses two pawns or more.",
   thinking: "The tutor saw the mistake. It checks the position with Stockfish before it speaks.",
   question: "Instead of the answer, the tutor asks a question.",
-  hint: "Stuck? Hint gives a nudge, still without the answer.",
-  showMe: "Show me gives the answer the engine found, with the reason.",
+  hint: "Hint asks the tutor for a nudge on your next move here, still without the answer.",
+  showMe: "Show me gives the engine's best move in this position.",
   outro: "Moves and evaluations come from Stockfish. Claude only explains.",
 } as const;
 
@@ -90,19 +91,26 @@ async function playAndWaitForBot(page: Page, move: PlannedMove | Mistake, before
   await expect(page.getByTestId("status")).toHaveText("Your move.", { timeout: PAGE_MS });
 }
 
-/** Waits for `target`, failing with the panel's text if the tutor failed or coaching is off. */
+/** Text of a test ID's element if visible, else null. */
+async function visibleText(page: Page, testId: string): Promise<string | null> {
+  const loc = page.getByTestId(testId);
+  return (await loc.isVisible()) ? ((await loc.textContent()) ?? "").trim() : null;
+}
+
+/**
+ * Waits for `target`, failing with the panel's text if the tutor failed, coaching is off, or Hint
+ * or Show me was refused. `.first()`: a rejected key shows tutor-failed and tutor-unavailable at once.
+ */
 async function waitForTutor(page: Page, target: Locator, step: string) {
-  const failed = page.getByTestId("tutor-failed");
-  const unavailable = page.getByTestId("tutor-unavailable");
-  await expect(target.or(failed).or(unavailable)).toBeVisible({ timeout: TUTOR_MS });
-  for (const [what, loc] of [
-    ["tutor-failed", failed],
-    ["tutor-unavailable", unavailable],
-  ] as const) {
-    if (await loc.isVisible()) {
-      throw new Error(`demo stopped at ${step}: ${what}: ${(await loc.textContent())?.trim()}`);
-    }
-  }
+  const problems = ["tutor-failed", "tutor-unavailable", "tutor-notice"].map((id) => page.getByTestId(id));
+  const any = problems.reduce((acc, loc) => acc.or(loc), target);
+  await expect(any.first()).toBeVisible({ timeout: TUTOR_MS });
+  const problem = tutorProblem(step, {
+    failed: await visibleText(page, "tutor-failed"),
+    unavailable: await visibleText(page, "tutor-unavailable"),
+    notice: await visibleText(page, "tutor-notice"),
+  });
+  if (problem) throw new Error(problem);
 }
 
 test("guided demo: the tutor catches a mistake (FR-27)", async ({ page }) => {
@@ -120,6 +128,7 @@ test("guided demo: the tutor catches a mistake (FR-27)", async ({ page }) => {
   }
 
   const engine = createEngineFromEnv();
+  let finished = false;
   try {
     await page.goto("/");
     await expect(page.getByTestId("new-game")).toBeVisible({ timeout: PAGE_MS });
@@ -169,7 +178,8 @@ test("guided demo: the tutor catches a mistake (FR-27)", async ({ page }) => {
     await caption(page, CAPTIONS.question);
     await page.waitForTimeout(READ_PAUSE_MS);
 
-    // Hint (FR-12): the reply replaces the question text.
+    // Hint (FR-12): a new ask about the current position (after the bot's reply); it closes the
+    // blunder's question, and its reply replaces the question text.
     const asked = (await question.textContent()) ?? "";
     const hint = page.getByTestId("tutor-hint");
     await expect(hint).toBeEnabled({ timeout: PAGE_MS });
@@ -178,9 +188,11 @@ test("guided demo: the tutor catches a mistake (FR-27)", async ({ page }) => {
     await waitForTutor(page, question.filter({ hasNotText: asked }), "Hint");
     await page.waitForTimeout(READ_PAUSE_MS);
 
-    // Show me (FR-11): the answer comes from the engine, shown as "Answer: <san>".
+    // Show me (FR-11): the hint ask's answer for the current position, from the engine ("Answer: <san>").
+    // The hint reply has just rendered, so Show me's state is settled: check it, do not wait.
     const showMe = page.getByTestId("tutor-show-me");
-    await expect(showMe).toBeEnabled({ timeout: PAGE_MS });
+    const showMeIssue = showMeProblem({ visible: await showMe.isVisible(), enabled: await showMe.isEnabled().catch(() => false) });
+    if (showMeIssue) throw new Error(showMeIssue);
     await caption(page, CAPTIONS.showMe);
     await showMe.click();
     const reveal = page.getByTestId("tutor-reveal");
@@ -189,14 +201,21 @@ test("guided demo: the tutor catches a mistake (FR-27)", async ({ page }) => {
 
     await caption(page, CAPTIONS.outro);
     await page.waitForTimeout(OUTRO_PAUSE_MS);
+    finished = true;
   } finally {
-    await engine.quit();
-    const video = page.video();
-    await page.close();
-    if (video) {
-      await mkdir(dirname(VIDEO_OUT), { recursive: true });
-      await video.saveAs(VIDEO_OUT); // waits until the closed page's video is fully written
-      console.log(`demo video: ${VIDEO_OUT}`);
-    }
+    // The video first, the engine in its own try: a failing quit never loses the video.
+    const errors = await teardown({
+      saveVideo: async () => {
+        const video = page.video();
+        await page.close();
+        if (!video) return;
+        await mkdir(dirname(VIDEO_OUT), { recursive: true });
+        await video.saveAs(VIDEO_OUT); // waits until the closed page's video is fully written
+        console.log(`demo video: ${VIDEO_OUT}`);
+      },
+      quitEngine: () => engine.quit(),
+    });
+    for (const e of errors) console.error(`demo teardown: ${String(e)}`);
+    if (finished && errors.length > 0) throw errors[0];
   }
 });
