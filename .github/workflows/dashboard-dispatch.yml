@@ -1,0 +1,40 @@
+name: Dashboard dispatch
+
+# IR-10 (#63): on each push to main, tell the client dashboard repo to rebuild its snapshot.
+# The dashboard listens for repository_dispatch type "chess-tutor-merged" (its snapshot.yml)
+# and still waits for /api/health to report this SHA (#58) before recording.
+# DASHBOARD_DISPATCH_TOKEN is an Actions secret: a fine-grained token with access to the
+# dashboard repo only (Contents: read and write, which repository_dispatch requires).
+# This workflow is not a required check: if the secret or the repo is missing it fails
+# here, visibly, and blocks nothing else in chess-tutor.
+on:
+  push:
+    branches: [main]
+
+permissions: {}
+
+concurrency:
+  group: dashboard-dispatch
+  cancel-in-progress: false
+
+jobs:
+  dispatch:
+    name: Notify the dashboard
+    runs-on: ubuntu-latest
+    timeout-minutes: 2
+    steps:
+      - name: Send repository_dispatch
+        env:
+          GH_TOKEN: ${{ secrets.DASHBOARD_DISPATCH_TOKEN }}
+          DASHBOARD_REPO: ${{ github.repository_owner }}/chess-tutor-dashboard
+          SHA: ${{ github.sha }}
+        run: |
+          if [ -z "$GH_TOKEN" ]; then
+            echo "::error::DASHBOARD_DISPATCH_TOKEN is not set, so the dashboard was not notified (IR-10, #63)."
+            exit 1
+          fi
+          gh api --method POST "repos/$DASHBOARD_REPO/dispatches" \
+            -f event_type=chess-tutor-merged \
+            -f "client_payload[sha]=$SHA" \
+            || { echo "::error::Dispatch to $DASHBOARD_REPO failed (missing repo or token without access)."; exit 1; }
+          echo "Dispatched chess-tutor-merged for $SHA to $DASHBOARD_REPO"
