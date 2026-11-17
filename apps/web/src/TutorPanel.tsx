@@ -1,10 +1,11 @@
 // Tutor panel (#7: FR-8, FR-11, FR-12, NFR-1, NFR-9): thinking and progress, the question,
-// "Show me" and its reveal, the attempt result, failures, and why coaching is off.
+// "Show me" and its reveal, failures, and why coaching is off. A graded try is not panel text: it
+// shows as a pop-up near the board (TryToast, #52, FR-24).
 // No hooks, so tests can render it on the server or call it directly. Everything shown comes
 // from the server (GameView.tutor and tutor_* events); nothing here invents a move.
 import type { Arrow } from "react-chessboard";
 import type { GameController } from "./controller.ts";
-import { canHint, canReveal, tutorArrows, tutorAttemptText, tutorStatusOf, type GameState } from "./game-state.ts";
+import { canHint, canReveal, tutorArrows, tutorStatusOf, type GameState } from "./game-state.ts";
 
 export type TutorPanelHandlers = Pick<GameController, "hint" | "reveal">;
 
@@ -24,7 +25,6 @@ export function TutorPanel({ state, controller }: { state: GameState; controller
   const game = state.game;
   const status = tutorStatusOf(state);
   const t = state.tutor;
-  const attempt = tutorAttemptText(state);
   const reveal = t.question && t.reveal?.questionId === t.question.id ? t.reveal : null;
   const idle = status.available && !status.thinking && !t.question && !t.failed && !t.notice;
 
@@ -56,11 +56,6 @@ export function TutorPanel({ state, controller }: { state: GameState; controller
       {t.question && (
         <p className="tutor-question" data-testid="tutor-question">
           {t.question.message}
-        </p>
-      )}
-      {attempt && (
-        <p className={t.attempt?.correct ? "tutor-attempt good" : "tutor-attempt bad"} data-testid="tutor-attempt">
-          {attempt}
         </p>
       )}
       {reveal && (

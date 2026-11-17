@@ -455,7 +455,7 @@ describe("game controller: tutor (#7: FR-8, FR-11, FR-12, NFR-1, NFR-9)", () => 
     es.emit("tutor_reveal", { type: "tutor_reveal", reveal: reveal() });
     expect(h.state().tutor.reveal).toEqual(reveal());
     es.emit("tutor_attempt", { type: "tutor_attempt", questionId: "q1", move: BF4, correct: true, cpLoss: 0 });
-    expect(h.state().tutor.attempt?.correct).toBe(true);
+    expect(tutorStatusOf(h.state()).question).toBeNull();
     es.emit("tutor_failed", { type: "tutor_failed", message: "The tutor could not answer." });
     expect(h.state().tutor.failed).toBe("The tutor could not answer.");
   });

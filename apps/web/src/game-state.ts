@@ -6,8 +6,14 @@
 // clears busy and pendingFen and keeps the SSE-derived game and error.
 // Tutor (#7: FR-8, FR-11, FR-12, NFR-1, NFR-9): GameView.tutor is the truth. The tutor_* events
 // patch it between "state" events, and `tutor` keeps what only the browser holds: the progress
-// label, the question, its reveal, the attempt result, a failure message and a notice from a
-// refused Hint or Show me.
+// label, the question, its reveal, a failure message and a notice from a refused Hint or Show me.
+// Try result (#52: FR-24, FR-8, FR-10): a graded try ("tutor_attempt") is not panel text but a
+// short pop-up near the board, `tryResult`. It comes only from live events (never from a GameView,
+// so opening or reloading a game shows none), names the best move only from the server's
+// "tutor_reveal" for the same question, and closes at the player's next move (move_attempted) or
+// when the controller's timer dispatches try_result_expired with its seq. Only the grade of the
+// player's latest move opens it (`tryMove`): the server grades after the bot's reply, so a grade that
+// arrives after the player's next move is stale and opens nothing (review 086); its question still closes.
 // Panel follows the board (#51: FR-24, FR-8): the player's move (move_attempted) clears the panel
 // at once, keeping only the tutor's progress. The question it left is never shown again (late
 // tutor_attempt / tutor_reveal, or a later GameView still carrying it as shown); the panel shows a
@@ -27,11 +33,16 @@ type TutorKind = TutorQuestion["kind"];
 
 export const START_FEN = "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1";
 
-export interface TutorAttemptResult {
+/** A graded try, shown as a pop-up near the board (#52, FR-24). */
+export interface TryResult {
   questionId: string;
   move: MoveView;
   correct: boolean;
   cpLoss: number;
+  /** The best move from the "tutor_reveal" for the same question (FR-10); null until then, or when it has none. */
+  best: MoveView | null;
+  /** Tells this pop-up from the one before it, so a stale timer closes nothing. */
+  seq: number;
 }
 
 export interface TutorPanelState {
@@ -43,7 +54,6 @@ export interface TutorPanelState {
   progress: string | null;
   /** The reveal for `question`, from POST /tutor/reveal or a "tutor_reveal" event. */
   reveal: TutorReveal | null;
-  attempt: TutorAttemptResult | null;
   /** tutor_failed message. */
   failed: string | null;
   /** A refused Hint or Show me (409, 503, network). */
@@ -79,6 +89,17 @@ export interface GameState {
   unconfirmedMove: { uci: string; ply: number } | null;
   /** The panel as it was before the move in flight, restored if the server rejects it (#51). */
   tutorBeforeMove: TutorPanelState | null;
+  /** The graded try's pop-up (#52); only from live events, closed by the next move or its timer. */
+  tryResult: TryResult | null;
+  /** seq of the latest try result, kept after it closes. */
+  trySeq: number;
+  /**
+   * The player's latest move and the question it left, if any: the only try whose grade may open the
+   * pop-up (#52). Set by every move_attempted, so a later move makes an earlier try's grade stale.
+   */
+  tryMove: { questionId: string; uci: string } | null;
+  /** The latest "tutor_reveal" answer move, for a try graded after its reveal arrived. */
+  lastRevealMove: { questionId: string; move: MoveView | null } | null;
 }
 
 export type GameAction =
@@ -103,14 +124,15 @@ export type GameAction =
   /** The 200 TutorReveal from POST /tutor/reveal ("Show me"). */
   | { type: "tutor_reveal_received"; reveal: TutorReveal }
   /** A refused Hint or Show me; null clears it. */
-  | { type: "tutor_notice"; message: string | null };
+  | { type: "tutor_notice"; message: string | null }
+  /** The try result's timer ran out (#52); closes it only if it is still the one with `seq`. */
+  | { type: "try_result_expired"; seq: number };
 
 export const emptyTutorPanel: TutorPanelState = {
   question: null,
   open: false,
   progress: null,
   reveal: null,
-  attempt: null,
   failed: null,
   notice: null,
   left: null,
@@ -131,6 +153,10 @@ export const initialGameState: GameState = {
   notFound: false,
   unconfirmedMove: null,
   tutorBeforeMove: null,
+  tryResult: null,
+  trySeq: 0,
+  tryMove: null,
+  lastRevealMove: null,
 };
 
 /** For a GameView without `tutor` (a server from before #7): no coaching, no reason given. */
@@ -182,7 +208,7 @@ function syncTutor(panel: TutorPanelState, game: GameView | null | undefined): T
     // Closed on the server: its text (question, reveal, try result) leaves the panel too (#51).
     if (!panel.question && !panel.open && !panel.tentative && progress === panel.progress) return panel;
     const left = panel.question?.id ?? panel.left;
-    return { ...panel, question: null, open: false, reveal: null, attempt: null, progress, left, tentative: false };
+    return { ...panel, question: null, open: false, reveal: null, progress, left, tentative: false };
   }
   // A reveal already shown (#47): a refreshed page shows it again.
   const shown = t.reveal && t.reveal.questionId === q.id ? t.reveal : null;
@@ -210,7 +236,6 @@ function settleTentative(panel: TutorPanelState, status: TutorStatus | undefined
     question: null,
     open: false,
     reveal: null,
-    attempt: null,
     failed: null,
     notice: null,
     tentative: false,
@@ -250,6 +275,22 @@ function patchTutor(game: GameView, patch: Partial<TutorStatus>): GameView {
   return { ...game, tutor: { ...(game.tutor ?? NO_TUTOR), ...patch } };
 }
 
+/**
+ * The question the player's move `uci` is a try at: the one on the panel, or one the server holds that
+ * an earlier move did not already leave (#51); a question left before is never tried again.
+ */
+function triedQuestion(state: GameState, uci: string): GameState["tryMove"] {
+  const held = state.game?.tutor?.question?.id ?? null;
+  const id = state.tutor.question?.id ?? (held !== state.tutor.left ? held : null);
+  return id === null ? null : { questionId: id, uci };
+}
+
+/** A wrong try's pop-up with the reveal's move for the same question as its best move (#52, FR-10). */
+function bestFromReveal(r: TryResult | null, questionId: string, move: MoveView | null): TryResult | null {
+  if (!r || r.correct || r.questionId !== questionId || r.best?.uci === move?.uci) return r;
+  return { ...r, best: move };
+}
+
 /** Same result for the HTTP reply and the "tutor_reveal" event, in either order. */
 function applyReveal(state: GameState, reveal: TutorReveal): GameState {
   const t = state.tutor;
@@ -285,15 +326,38 @@ function tutorEvent(state: GameState, game: GameView, event: TutorEvent): GameSt
         tutor: { ...t, progress: null, failed: event.message, tentative: t.tentative || state.tutorBeforeMove !== null },
       };
     case "tutor_reveal": {
-      const next = applyReveal(state, event.reveal);
-      return next === state ? state : { ...next, tutorSinceRequest: true };
+      const r = event.reveal;
+      // A wrong try names the best move only from the server's reveal for the same question (#52, FR-10).
+      const seen = state.lastRevealMove;
+      const tryResult = bestFromReveal(state.tryResult, r.questionId, r.move);
+      const same = seen?.questionId === r.questionId && seen.move?.uci === r.move?.uci && tryResult === state.tryResult;
+      const withBest: GameState = same
+        ? state
+        : { ...state, lastRevealMove: { questionId: r.questionId, move: r.move }, tryResult };
+      const next = applyReveal(withBest, r);
+      return next === withBest ? withBest : { ...next, tutorSinceRequest: true };
     }
     case "tutor_attempt": {
       const { questionId, move, correct, cpLoss } = event;
+      // A question this page knows: on the panel, left by the player's move (#51), or held by the server.
+      const known = t.question?.id === questionId || t.left === questionId || game.tutor?.question?.id === questionId;
+      if (!known) return state;
       const closed = game.tutor?.question?.id === questionId ? patchTutor(game, { question: null }) : game;
-      // Not the panel's question (e.g. the one the player's move just left, #51): close it, show nothing.
-      if (!t.question || t.question.id !== questionId) return closed === game ? state : { ...live, game: closed };
-      return { ...live, game: closed, tutor: { ...t, open: false, attempt: { questionId, move, correct, cpLoss }, notice: null } };
+      // Only the grade of the player's latest move opens the pop-up (review 086, FR-24): one that
+      // arrives after the next move is stale. The question still closes as before.
+      const latest = state.tryMove?.questionId === questionId && state.tryMove.uci === move.uci;
+      if (!latest) {
+        const tutor = t.question?.id === questionId ? { ...t, open: false, notice: null } : t;
+        return closed === game && tutor === t ? state : { ...live, game: closed, tutor };
+      }
+      const seq = state.trySeq + 1;
+      const fresh: TryResult = { questionId, move, correct, cpLoss, best: null, seq };
+      const r = state.lastRevealMove;
+      const tryResult = r ? bestFromReveal(fresh, r.questionId, r.move) : fresh;
+      const base = { ...live, game: closed, tryResult, trySeq: seq, tryMove: null };
+      // The result is the pop-up's, never the panel's (#52, FR-24); the panel's question just closes.
+      if (!t.question || t.question.id !== questionId) return base;
+      return { ...base, tutor: { ...t, open: false, notice: null } };
     }
   }
 }
@@ -319,6 +383,9 @@ export function gameReducer(state: GameState, action: GameAction): GameState {
         // FR-24: whatever the panel showed leaves it with the position (#51).
         tutor: leavePanel(state),
         tutorBeforeMove: state.tutor,
+        // The next move closes the try result's pop-up at once (#52), and only its own grade may open one.
+        tryResult: null,
+        tryMove: triedQuestion(state, action.uci),
       };
 
     case "move_accepted": {
@@ -417,6 +484,9 @@ export function gameReducer(state: GameState, action: GameAction): GameState {
 
     case "tutor_reveal_received":
       return applyReveal(state, action.reveal);
+
+    case "try_result_expired":
+      return state.tryResult?.seq === action.seq ? { ...state, tryResult: null } : state;
 
     case "tutor_notice":
       return state.tutor.notice === action.message ? state : { ...state, tutor: { ...state.tutor, notice: action.message } };
@@ -546,12 +616,21 @@ export function tutorArrows(state: GameState): BoardArrow[] {
   return out;
 }
 
-/** The graded attempt for the shown question, as one line; null when there is none. */
-export function tutorAttemptText(state: GameState): string | null {
-  const a = state.tutor.attempt;
-  if (!a) return null;
-  if (a.correct) return `Correct: ${a.move.san} is a good move.`;
-  return `Not quite: ${a.move.san} loses ${a.cpLoss} centipawns against the best move.`;
+/**
+ * The try result's line (#52, FR-24), without the check or cross mark: "Nf3, correct. Only 0.1 off
+ * the best move" (cpLoss in pawns, one decimal), "Nf3, correct. The best move" at cpLoss 0, and
+ * "Be2, not quite. Best was h3", where the best move is the server's reveal move (FR-10); without
+ * one, no best move is named.
+ */
+export function tryResultText(r: TryResult): string {
+  if (r.correct) {
+    if (r.cpLoss <= 0) return `${r.move.san}, correct. The best move`;
+    const pawns = (r.cpLoss / 100).toFixed(1);
+    // A loss that rounds to 0.0 is still not the best move.
+    if (pawns === "0.0") return `${r.move.san}, correct. Less than 0.1 off the best move`;
+    return `${r.move.san}, correct. Only ${pawns} off the best move`;
+  }
+  return r.best ? `${r.move.san}, not quite. Best was ${r.best.san}` : `${r.move.san}, not quite.`;
 }
 
 function resultText(game: GameView): string {
