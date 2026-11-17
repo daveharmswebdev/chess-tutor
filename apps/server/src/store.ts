@@ -25,10 +25,18 @@ export interface SavedGame {
    * under schema v1; those are rebuilt from the PGN.
    */
   state?: string | null;
+  /**
+   * Schema v3 (FR-28, #64): who started the game. "demo" for a game started by the daily demo
+   * with the right DEMO_TOKEN, else "player" (the default when omitted). Set once, on insert:
+   * a later save never changes it. Server-side only; not part of GameView.
+   */
+  source?: GameSource;
 }
 
-/** A row as read back: `state` is always present (null for v1 rows). */
-export type StoredGame = SavedGame & { state: string | null };
+export type GameSource = "player" | "demo";
+
+/** A row as read back: `state` and `source` are always present (null and "player" for old rows). */
+export type StoredGame = SavedGame & { state: string | null; source: GameSource };
 
 export interface GameStore {
   /** Insert or replace by id. */
@@ -47,7 +55,7 @@ export function resolveDbPath(env: Record<string, string | undefined>): string {
   return path === undefined || path === "" ? DEFAULT_DB_PATH : path;
 }
 
-export const SCHEMA_VERSION = 2;
+export const SCHEMA_VERSION = 3;
 
 /**
  * SQLite game store (node:sqlite, one connection). Writes are synchronous: when save()
@@ -58,6 +66,8 @@ export const SCHEMA_VERSION = 2;
  *   2  adds `state` (JSON: the live game state) and an index on status; games in progress are
  *      saved too (#47, NFR-14). Migrated from 1 by ALTER TABLE, so v1 rows keep working with
  *      state NULL and are rebuilt from their PGN.
+ *   3  adds `source` ('player' or 'demo', default 'player'; FR-28, #64), so usage reporting can
+ *      tell demo games apart. Migrated by ALTER TABLE; older rows read back as 'player'.
  * Tutor notes (#53, FR-25, FR-5) live in `state` (its `notes` array, [] when absent) and in the
  * PGN as {...} comments; no separate table and no schema change.
  * A database with a newer version than this code knows is refused.
@@ -73,8 +83,8 @@ export function createSqliteGameStore(path: string): GameStore {
   }
 
   const upsert = db.prepare(
-    `INSERT INTO games (id, player_color, status, result, end_reason, pgn, created_at, updated_at, state)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+    `INSERT INTO games (id, player_color, status, result, end_reason, pgn, created_at, updated_at, state, source)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
      ON CONFLICT(id) DO UPDATE SET status = excluded.status, result = excluded.result,
        end_reason = excluded.end_reason, pgn = excluded.pgn, updated_at = excluded.updated_at,
        state = excluded.state`,
@@ -84,7 +94,7 @@ export function createSqliteGameStore(path: string): GameStore {
 
   return {
     save(g) {
-      upsert.run(g.id, g.playerColor, g.status, g.result, g.endReason, g.pgn, g.createdAt, g.updatedAt, g.state ?? null);
+      upsert.run(g.id, g.playerColor, g.status, g.result, g.endReason, g.pgn, g.createdAt, g.updatedAt, g.state ?? null, g.source ?? "player");
     },
     get(id) {
       const row = select.get(id);
@@ -111,6 +121,7 @@ function fromRow(row: Record<string, unknown>): StoredGame {
     createdAt: String(row["created_at"]),
     updatedAt: String(row["updated_at"]),
     state: state === null || state === undefined ? null : String(state),
+    source: row["source"] === "demo" ? "demo" : "player",
   };
 }
 
@@ -139,6 +150,8 @@ function migrate(db: DatabaseSync): void {
     const columns = db.prepare("PRAGMA table_info(games)").all().map((c) => String(c["name"]));
     if (!columns.includes("state")) db.exec("ALTER TABLE games ADD COLUMN state TEXT");
     db.exec("CREATE INDEX IF NOT EXISTS games_status ON games (status)");
+    // Version 3 (#64, FR-28): who started the game; every older row is a player game.
+    if (!columns.includes("source")) db.exec("ALTER TABLE games ADD COLUMN source TEXT NOT NULL DEFAULT 'player' CHECK (source IN ('player', 'demo'))");
     db.exec(`PRAGMA user_version = ${SCHEMA_VERSION}`);
     db.exec("COMMIT");
   } catch (err) {

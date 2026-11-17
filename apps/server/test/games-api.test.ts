@@ -1,7 +1,7 @@
 import { afterEach, describe, expect, it } from "vitest";
 import type { FastifyInstance } from "fastify";
 import type { GameView } from "@chess-tutor/chess-core";
-import { buildServer } from "../src/app.ts";
+import { buildServer, demoSource } from "../src/app.ts";
 import type { GameManager } from "../src/games.ts";
 import { createSqliteGameStore, type GameStore } from "../src/store.ts";
 import { createFakeBot, eventCollector, ucis, type FakeBot } from "./helpers.ts";
@@ -13,11 +13,21 @@ let games: GameManager;
 let store: GameStore;
 let bot: FakeBot;
 
-function setup(script: string[] = []) {
+let logLines: string[] = [];
+
+function setup(script: string[] = [], opts: { demoToken?: string; captureLog?: boolean } = {}) {
   bot = createFakeBot(script);
   store = createSqliteGameStore(":memory:");
   let n = 0;
-  ({ app, games } = buildServer({ bot, store, newId: () => `g${++n}`, logger: false }));
+  logLines = [];
+  const logger = opts.captureLog ? { level: "trace", stream: { write: (line: string) => void logLines.push(line) } } : false;
+  ({ app, games } = buildServer({
+    bot,
+    store,
+    newId: () => `g${++n}`,
+    logger,
+    ...(opts.demoToken === undefined ? {} : { demoToken: opts.demoToken }),
+  }));
 }
 
 afterEach(async () => {
@@ -131,6 +141,107 @@ describe("POST /api/games", () => {
     const saved = store.get(g.id)!;
     expect(saved).toMatchObject({ status: "playing", result: "*", endReason: null, playerColor: "w" });
     expect(saved.pgn).toMatch(/1\. e4 e5 \*\s*$/);
+  });
+});
+
+describe("demo games (FR-28, IR-10, #64)", () => {
+  const TOKEN = "s3cret-demo-token";
+
+  async function create(headers: Record<string, string> = {}) {
+    const res = await app.inject({ method: "POST", url: "/api/games", headers, payload: { playerColor: "w" } });
+    return { status: res.statusCode, body: res.json() as GameView & { error?: string }, raw: res.body };
+  }
+
+  it("DEMO_TOKEN unset: the header is ignored, the game is a player game", async () => {
+    setup();
+    const res = await create({ "x-demo-token": TOKEN });
+    expect(res.status).toBe(201);
+    expect(store.get(res.body.id)?.source).toBe("player");
+  });
+
+  it("DEMO_TOKEN blank: the header is ignored, the game is a player game", async () => {
+    setup([], { demoToken: "  " });
+    const res = await create({ "x-demo-token": "  " });
+    expect(res.status).toBe(201);
+    expect(store.get(res.body.id)?.source).toBe("player");
+  });
+
+  it("a configured token with a trailing newline or surrounding spaces matches the trimmed header (review 081)", async () => {
+    expect(demoSource("tok\n", "tok")).toBe("demo");
+    expect(demoSource("  tok  ", "tok")).toBe("demo");
+    expect(demoSource("\ttok\r\n", "tok")).toBe("demo");
+    expect(demoSource("tok\n", "tox")).toBeNull();
+    setup([], { demoToken: `${TOKEN}\n` });
+    const res = await app.inject({
+      method: "POST",
+      url: "/api/games",
+      // What Node's HTTP parser delivers for "x-demo-token:   <token>   " (inject does not trim).
+      headers: { "x-demo-token": TOKEN },
+      payload: { playerColor: "w" },
+    });
+    expect(res.statusCode, res.body).toBe(201);
+    expect(store.get((res.json() as GameView).id)?.source).toBe("demo");
+  });
+
+  it("a whitespace-only token is off: any header is ignored, the game is a player game", async () => {
+    for (const blank of ["", " ", "\n", " \t\r\n "]) {
+      expect(demoSource(blank, "anything"), JSON.stringify(blank)).toBe("player");
+      expect(demoSource(blank, ""), JSON.stringify(blank)).toBe("player");
+      expect(demoSource(blank, undefined), JSON.stringify(blank)).toBe("player");
+    }
+    setup([], { demoToken: " \n" });
+    const res = await create({ "x-demo-token": "anything" });
+    expect(res.status).toBe(201);
+    expect(store.get(res.body.id)?.source).toBe("player");
+  });
+
+  it("DEMO_TOKEN set, no header: a player game", async () => {
+    setup([], { demoToken: TOKEN });
+    const res = await create();
+    expect(res.status).toBe(201);
+    expect(store.get(res.body.id)?.source).toBe("player");
+  });
+
+  it("DEMO_TOKEN set, the right header: 201 and a demo game; source is not in the view", async () => {
+    setup([], { demoToken: TOKEN, captureLog: true });
+    const res = await create({ "x-demo-token": TOKEN });
+    expect(res.status).toBe(201);
+    expect(store.get(res.body.id)?.source).toBe("demo");
+    expect(res.body).not.toHaveProperty("source");
+    expect(res.raw).not.toContain(TOKEN);
+    expect(logLines.join("")).not.toContain(TOKEN);
+    const newGameLine = logLines.map((l) => JSON.parse(l) as Record<string, unknown>).find((e) => e["msg"] === "new game");
+    expect(newGameLine).toMatchObject({ gameSource: "demo" });
+    expect(newGameLine).not.toHaveProperty("source");
+  });
+
+  it("DEMO_TOKEN set, a wrong header of the same length: 403, no game created", async () => {
+    setup([], { demoToken: TOKEN, captureLog: true });
+    const wrong = TOKEN.slice(0, -1) + "X";
+    const res = await create({ "x-demo-token": wrong });
+    expect(res.status).toBe(403);
+    expect(res.body).toEqual({ error: expect.any(String) });
+    expect(res.raw).not.toContain(TOKEN);
+    expect(store.get("g1")).toBeUndefined();
+    expect(store.listPlaying()).toEqual([]);
+    expect(logLines.join("")).not.toContain(TOKEN);
+    expect(logLines.join("")).not.toContain(wrong);
+  });
+
+  it("DEMO_TOKEN set, a wrong header of another length: 403, no game created", async () => {
+    setup([], { demoToken: TOKEN });
+    for (const wrong of ["x", TOKEN + "x", ""]) {
+      const res = await create({ "x-demo-token": wrong });
+      expect(res.status, wrong).toBe(403);
+    }
+    expect(store.listPlaying()).toEqual([]);
+  });
+
+  it("a rejected demo token leaves the game in progress playing", async () => {
+    setup([], { demoToken: TOKEN });
+    const g = await newGame("w");
+    expect((await create({ "x-demo-token": "nope" })).status).toBe(403);
+    expect(games.view(g.id)?.status).toBe("playing");
   });
 });
 

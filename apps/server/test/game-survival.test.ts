@@ -7,7 +7,7 @@ import type { FastifyInstance } from "fastify";
 import type { GameEvent, GameView } from "@chess-tutor/chess-core";
 import { buildServer } from "../src/app.ts";
 import type { GameManager } from "../src/games.ts";
-import { createSqliteGameStore, type GameStore } from "../src/store.ts";
+import { createSqliteGameStore, SCHEMA_VERSION, type GameStore } from "../src/store.ts";
 import {
   createFakeAnalyzer,
   createFakeBot,
@@ -54,7 +54,7 @@ afterEach(async () => {
 });
 
 /** A server on dbPath. Ids are `${prefix}1`, `${prefix}2`, ... so A's and B's never collide. */
-function boot(prefix: string, script: string[] = [], opts: { coachingOff?: boolean } = {}): Server {
+function boot(prefix: string, script: string[] = [], opts: { coachingOff?: boolean; demoToken?: string } = {}): Server {
   const store = createSqliteGameStore(dbPath);
   const bot = createFakeBot(script);
   const analyzer = createFakeAnalyzer();
@@ -65,6 +65,7 @@ function boot(prefix: string, script: string[] = [], opts: { coachingOff?: boole
     store,
     newId: () => `${prefix}${++n}`,
     logger: false,
+    ...(opts.demoToken === undefined ? {} : { demoToken: opts.demoToken }),
     coaching: opts.coachingOff
       ? { analyzer, tutor: null, offReason: "Coaching is off: no API key is set." }
       : { analyzer, tutor },
@@ -438,9 +439,9 @@ describe("schema v1 database", () => {
 
     const b = boot("b");
     const check = new DatabaseSync(dbPath);
-    expect((check.prepare("PRAGMA user_version").get() as { user_version: number }).user_version).toBe(2);
+    expect((check.prepare("PRAGMA user_version").get() as { user_version: number }).user_version).toBe(SCHEMA_VERSION);
     check.close();
-    expect(b.store.get("old1")).toMatchObject({ status: "finished", pgn, state: null });
+    expect(b.store.get("old1")).toMatchObject({ status: "finished", pgn, state: null, source: "player" });
     const res = await get(b, "old1");
     expect(res.status).toBe(200);
     expect(res.view).toMatchObject({ id: "old1", playerColor: "b", status: "finished", result: "1-0", endReason: "resigned" });
@@ -455,6 +456,84 @@ describe("schema v1 database", () => {
     expect(onDisk(id)).toMatchObject({ status: "playing" });
   });
 
+  it("is at schema version 3", () => {
+    expect(SCHEMA_VERSION).toBe(3);
+  });
+});
+
+describe("schema v2 database (FR-28, #64)", () => {
+  it("migrates to v3: old rows read back as player games, in progress and finished; twice is harmless", async () => {
+    const db = new DatabaseSync(dbPath);
+    db.exec(`
+      CREATE TABLE games (
+        id TEXT PRIMARY KEY,
+        player_color TEXT NOT NULL CHECK (player_color IN ('w', 'b')),
+        status TEXT NOT NULL,
+        result TEXT NOT NULL,
+        end_reason TEXT,
+        pgn TEXT NOT NULL,
+        created_at TEXT NOT NULL,
+        updated_at TEXT NOT NULL,
+        state TEXT
+      )
+    `);
+    db.exec("CREATE INDEX games_status ON games (status)");
+    db.exec("PRAGMA user_version = 2");
+    const pgn =
+      '[Event "Sparring game"]\n[Site "Chess Tutor"]\n[Date "2026.11.07"]\n[Round "-"]\n[White "Sparring bot"]\n' +
+      '[Black "Player"]\n[Result "1-0"]\n[Termination "resigned"]\n\n1. d4 Nf6 2. c4 1-0\n';
+    const insert = db.prepare("INSERT INTO games VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)");
+    insert.run("old1", "b", "finished", "1-0", "resigned", pgn, "2026-11-07T10:00:00.000Z", "2026-11-07T10:05:00.000Z", null);
+    const playingPgn = '[Event "Sparring game"]\n[Result "*"]\n\n1. e4 e5 *\n';
+    insert.run("old2", "w", "playing", "*", null, playingPgn, "2026-11-07T11:00:00.000Z", "2026-11-07T11:01:00.000Z", null);
+    db.close();
+
+    const b = boot("b");
+    const check = new DatabaseSync(dbPath);
+    expect((check.prepare("PRAGMA user_version").get() as { user_version: number }).user_version).toBe(3);
+    const cols = check.prepare("PRAGMA table_info(games)").all() as { name: string; notnull: number; dflt_value: string }[];
+    expect(cols.find((c) => c.name === "source")).toMatchObject({ notnull: 1, dflt_value: "'player'" });
+    check.close();
+    expect(b.store.get("old1")).toMatchObject({ status: "finished", source: "player" });
+    expect(b.store.get("old2")).toMatchObject({ status: "playing", source: "player" });
+    expect((await get(b, "old2")).view.moves.map((m) => m.uci)).toEqual(["e2e4", "e7e5"]);
+    await b.close();
+
+    // A v2 database whose column already exists (a migration that stopped after the ALTER).
+    const again = new DatabaseSync(dbPath);
+    again.exec("PRAGMA user_version = 2");
+    again.close();
+    const c = boot("c");
+    expect(c.store.get("old1")?.source).toBe("player");
+  });
+});
+
+describe("a demo game across a restart (FR-28, NFR-14)", () => {
+  it("keeps its source after a restart and when it is saved again", async () => {
+    const a = boot("a", ["e7e5"], { demoToken: "tok" });
+    const res = await a.app.inject({
+      method: "POST",
+      url: "/api/games",
+      headers: { "x-demo-token": "tok" },
+      payload: { playerColor: "w" },
+    });
+    expect(res.statusCode, res.body).toBe(201);
+    const id = (res.json() as GameView).id;
+    await play(a, id, "d2d4");
+    await a.close();
+    expect(onDisk(id)?.source).toBe("demo");
+
+    // B has no DEMO_TOKEN at all: the restored game is still a demo game.
+    const b = boot("b", ["d7d5"]);
+    expect(b.games.view(id)?.status).toBe("playing");
+    await play(b, id, "c2c4");
+    expect(onDisk(id)?.source).toBe("demo");
+    expect((await post(b, `/api/games/${id}/resign`)).status).toBe(200);
+    expect(onDisk(id)).toMatchObject({ status: "finished", source: "demo" });
+  });
+});
+
+describe("schema version guard", () => {
   it("a database newer than this server is refused", () => {
     const db = new DatabaseSync(dbPath);
     db.exec("PRAGMA user_version = 99");

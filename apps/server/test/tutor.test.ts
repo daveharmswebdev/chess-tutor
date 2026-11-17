@@ -742,3 +742,65 @@ describe("availability (NFR-9)", () => {
     expect((res.body as unknown as GameView).tutor).toMatchObject({ available: false, reason: expect.any(String) });
   });
 });
+
+describe("tutor log lines carry the game's source (FR-28, #64)", () => {
+  function setupLogged(demoToken: string): string[] {
+    const lines: string[] = [];
+    bot = createFakeBot(["e7e5"]);
+    analyzer = createFakeAnalyzer();
+    tutor = createFakeTutor();
+    store = createSqliteGameStore(":memory:");
+    let n = 0;
+    ({ app, games } = buildServer({
+      bot,
+      store,
+      newId: () => `g${++n}`,
+      logger: { level: "info", stream: { write: (line: string) => void lines.push(line) } },
+      demoToken,
+      coaching: { analyzer, tutor },
+    }));
+    return lines;
+  }
+
+  async function hintLine(lines: string[], headers: Record<string, string>, msg: string) {
+    const res = await app.inject({ method: "POST", url: "/api/games", headers, payload: { playerColor: "w" } });
+    expect(res.statusCode, res.body).toBe(201);
+    const id = (res.json() as GameView).id;
+    const events = eventCollector();
+    games.subscribe(id, events.push);
+    expect((await post(`/api/games/${id}/tutor/hint`)).status).toBe(202);
+    await events.next(msg === "tutor reply" ? "tutor_reply" : "tutor_failed");
+    const entries = lines.map((l) => JSON.parse(l) as Record<string, unknown>);
+    return entries.find((e) => e["msg"] === msg && e["gameId"] === id);
+  }
+
+  it("the bot move line keeps source (book/engine) and has no gameSource (review 081)", async () => {
+    const lines = setupLogged("tok-123");
+    const res = await app.inject({ method: "POST", url: "/api/games", payload: { playerColor: "w" } });
+    const id = (res.json() as GameView).id;
+    await play(id, "e2e4");
+    const botLine = lines.map((l) => JSON.parse(l) as Record<string, unknown>).find((e) => e["msg"] === "bot move");
+    expect(botLine).toMatchObject({ gameId: id, source: "engine" });
+    expect(botLine).not.toHaveProperty("gameSource");
+  });
+
+  it("a demo game's tutor reply and a player game's tutor failure", async () => {
+    const lines = setupLogged("tok-123");
+    tutor.auto = () => okOutcome({ kind: "hint" });
+    const reply = await hintLine(lines, { "x-demo-token": "tok-123" }, "tutor reply");
+    expect(reply).toMatchObject({ gameSource: "demo", usage: expect.any(Object) });
+    expect(reply).not.toHaveProperty("source");
+    tutor.auto = () => failOutcome("api_unavailable");
+    const failed = await hintLine(lines, {}, "tutor failed");
+    expect(failed).toMatchObject({ gameSource: "player", usage: expect.any(Object) });
+    expect(failed).not.toHaveProperty("source");
+    const entries = lines.map((l) => JSON.parse(l) as Record<string, unknown>);
+    const newGames = entries.filter((x) => x["msg"] === "new game");
+    expect(newGames).toHaveLength(2);
+    for (const e of newGames) {
+      expect(e).toHaveProperty("gameSource");
+      expect(e).not.toHaveProperty("source");
+    }
+    expect(lines.join("")).not.toContain("tok-123");
+  });
+});

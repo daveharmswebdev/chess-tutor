@@ -123,11 +123,41 @@ describe("game store", () => {
     };
     store.save(rec);
     store.save({ ...rec, pgn: "pgn-2", updatedAt: "2026-11-07T10:06:00.000Z" });
-    expect(store.get("g1")).toEqual({ ...rec, pgn: "pgn-2", updatedAt: "2026-11-07T10:06:00.000Z", state: null });
+    expect(store.get("g1")).toEqual({
+      ...rec,
+      pgn: "pgn-2",
+      updatedAt: "2026-11-07T10:06:00.000Z",
+      state: null,
+      source: "player",
+    });
     store.save({ ...rec, id: "g2", status: "playing", result: "*", endReason: null, state: '{"v":1}' });
     expect(store.get("g2")?.state).toBe('{"v":1}');
     expect(store.listPlaying().map((g) => g.id)).toEqual(["g2"]);
     expect(store.get("nope")).toBeUndefined();
+    store.close();
+  });
+
+  it("stores a game's source (FR-28): demo or player, player when omitted; an update keeps it", () => {
+    const store = createSqliteGameStore(":memory:");
+    const rec = {
+      id: "d1",
+      playerColor: "w" as const,
+      status: "playing" as const,
+      result: "*" as const,
+      endReason: null,
+      pgn: "p",
+      createdAt: "2026-11-07T10:00:00.000Z",
+      updatedAt: "2026-11-07T10:00:00.000Z",
+      source: "demo" as const,
+    };
+    store.save(rec);
+    expect(store.get("d1")?.source).toBe("demo");
+    expect(store.listPlaying()[0]?.source).toBe("demo");
+    store.save({ ...rec, status: "finished", result: "1-0", endReason: "resigned" });
+    expect(store.get("d1")?.source).toBe("demo");
+    const { source: _omit, ...withoutSource } = rec;
+    store.save({ ...withoutSource, id: "p1" });
+    expect(store.get("p1")?.source).toBe("player");
     store.close();
   });
 
