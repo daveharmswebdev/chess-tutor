@@ -1,3 +1,4 @@
+import type { DailyStats, UsageCounts } from "@chess-tutor/chess-core";
 import type { ModelPrice } from "./config.ts";
 import type { GameSource, UsageEvent, UsageLedger } from "./store.ts";
 
@@ -6,33 +7,7 @@ import type { GameSource, UsageEvent, UsageLedger } from "./store.ts";
  * stored usage ledger, so the counting rules are tested without HTTP.
  */
 
-/**
- * Mirrors DailyStats and UsageCounts in packages/chess-core/src/api.ts (the contract). They are
- * not re-exported by @chess-tutor/chess-core's index (contract gap reported), so they are
- * restated here; keep them identical.
- */
-export interface DailyStats {
-  version: 1;
-  date: string;
-  generatedAt: string;
-  player: UsageCounts;
-  demo: UsageCounts;
-}
-
-export interface UsageCounts {
-  gamesStarted: number;
-  tutorReplies: number;
-  tutorLatencyMs: { p50: number | null; p95: number | null };
-  errors: Record<string, number>;
-  claude: {
-    requests: number;
-    inputTokens: number;
-    outputTokens: number;
-    cacheReadInputTokens: number;
-    cacheCreationInputTokens: number;
-    spendUsd: number;
-  };
-}
+export type { DailyStats, UsageCounts };
 
 /** USD per million tokens by model id (config/models.json pricingPerMTok). */
 export type Pricing = Record<string, ModelPrice>;
