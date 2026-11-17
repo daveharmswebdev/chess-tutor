@@ -268,7 +268,10 @@ export interface DailyStats {
 
 export interface UsageCounts {
   gamesStarted: number;
-  /** Tutor asks (key moments and hints) that ended with a validated reply. */
+  /**
+   * Tutor asks (key moments and hints) that ended with a validated reply, including one the
+   * page never showed because the player moved on first (it was produced and paid for).
+   */
   tutorReplies: number;
   /** Latency of those replies in ms (nearest-rank percentiles); null when there were none. */
   tutorLatencyMs: { p50: number | null; p95: number | null };

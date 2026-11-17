@@ -30,6 +30,7 @@ export type {
 } from "./bot.ts";
 export type {
   ApiError,
+  DailyStats,
   GameEndReason,
   GameEvent,
   GameResult,
@@ -44,4 +45,5 @@ export type {
   TutorQuestion,
   TutorReveal,
   TutorStatus,
+  UsageCounts,
 } from "./api.ts";
