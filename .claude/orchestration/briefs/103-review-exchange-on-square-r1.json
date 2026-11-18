@@ -1,0 +1,25 @@
+{
+  "brief_id": "103-review-exchange-on-square-r1",
+  "agent": "reviewer",
+  "issue": 44,
+  "base_sha": "fb6200f",
+  "scratch_dir": "/private/tmp/claude-501/-Users-daveharms-personal-workspace-chess-tutor/4a8b1168-9770-4b7b-9a50-977522c5a01c/scratchpad/103-review-exchange-on-square-r1",
+  "objective": "Review #44 chess-core round: `git diff 316ca50..fb6200f` (core-agent: packages/chess-core/src/exchange.ts, src/index.ts, test/exchange.test.ts) for correctness of exchangeOnSquare against the ExchangeResult contract's doc comment in packages/chess-core/src/types.ts and FR-21. Focus: (1) attacker/defender lists: capture order cheapest first, x-rays found by lifting own pieces and flagged xray: true, never earlier than the piece in front; x-ray through an enemy piece not counted; batteries mixing pieces (Q in front of R, B in front of Q, pawn in front of bishop/queen on a diagonal); (2) the sequence alternation and when it ends; (3) the king rule: captures only when the square is then no longer attacked, including attackers revealed after earlier captures; (4) promotion on the square for both colours, value 9 afterwards; (5) fullResult and the negamax result/bestLength, including equal trades and cases where the defender should stop early; (6) side rules: occupant colour vs side to move, empty square, a king on the square, attackerToMove false; (7) invalid FEN/square errors; (8) whether the 17 tests' FENs and expected numbers are actually right (check by hand or with chess.js in a scratch script). The tutor tool is the next round and is out of scope.",
+  "requirements": [
+    "FR-21",
+    "FR-10",
+    "FR-23"
+  ],
+  "contract": "The normative contract is the doc comment on ExchangeResult/ExchangePiece/ExchangeCapture in packages/chess-core/src/types.ts (unchanged by this diff; read it with git show fb6200f:packages/chess-core/src/types.ts).\nSpoke's design choices: lists built per side by repeatedly taking the cheapest current attacker (p,n,b,r,q,k; ties by square), lifting it and re-asking chess.js attackers(); pieces not attacking on the original board are xray: true; enemy pieces never lifted. Sequence alternates until one side runs out; before a king captures it checks, on a board with all earlier capturers removed and the king lifted, whether the other side still attacks the square; if so the sequence stops. Pawn capture onto rank 8/1 promotes: gain = captured + 8, square holds a queen (9). fullResult = alternating sum; result by negamax best[i] = max(0, gain[i] - best[i+1]); on a tie the side stops (even trade -> bestLength 0, result 0). Empty square or king on the square -> empty sequence, lists still filled. Invalid square (/^[a-h][1-8]$/) or FEN -> Error. En passant ignored. EXCHANGE_CAVEAT exported.\nThe coordinator re-ran the gate at fb6200f: Test Files 61 passed, Tests 1403 passed; typecheck clean.",
+  "scope": [],
+  "negative": [
+    "Read-only: do not edit, commit, or run anything that writes to the repo.",
+    "Do not run anything that calls the Claude API."
+  ],
+  "rubric": [
+    "Each finding cites file:line and evidence; reproduce blocking/major with a scratch script or test outside the repo (in your scratch dir), with the FEN.",
+    "Severities: blocking / major / minor. Summary ends SHIP or NO-SHIP."
+  ],
+  "concurrency": "Another reviewer reviews #36 (apps/server) in its own worktree. Read the reviewed code with git diff / git show <sha>:<path>.",
+  "round": 1
+}

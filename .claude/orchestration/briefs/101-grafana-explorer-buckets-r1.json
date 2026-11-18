@@ -1,0 +1,27 @@
+{
+  "brief_id": "101-grafana-explorer-buckets-r1",
+  "agent": "researcher",
+  "issue": 81,
+  "base_sha": "316ca50",
+  "scratch_dir": "/private/tmp/claude-501/-Users-daveharms-personal-workspace-chess-tutor/4a8b1168-9770-4b7b-9a50-977522c5a01c/scratchpad/101-grafana-explorer-buckets-r1",
+  "objective": "Answer two research questions with sources (official docs or library source), so the coordinator can write the #81 and #84 briefs without guessing. Q1 (#81): for shipping this app's pino 10.4.0 logs (Fastify 5.12.8, Node 22, one process on Render) to Grafana Cloud Logs: (a) the current Grafana Cloud free-tier logs limits (ingest volume per month, retention, any rate limits); (b) the currently recommended way to push from pino: pino-loki vs an OpenTelemetry/OTLP transport (e.g. pino-opentelemetry-transport) vs Grafana's own guidance, with the package name, current version, maintenance status, whether it runs as a pino worker-thread transport, and how it behaves when the endpoint is down (drops, buffers, crashes the process?); (c) the exact env-var inputs each needs (endpoint URL form, user/instance id, API token) and how labels like app=\"chess-tutor\" are set so `{app=\"chess-tutor\"} | json` works. Q2 (#84): the exact rating buckets the Lichess opening explorer's `/lichess` endpoint accepts in its `ratings` parameter today (e.g. 0, 1000, 1200, 1400, 1600, 1800, 2000, 2200, 2500), and what each bucket value means (lower bound? range to the next value?). Success: a return whose summary answers each sub-question with a source URL or file path for every claim, and marks anything it could not confirm as unconfirmed.",
+  "requirements": [
+    "IR-11",
+    "NFR-17",
+    "NFR-12",
+    "FR-2"
+  ],
+  "contract": "Context: #81 (decided with the owner 2026-11-17): in-process shipping, a pino transport inside the server pushes to Grafana Cloud Logs (Loki), chosen over Render log streams. With the Grafana env vars unset (local, tests, CI) nothing is sent and nothing fails. Credentials only as runtime env vars on Render (NFR-12). Logs never contain secrets or player text (NFR-17); pino `redact` may be used.\nFacts at 316ca50: pnpm-lock.yaml has pino@10.4.0, pino-abstract-transport@3.0.0, @pinojs/redact@0.4.0, fastify@5.12.8. The server's logger is configured at apps/server/src/main.ts:118 as `logger: { level: env[\"LOG_LEVEL\"] || \"info\" }`.\n#84: the bot samples opening moves from the Lichess opening explorer at a rating band (config/tutor.json `bot.explorerRatings: [1200, 1400]`, used in packages/chess-core/src/bot.ts and the explorer client in packages/explorer/). The issue says: 'as far as known, Lichess uses fixed buckets (0, 1000, 1200, 1400, 1600, 1800, 2000, 2200, 2500). Confirm before the brief.' Look at packages/explorer/src for how ratings are sent today, then confirm against the Lichess API docs (https://lichess.org/api#tag/Opening-Explorer) or the lila-openingexplorer source on GitHub.\nPut the answers in the return's summary (structured as Q1a, Q1b, Q1c, Q2) and any caveats in findings with owner coordinator. You change no files: files_changed is [].",
+  "scope": [],
+  "negative": [
+    "Read-only: do not edit, commit, or run anything that writes to the repo."
+  ],
+  "rubric": [
+    "Every claim has a source: an official doc URL, a GitHub source file URL, or a node_modules path. Claims that could not be confirmed are labelled unconfirmed.",
+    "Q1b ends with a recommendation (one package) and the reason, including endpoint-down behaviour.",
+    "Q2 lists the exact accepted bucket values and their meaning, with the source.",
+    "No files changed: files_changed is [] and no commit is made."
+  ],
+  "concurrency": "Two implementation spokes run at the same time (core-agent on packages/chess-core for #44, server-agent on apps/server/src/app.ts and config.ts for #36). You are read-only, so there is no overlap.",
+  "round": 1
+}

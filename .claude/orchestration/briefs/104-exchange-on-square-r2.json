@@ -1,0 +1,36 @@
+{
+  "brief_id": "104-exchange-on-square-r2",
+  "agent": "core-agent",
+  "issue": 44,
+  "base_sha": "3cdbe0f",
+  "scratch_dir": "/private/tmp/claude-501/-Users-daveharms-personal-workspace-chess-tutor/4a8b1168-9770-4b7b-9a50-977522c5a01c/scratchpad/104-exchange-on-square-r2",
+  "objective": "Round 2 of #44 on your branch (now rebased: your work is 3cdbe0f on top of main 076f303). Fix the blocking defect from review 103: an enemy slider standing behind a piece that captures on the square is never counted, because bearing() never lifts enemy pieces. Work the exchange out on the real board instead: after each capture remove the capturer from its square, re-ask chess.js attackers() for the side now to capture, and take the cheapest. List x-rays (xray: true) for any piece that does not attack on the original board but joins after a piece in front of it (of either colour) has captured. A piece behind an enemy piece that never captures on the square stays blocked. Rewrite the wrong test, add a regression test for the reviewer's FEN, and add the missing coverage tests listed in the rubric. Success: the reviewer's probes give the results stated in the contract, the gate is clean.",
+  "requirements": [
+    "FR-21",
+    "FR-10",
+    "FR-23",
+    "NFR-6"
+  ],
+  "contract": "Review 103 (reviewer, read-only, probed your fb6200f with node). Verdict NO-SHIP:\nBLOCKING packages/chess-core/src/exchange.ts:32: bearing() builds each side's list with enemy pieces never lifted, so a slider behind an enemy piece that captures on the square is missed even though that capture takes the piece off the line. Probe: exchangeOnSquare('3r2k1/8/3Q4/3n4/8/8/8/6K1 w - - 0 1','d5') -> attackers Qd6, defenders none, seq qd6xn, full 3, result 3, len 1. Truth: 1.Qxd5 Rxd5 (Rd8 sees d5 once Qd6 has left d6) -> White loses 9 for 3: full -6, result 0, bestLength 0; defenders must list Rd8 with xray: true.\nMAJOR packages/chess-core/test/exchange.test.ts:73: 'an x-ray through an enemy piece does not count' expects a wrong verdict. FEN 6k1/8/p7/8/1N6/r7/8/R5K1 w, square a6: the blocking piece Ra3 is the defender that recaptures, which opens the a-file for White's Ra1. Truth: attackers Nb4, Ra1 (xray: true); defenders Ra3; full sequence Nxa6 Rxa6 Rxa6 = +1 -3 +5 = +3 for White; Black should not recapture, so result 1, bestLength 1. A genuine 'enemy piece blocks' test needs an enemy blocker that does not take part, e.g. a black knight on a3 instead of a rook (then Ra1 is not listed).\nMINOR test line 104: 'does not step onto a square an enemy rook behind it would then see' (6k1/8/8/4p3/4K3/8/8/4r3 w) starts with the white king already in check from Re1. Replace or add a case where the king is not in check at the start and the stopping slider is revealed by an earlier capture, e.g. reviewer's '3r2k1/3r4/8/3p4/2K5/8/8/3R4 w' d5: seq Rd1xd5 Rd7xd5, then the king does not capture because Rd8 now sees d5.\nMINOR: missing tests (code already right at fb6200f per reviewer probes, keep it so): king on the square ('8/8/8/4k3/8/5N2/8/6K1 w' e5 -> attackers Nf3, sequence empty); pawn in front of bishop and queen on a diagonal ('6k1/8/3p4/4n3/3P4/2B5/1Q6/6K1 w' e5 -> attackers Pd4, Bc3 (xray), Qb2 (xray)); queen in front of rook ('3r2k1/8/8/3n4/8/8/3Q4/3R2K1 w' d5 -> attackers Qd2, Rd1 (xray); full -1, result 0, len 0); a defender-side king recapturing; promotion followed by a recapture from an x-ray.\nContract change on main (076f303, coordinator; inlined below): the ExchangePiece.xray doc now says a piece in front 'of either colour' that has itself captured on the square unblocks the line; a piece behind an enemy piece that never captures stays blocked; the sequence is worked out on the real board, capture by capture (standard SEE). Do not edit types.ts.\nKeep everything else as it was: king rule, promotion (+8, then 9), negamax result/bestLength with tie = stop, side rules, errors, EXCHANGE_CAVEAT.\nThe coordinator's gate at 3cdbe0f will be re-run after your round; at fb6200f it was 61 files, 1403 tests passed, typecheck clean.",
+  "contract_files": [
+    "packages/chess-core/src/types.ts"
+  ],
+  "scope": [
+    "packages/chess-core/**",
+    "repertoire/**"
+  ],
+  "negative": [
+    "Do not edit files outside scope, docs, config, .github, root files or the lockfile.",
+    "No new dependencies.",
+    "Do not change packages/chess-core/src/types.ts or api.ts (coordinator-owned contract).",
+    "No engine, no network, no randomness. Do not touch packages/tutor."
+  ],
+  "rubric": [
+    "Tests first (red then green): the reviewer's blocking FEN gives full -6, result 0, bestLength 0 with Rd8 as an xray defender; the rewritten a6 test gives Ra1 xray, full 3, result 1, bestLength 1; a true 'enemy blocker that does not capture' test (Ra1 not listed); the non-check king case where an earlier capture reveals the stopping rook; king on the square; P-B-Q diagonal battery; Q-in-front-of-R; defender king recapturing; promotion then x-ray recapture.",
+    "All 17 earlier tests still pass unless they encoded the wrong rule (say which and why in the summary).",
+    "pnpm test and pnpm typecheck clean from the repo root.",
+    "files_changed lists every file changed in 3cdbe0f..your head. Commit message references the requirement IDs and #44."
+  ],
+  "concurrency": "Nothing else runs in packages/chess-core now. #36 has merged (apps/server). PR #79 (#41, packages/tutor) is still open. Don't rebase; the coordinator does that at ship.",
+  "round": 2
+}

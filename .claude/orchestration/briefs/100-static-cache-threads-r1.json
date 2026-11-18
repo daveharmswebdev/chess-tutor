@@ -1,0 +1,32 @@
+{
+  "brief_id": "100-static-cache-threads-r1",
+  "agent": "server-agent",
+  "issue": 36,
+  "base_sha": "0215881",
+  "scratch_dir": "/private/tmp/claude-501/-Users-daveharms-personal-workspace-chess-tutor/4a8b1168-9770-4b7b-9a50-977522c5a01c/scratchpad/100-static-cache-threads-r1",
+  "objective": "Fix three static-serving defects in apps/server/src/app.ts and add an environment override for the engine thread count in apps/server/src/config.ts. (1) With WEB_DIST set, a GET/HEAD for a path under /assets/ or whose last segment has a file extension that matches no file returns 404 (JSON apiError like other 404s), not index.html; extensionless client routes (/games/abc, /games/abc?x=1) still get index.html. (2) Cache headers: files under /assets/* get `public, max-age=31536000, immutable`; index.html (both at / and via the SPA fallback) gets `no-cache`. (3) Dotfiles in WEB_DIST are not served (GET /.hidden -> 404). (4) loadEngineThreads reads env ENGINE_THREADS first (a positive integer; blank or unset falls back to config/tutor.json engine.threads; any other value throws a clear Error so startup fails loudly). Success: tests in apps/server/test/deploy.test.ts and a config test show each case, and the gate is clean.",
+  "requirements": [
+    "NFR-13",
+    "NFR-2",
+    "NFR-3"
+  ],
+  "contract": "Issue #36 (P3) Done when:\n- A missing file under /assets/ (or any path with a file extension) gets a 404, not the HTML page; hashed build files are cached long-term; index.html is not. Dotfiles in the build folder are not served (NFR-13).\n- On the real Render instance, the bot's reply time is measured against NFR-2/NFR-3; if it misses, the engine thread count can be set for the deploy (for example an env override) and is set to fit the instance. (The measurement and setting the value on Render are the coordinator's, after deploy. Your part is the override.)\nFacts at base 0215881:\n- apps/server/src/app.ts:145-159:\n  const webDist = deps.webDist;\n  if (webDist !== undefined) { checkWebDist(webDist); void app.register(fastifyStatic, { root: webDist }); }\n  app.setNotFoundHandler((request, reply) => {\n    const method = request.method;\n    if (webDist !== undefined && (method === \"GET\" || method === \"HEAD\") && !isApiPath(request.url)) {\n      return reply.status(200).sendFile(\"index.html\");\n    }\n    return reply.status(404).send(apiError(`no route ${method} ${request.url}`));\n  });\n- apps/server/test/deploy.test.ts: \"SPA fallback: an unknown non-/api GET returns index.html\" currently asserts 200 index.html for [\"/games/abc\", \"/games/abc?x=1\", \"/assets/missing.js\", \"/apifoo\"]; /assets/missing.js must move to the 404 expectation. The fixture serves /assets/app.js (currently cache-control \"public, max-age=0\").\n- @fastify/static has options such as dotfiles, setHeaders(res, path), cacheControl/maxAge/immutable. Check the installed version's options in node_modules before relying on them.\n- apps/server/src/config.ts:27: export function loadEngineThreads(path = TUTOR_CONFIG_PATH): number | undefined { return readConfig(path).engine?.threads; }  Called from apps/server/src/main.ts:93 as loadEngineThreads() with no argument. main.ts is touched by open PR #79, so DO NOT edit main.ts: add an optional second parameter env: Record<string, string | undefined> = process.env to loadEngineThreads so the call site stays unchanged.\n- config/tutor.json: \"engine\": { \"flavor\": \"full\", \"threads\": 4, \"depth\": 18, \"movetimeCapMs\": 1000, \"multiPv\": 3 }. render.yaml (plan: starter) and config/ are coordinator-owned.\n- Not in scope (noted in the issue, not filed): HEAD fallback tests, SSE with WEB_DIST, /API/x case.\nGate at base 0215881 (run by the coordinator): pnpm test -> Test Files 60 passed, Tests 1386 passed (1386); pnpm typecheck clean.",
+  "scope": [
+    "apps/server/src/app.ts",
+    "apps/server/src/config.ts",
+    "apps/server/test/**"
+  ],
+  "negative": [
+    "Do not edit files outside scope, docs, config, .github, root files or the lockfile.",
+    "No new dependencies.",
+    "Do not edit apps/server/src/main.ts (open PR #79 touches it).",
+    "Do not edit render.yaml, config/ or docs/: in the return, state the env var name and the line the coordinator should add to docs."
+  ],
+  "rubric": [
+    "Tests first (red then green) for NFR-13: missing /assets/x.js and /missing.css -> 404 JSON; /games/abc and /games/abc?x=1 still index.html; a fixture dotfile /.hidden -> 404; /assets/app.js cache-control contains max-age=31536000 and immutable; / and SPA-fallback index.html cache-control no-cache; loadEngineThreads with ENGINE_THREADS='2' -> 2, '' or unset -> config value, '0'/'abc'/'1.5' -> throws.",
+    "pnpm test and pnpm typecheck clean from the repo root.",
+    "files_changed lists every file changed in 0215881..your head. Commit message references the requirement IDs and #36."
+  ],
+  "concurrency": "#44 runs at the same time in another worktree (core-agent: packages/chess-core/ only). PR #79 (#41) is open and touches apps/server/src/main.ts, so leave that file alone. No file overlap otherwise. Don't rebase; the coordinator does that at ship.",
+  "round": 1
+}

@@ -1,0 +1,25 @@
+{
+  "brief_id": "102-review-static-cache-r1",
+  "agent": "reviewer",
+  "issue": 36,
+  "base_sha": "19d1f05",
+  "scratch_dir": "/private/tmp/claude-501/-Users-daveharms-personal-workspace-chess-tutor/4a8b1168-9770-4b7b-9a50-977522c5a01c/scratchpad/102-review-static-cache-r1",
+  "objective": "Review #36 round 1: `git diff 316ca50..19d1f05` (server-agent: apps/server/src/app.ts, apps/server/src/config.ts, apps/server/test/deploy.test.ts, apps/server/test/engine-threads.test.ts) against NFR-13, NFR-2, NFR-3 and the issue's done-when. Focus: (1) isSpaRoute: every client route the web app uses (grep apps/web/src for routes, e.g. /games/<id>) still gets index.html, and paths with an extension, under /assets/, or with a dot-segment (raw or percent-encoded) get the JSON 404, for GET and HEAD; check edge cases like trailing slashes, query strings, double slashes, and /ops/* (must stay a route, not the SPA); (2) cache headers: /assets/* immutable for one year, index.html no-cache at / and via the fallback, and nothing an API or SSE response sends is changed; (3) dotfiles: @fastify/static 10.1.7 `dotfiles: 'ignore'` really refuses /.hidden and nested /.git/config (check the option's real semantics in node_modules); (4) loadEngineThreads(path, env = process.env): ENGINE_THREADS parsing, fallback, error message, and that main.ts's call site (unchanged) picks it up; (5) tests really exercise these paths (not only mocks).",
+  "requirements": [
+    "NFR-13",
+    "NFR-2",
+    "NFR-3"
+  ],
+  "contract": "Issue #36 Done when: a missing file under /assets/ (or any path with a file extension) gets a 404, not the HTML page; hashed build files are cached long-term; index.html is not. Dotfiles in the build folder are not served (NFR-13). The thread count can be set for the deploy by an env override (the Render measurement is the coordinator's, after deploy).\nSpoke's summary: @fastify/static (10.1.7) registered with dotfiles: 'ignore' and a setHeaders hook; /assets/* -> 'public, max-age=31536000, immutable'; root index.html -> 'no-cache' at / and via sendFile in the fallback. Not-found handler falls back to index.html only when isSpaRoute(url): not /api or /ops, not under /assets, no percent-decoded segment starts with '.', last segment has no extension. loadEngineThreads reads trimmed ENGINE_THREADS /^[1-9][0-9]*$/ safe integer; blank/unset -> config; else throws.\nThe spoke's own minor note: root files other than index.html (e.g. favicon.ico) keep 'public, max-age=0'.\nThe coordinator re-ran the gate at 19d1f05: Test Files 61 passed, Tests 1393 passed; typecheck clean.",
+  "scope": [],
+  "negative": [
+    "Read-only: do not edit, commit, or run anything that writes to the repo.",
+    "Do not run anything that calls the Claude API."
+  ],
+  "rubric": [
+    "Each finding cites file:line and evidence; reproduce blocking/major with a scratch test outside the repo (in your scratch dir).",
+    "Severities: blocking / major / minor. Summary ends SHIP or NO-SHIP."
+  ],
+  "concurrency": "core-agent works on packages/chess-core (#44) in another worktree; a researcher is running read-only. Read the reviewed code with git diff / git show <sha>:<path>.",
+  "round": 1
+}

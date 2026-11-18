@@ -1,0 +1,36 @@
+{
+  "brief_id": "099-exchange-on-square-r1",
+  "agent": "core-agent",
+  "issue": 44,
+  "base_sha": "0215881",
+  "scratch_dir": "/private/tmp/claude-501/-Users-daveharms-personal-workspace-chess-tutor/4a8b1168-9770-4b7b-9a50-977522c5a01c/scratchpad/099-exchange-on-square-r1",
+  "objective": "Implement and export from @chess-tutor/chess-core a pure, deterministic `exchangeOnSquare(fen: string, square: string): ExchangeResult` (new file packages/chess-core/src/exchange.ts, exported from src/index.ts) that returns exactly the ExchangeResult shape already defined in packages/chess-core/src/types.ts (do not change that type). It lists attackers and defenders of the square in capture order (cheapest first, x-rays included and flagged), the full recapture sequence, fullResult, and the best-stopping result/bestLength where either side may stop early (classic static exchange evaluation by negamax over the gain list), plus the fixed caveat text. Success: the unit tests named in the rubric pass, the gate is clean, and no engine is used.",
+  "requirements": [
+    "FR-21",
+    "FR-10",
+    "FR-23",
+    "NFR-6"
+  ],
+  "contract": "Issue #44 Done when (chess-core part; the tutor tool and claims check come in a later tutor-agent round, not yours):\n- A deterministic function returns, for a square: attackers and defenders in capture order (cheapest first, x-rays included), the recapture sequence, and the material result in pawns, with either side allowed to stop early (FR-21).\n- Unit tests cover: a simple 2-vs-1 trade, x-ray pieces behind a rook or bishop, a capture by the king only when the square is safe, promotions on the square, and a square nobody attacks (FR-21).\nTechnical notes from the issue: chess.js 1.4.0 (already a chess-core dependency, ^1.4.0) has `attackers(square, color)`; x-rays need re-asking after each capture (remove the capturing piece from the board, then re-ask, so a rook/queen/bishop behind it is found). Static exchange evaluation is a first filter: it ignores pins, checks and threats elsewhere; the result's `caveat` field says so in plain words (FR-23's teaching point).\nThe contract (ExchangeResult, ExchangePiece, ExchangeCapture, PieceType) was committed by the coordinator at 7d13541 and is inlined below in contract_files with its doc comment, which is normative: sides (attacking side = colour opposite the occupant; on an empty square the side to move; attackerToMove false => computed as if it were that side's turn), order (pawn 1, knight 3, bishop 3, rook 5, queen 9, king last with value 0), x-ray listing rule (xray: true, no earlier than the piece in front of it), king captures only when the square is then no longer attacked by the other side, promotion to queen (gain counted, worth 9 when recaptured), results in pawns for the attacking side. These types are already exported from src/index.ts.\nDesign choices left to you (state them in the return): the exact caveat sentence (fixed, plain words for a 1000-rated player, mentioning pins, checks and threats elsewhere and that the engine is the check); how an x-ray through an *enemy* piece is treated (recommended: not counted); behaviour on an invalid FEN or square (recommended: throw an Error with a clear message; the tutor handler will turn it into a tool error); en passant is out of scope (ignore it; say so in a code comment).\nAlso: a pawn moving straight forward does not attack; a pawn only captures diagonally. fullResult and result use material only (captured values, plus promotion gain 8 when a pawn promotes on capture).\nGate at base 0215881 (run by the coordinator): pnpm test -> Test Files 60 passed, Tests 1386 passed (1386); pnpm typecheck clean.",
+  "contract_files": [
+    "packages/chess-core/src/types.ts"
+  ],
+  "scope": [
+    "packages/chess-core/**",
+    "repertoire/**"
+  ],
+  "negative": [
+    "Do not edit files outside scope, docs, config, .github, root files or the lockfile.",
+    "No new dependencies.",
+    "Do not change packages/chess-core/src/types.ts (the contract) or api.ts; if the contract is wrong or missing something, report it in contract_gaps instead.",
+    "No engine, no network, no randomness: the function is pure and synchronous.",
+    "Do not touch packages/tutor (the tool is the next round, another spoke)."
+  ],
+  "rubric": [
+    "Tests first (red then green) in packages/chess-core/test/exchange.test.ts with hand-checked FENs for: a simple 2-vs-1 trade (attacker wins material); a defended piece where capturing loses (result 0, bestLength 0, fullResult negative); x-ray behind a rook (doubled rooks) and behind a bishop (queen behind bishop), flagged xray: true and ordered after the front piece; a king that captures only when the square is safe (one case where it may, one where it may not); a pawn capture that promotes on the last rank, then gets recaptured (promotion: true, queen value 9 afterwards); a square nobody attacks (empty attackers, sequence [], result 0); an empty square (occupant null, attacking side = side to move); an attackerToMove false case.",
+    "pnpm test and pnpm typecheck clean from the repo root.",
+    "files_changed lists every file changed in 0215881..your head. Commit message references the requirement IDs and #44."
+  ],
+  "concurrency": "#36 runs at the same time in another worktree (server-agent: apps/server/src/app.ts, apps/server/src/config.ts and their tests only). PR #79 (#41: packages/tutor, prompts, evals, apps/server/src/main.ts) is open. No file overlap with you. Don't rebase; the coordinator does that at ship.",
+  "round": 1
+}

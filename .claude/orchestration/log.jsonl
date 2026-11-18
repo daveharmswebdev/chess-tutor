@@ -373,3 +373,28 @@
 {"ts":"2026-11-17T14:43:18.687Z","event":"shipped","issue":54,"pr":78}
 {"ts":"2026-11-17T14:44:43.489Z","event":"return_valid","agent_id":"a973f88699014628e","agent_type":"tutor-agent","via":"handback"}
 {"ts":"2026-11-17T14:45:45.447Z","event":"coordinator_verdict","brief_id":"098-plan-after-book-r2","agent":"tutor-agent","verdict":"accepted","reason":"11 files match; rebased 8daf5c4 on 86bdf93, 1410 passed; claims/evidence diff read by coordinator, no re-review","tokens":154094,"duration_ms":407606}
+{"ts":"2026-11-18T02:20:35.363Z","event":"dispatch","subagent_type":"core-agent","brief_id":"099-exchange-on-square-r1","base_sha":"0215881","spoke":true}
+{"ts":"2026-11-18T02:20:55.114Z","event":"dispatch","subagent_type":"server-agent","brief_id":"100-static-cache-threads-r1","base_sha":"0215881","spoke":true}
+{"ts":"2026-11-18T02:20:55.361Z","event":"agent_complete","subagent_type":"core-agent","brief_id":"099-exchange-on-square-r1","agent_id":"a5aed1c9b291be767","status":"async_launched","contract":"pending"}
+{"ts":"2026-11-18T02:20:55.394Z","event":"agent_complete","subagent_type":"server-agent","brief_id":"100-static-cache-threads-r1","agent_id":"ac7710b0914e70ca3","status":"async_launched","contract":"pending"}
+{"ts":"2026-11-18T02:23:12.696Z","event":"dispatch","subagent_type":"researcher","brief_id":"101-grafana-explorer-buckets-r1","base_sha":"316ca50","spoke":true}
+{"ts":"2026-11-18T02:23:12.913Z","event":"agent_complete","subagent_type":"researcher","brief_id":"101-grafana-explorer-buckets-r1","agent_id":"a3a19493def17def2","status":"async_launched","contract":"pending"}
+{"ts":"2026-11-18T02:24:10.634Z","event":"return_valid","agent_id":"ac7710b0914e70ca3","agent_type":"server-agent","via":"handback"}
+{"ts":"2026-11-18T02:25:02.285Z","event":"coordinator_verdict","brief_id":"100-static-cache-threads-r1","agent":"server-agent","verdict":"accepted","reason":"files match, rebased 19d1f05 on 316ca50, 1393 passed, typecheck clean","tokens":42543,"duration_ms":195619}
+{"ts":"2026-11-18T02:25:12.030Z","event":"return_valid","agent_id":"a5aed1c9b291be767","agent_type":"core-agent","via":"handback"}
+{"ts":"2026-11-18T02:25:35.320Z","event":"dispatch","subagent_type":"reviewer","brief_id":"102-review-static-cache-r1","base_sha":"19d1f05","spoke":true}
+{"ts":"2026-11-18T02:25:35.557Z","event":"agent_complete","subagent_type":"reviewer","brief_id":"102-review-static-cache-r1","agent_id":"a2c1b3475c2831267","status":"async_launched","contract":"pending"}
+{"ts":"2026-11-18T02:26:22.219Z","event":"coordinator_verdict","brief_id":"099-exchange-on-square-r1","agent":"core-agent","verdict":"accepted","reason":"files match, rebased fb6200f on 316ca50, 1403 passed, typecheck clean","tokens":37751,"duration_ms":257022}
+{"ts":"2026-11-18T02:26:59.001Z","event":"dispatch","subagent_type":"reviewer","brief_id":"103-review-exchange-on-square-r1","base_sha":"fb6200f","spoke":true}
+{"ts":"2026-11-18T02:26:59.365Z","event":"agent_complete","subagent_type":"reviewer","brief_id":"103-review-exchange-on-square-r1","agent_id":"ad473a96dd22d1459","status":"async_launched","contract":"pending"}
+{"ts":"2026-11-18T02:27:20.340Z","event":"return_valid","agent_id":"a2c1b3475c2831267","agent_type":"reviewer","via":"handback"}
+{"ts":"2026-11-18T02:27:30.144Z","event":"coordinator_verdict","brief_id":"102-review-static-cache-r1","agent":"reviewer","verdict":"review","reason":"SHIP, 4 minor (encoded /assets prefix, // 403, favicon max-age=0, no thread upper bound)","tokens":36948,"duration_ms":105097}
+{"ts":"2026-11-18T02:28:25.666Z","event":"return_invalid","agent_id":"a3a19493def17def2","agent_type":"researcher","attempt":1,"errors":["/brief_defects/0: must be string"]}
+{"ts":"2026-11-18T02:29:06.167Z","event":"return_valid","agent_id":"a3a19493def17def2","agent_type":"researcher","via":"handback"}
+{"ts":"2026-11-18T02:29:33.710Z","event":"shipped","issue":36,"pr":85}
+{"ts":"2026-11-18T02:29:33.711Z","event":"coordinator_verdict","brief_id":"101-grafana-explorer-buckets-r1","agent":"researcher","verdict":"accepted","reason":"all four questions answered with sources; recommends pino-loki 3.0.0; Lichess buckets confirmed from OpenAPI spec","tokens":54107,"duration_ms":353423}
+{"ts":"2026-11-18T02:30:02.557Z","event":"return_valid","agent_id":"ad473a96dd22d1459","agent_type":"reviewer","via":"handback"}
+{"ts":"2026-11-18T02:30:11.556Z","event":"coordinator_verdict","brief_id":"103-review-exchange-on-square-r1","agent":"reviewer","verdict":"review","reason":"NO-SHIP: blocking enemy-slider-behind-capturer missed (3r2k1/8/3Q4/3n4 d5 +3 vs -6); major wrong test line 73; contract xray wording ambiguous","tokens":43810,"duration_ms":183627}
+{"ts":"2026-11-18T02:34:09.063Z","event":"return_valid","agent_id":"a5aed1c9b291be767","agent_type":"core-agent","via":"handback"}
+{"ts":"2026-11-18T02:35:01.683Z","event":"coordinator_verdict","brief_id":"104-exchange-on-square-r2","agent":"core-agent","verdict":"accepted","reason":"files match, 1418 passed at ae9d30b, coordinator probes (review FEN -6/0, a6 +1, Nf3xe5 -2, exd5 0) correct; no re-review","tokens":62958,"duration_ms":185364}
+{"ts":"2026-11-18T02:41:49.606Z","event":"shipped","issue":44,"pr":86,"partial":true}
