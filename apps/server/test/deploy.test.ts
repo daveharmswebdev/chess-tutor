@@ -21,6 +21,9 @@ function makeDist(): string {
   writeFileSync(join(dir, "index.html"), INDEX_HTML);
   mkdirSync(join(dir, "assets"));
   writeFileSync(join(dir, "assets", "app.js"), APP_JS);
+  writeFileSync(join(dir, ".hidden"), "secret-ish");
+  mkdirSync(join(dir, ".git"));
+  writeFileSync(join(dir, ".git", "config"), "[core]");
   return dir;
 }
 
@@ -61,11 +64,54 @@ describe("static web build (NFR-13, #12)", () => {
 
   it("SPA fallback: an unknown non-/api GET returns index.html", async () => {
     const app = server(dist);
-    for (const url of ["/games/abc", "/games/abc?x=1", "/assets/missing.js", "/apifoo"]) {
+    for (const url of ["/games/abc", "/games/abc?x=1", "/apifoo", "/games/v1.2/x"]) {
       const res = await app.inject({ method: "GET", url });
       expect(res.statusCode, url).toBe(200);
       expect(res.headers["content-type"], url).toMatch(/text\/html/);
       expect(res.body, url).toBe(INDEX_HTML);
+      expect(res.headers["cache-control"], url).toBe("no-cache");
+    }
+    await app.close();
+  });
+
+  it("a missing file under /assets/ or with a file extension is a JSON 404, not index.html", async () => {
+    const app = server(dist);
+    const urls = ["/assets/missing.js", "/assets/x.js", "/missing.css", "/assets/nested/thing", "/assets/", "/games/abc.png?v=1"];
+    for (const url of urls) {
+      for (const method of ["GET", "HEAD"] as const) {
+        const res = await app.inject({ method, url });
+        expect(res.statusCode, `${method} ${url}`).toBe(404);
+        expect(res.headers["content-type"], `${method} ${url}`).toMatch(/application\/json/);
+        if (method === "GET") expect(res.json(), url).toEqual({ error: `no route GET ${url}` });
+      }
+    }
+    await app.close();
+  });
+
+  it("dotfiles in WEB_DIST are not served", async () => {
+    const app = server(dist);
+    for (const url of ["/.hidden", "/.git/config", "/.git/", "/%2ehidden"]) {
+      const res = await app.inject({ method: "GET", url });
+      expect(res.statusCode, url).toBe(404);
+      expect(res.body, url).not.toContain("secret-ish");
+      expect(res.body, url).not.toContain("[core]");
+      expect(res.json(), url).toEqual({ error: `no route GET ${url}` });
+    }
+    await app.close();
+  });
+
+  it("hashed build files are cached long-term; index.html is not", async () => {
+    const app = server(dist);
+    const asset = await app.inject({ method: "GET", url: "/assets/app.js" });
+    expect(asset.statusCode).toBe(200);
+    expect(asset.headers["cache-control"]).toContain("max-age=31536000");
+    expect(asset.headers["cache-control"]).toContain("immutable");
+    expect(asset.headers["cache-control"]).toBe("public, max-age=31536000, immutable");
+    for (const url of ["/", "/index.html", "/games/abc"]) {
+      const res = await app.inject({ method: "GET", url });
+      expect(res.statusCode, url).toBe(200);
+      expect(res.body, url).toBe(INDEX_HTML);
+      expect(res.headers["cache-control"], url).toBe("no-cache");
     }
     await app.close();
   });

@@ -24,7 +24,24 @@ export function loadBotConfig(path: string = TUTOR_CONFIG_PATH): BotConfig {
   return bot;
 }
 
-export function loadEngineThreads(path: string = TUTOR_CONFIG_PATH): number | undefined {
+/**
+ * Engine thread count (NFR-2, NFR-3, #36). ENGINE_THREADS, when set and not blank, wins and
+ * must be a positive integer (anything else throws, so a bad deploy fails at startup);
+ * otherwise config/tutor.json `engine.threads`.
+ */
+export function loadEngineThreads(
+  path: string = TUTOR_CONFIG_PATH,
+  env: Record<string, string | undefined> = process.env,
+): number | undefined {
+  const raw = env.ENGINE_THREADS;
+  if (raw !== undefined && raw.trim() !== "") {
+    const value = raw.trim();
+    const n = Number(value);
+    if (!/^[1-9][0-9]*$/.test(value) || !Number.isSafeInteger(n)) {
+      throw new Error(`ENGINE_THREADS must be a positive integer, got ${JSON.stringify(raw)}`);
+    }
+    return n;
+  }
   return readConfig(path).engine?.threads;
 }
 

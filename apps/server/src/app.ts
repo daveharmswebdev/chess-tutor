@@ -1,6 +1,7 @@
 import Fastify, { type FastifyInstance, type FastifyServerOptions } from "fastify";
 import type { ServerResponse } from "node:http";
 import { timingSafeEqual } from "node:crypto";
+import { relative, sep } from "node:path";
 import fastifyStatic from "@fastify/static";
 import type { ApiError, GameEvent, SparringBot } from "@chess-tutor/chess-core";
 import type { CoachingDeps } from "./coaching.ts";
@@ -93,6 +94,26 @@ function apiError(message: string): ApiError {
   return { error: message };
 }
 
+/**
+ * True when a GET for `url` that matched no file should get index.html (NFR-13, #36): not
+ * /api or /ops, not under /assets/, no dotfile segment, and a last segment with no file
+ * extension. So /games/abc?x=1 falls back, while /assets/x.js, /missing.css and /.env are 404.
+ */
+export function isSpaRoute(url: string): boolean {
+  if (isApiPath(url)) return false;
+  const path = url.split(/[?#]/, 1)[0]!;
+  if (path === "/assets" || path.startsWith("/assets/")) return false;
+  const segments = path.split("/").map((s) => {
+    try {
+      return decodeURIComponent(s);
+    } catch {
+      return s;
+    }
+  });
+  if (segments.some((s) => s.startsWith("."))) return false;
+  return !/\.[^.]+$/.test(segments.at(-1)!);
+}
+
 function sseMessage(event: GameEvent): string {
   return `event: ${event.type}\ndata: ${JSON.stringify(event)}\n\n`;
 }
@@ -143,17 +164,30 @@ export function buildServer(deps: ServerDeps): { app: FastifyInstance; games: Ga
     return reply.status(status).send(apiError(err.message));
   });
 
-  // Static web build (architecture §6.1): files at /, index.html for any other non-/api
-  // GET or HEAD (SPA fallback). /api/* and other methods keep the JSON 404.
+  // Static web build (architecture §6.1, NFR-13, #36): files at /, index.html for any other
+  // non-/api GET or HEAD that looks like a client route (SPA fallback). /api/*, other methods,
+  // missing files (under /assets/ or with an extension) and dotfiles keep the JSON 404.
+  // Hashed /assets/* files are cached for a year; index.html must be revalidated.
   const webDist = deps.webDist;
   if (webDist !== undefined) {
     checkWebDist(webDist);
-    void app.register(fastifyStatic, { root: webDist });
+    void app.register(fastifyStatic, {
+      root: webDist,
+      dotfiles: "ignore",
+      setHeaders: (reply, path) => {
+        const rel = relative(webDist, path).split(sep);
+        if (rel[0] === "assets" && rel.length > 1) {
+          reply.header("cache-control", "public, max-age=31536000, immutable");
+        } else if (rel.length === 1 && rel[0] === "index.html") {
+          reply.header("cache-control", "no-cache");
+        }
+      },
+    });
   }
 
   app.setNotFoundHandler((request, reply) => {
     const method = request.method;
-    if (webDist !== undefined && (method === "GET" || method === "HEAD") && !isApiPath(request.url)) {
+    if (webDist !== undefined && (method === "GET" || method === "HEAD") && isSpaRoute(request.url)) {
       return reply.status(200).sendFile("index.html");
     }
     return reply.status(404).send(apiError(`no route ${method} ${request.url}`));
