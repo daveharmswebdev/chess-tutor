@@ -1,4 +1,4 @@
-import type { Analysis } from "@chess-tutor/chess-core";
+import { exchangeOnSquare, type Analysis } from "@chess-tutor/chess-core";
 import { Chess } from "chess.js";
 import { describe, expect, it } from "vitest";
 import { KINDS, loadCases, selectCases } from "../src/cases.ts";
@@ -27,6 +27,38 @@ describe("committed cases (frozen by generate-cases with real Stockfish)", () =>
       expect(c.moment === null, c.id).toBe(c.kind === "hint");
       if (c.kind === "hint") expect(new Chess(c.fen).turn(), c.id).toBe(c.playerColor);
     }
+  });
+});
+
+describe("exchange cases (#44, FR-21): a capture is on the board for the player", () => {
+  const cases = new Map(loadCases(CASES_DIR).map((c) => [c.id, c]));
+  const exchange = (id: string, square: string) => {
+    const c = cases.get(id);
+    expect(c, id).toBeDefined();
+    expect(c!.kind).toBe("hint");
+    const r = exchangeOnSquare(c!.fen, square);
+    // The player is the attacking side and to move, and can capture there.
+    expect(r.attackingSide).toBe(c!.playerColor);
+    expect(r.attackerToMove).toBe(true);
+    expect(r.attackers.length).toBeGreaterThan(0);
+    return r;
+  };
+
+  it("hint-ex-london-e5-wins: dxe5 wins a pawn", () => {
+    const r = exchange("hint-ex-london-e5-wins", "e5");
+    expect(r.result).toBeGreaterThan(0);
+  });
+
+  it("hint-ex-kid-e4-loses: ...Nxe4 loses a piece for a pawn", () => {
+    const r = exchange("hint-ex-kid-e4-loses", "e4");
+    expect(r.result).toBe(0);
+    expect(r.fullResult).toBeLessThan(0);
+  });
+
+  it("hint-ex-london-h7-xray: the queen behind the bishop is an x-ray attacker, and Bxh7+ loses", () => {
+    const r = exchange("hint-ex-london-h7-xray", "h7");
+    expect(r.attackers.some((p) => p.xray)).toBe(true);
+    expect(r.fullResult).toBeLessThan(0);
   });
 });
 

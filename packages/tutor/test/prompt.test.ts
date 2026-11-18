@@ -4,20 +4,35 @@ import { describe, expect, it } from "vitest";
 import { TOOL_DEFINITIONS } from "../src/tools.ts";
 
 const root = fileURLToPath(new URL("../../../", import.meta.url));
-const prompt = readFileSync(`${root}prompts/tutor-system.v3.md`, "utf8");
+const prompt = readFileSync(`${root}prompts/tutor-system.v4.md`, "utf8");
+const v3 = readFileSync(`${root}prompts/tutor-system.v3.md`, "utf8");
 const changelog = readFileSync(`${root}prompts/CHANGELOG.md`, "utf8");
 
-describe("prompts/tutor-system.v3.md (release artifact)", () => {
-  it("is versioned and logged in the changelog with #41, FR-10 and FR-8", () => {
-    expect(prompt).toMatch(/version: 3/);
-    const entry = changelog.split("\n").find((l) => l.includes("**tutor-system.v3.md**"));
+describe("prompts/tutor-system.v4.md (release artifact)", () => {
+  it("is versioned and logged in the changelog with #44, the tool, the claims rule and the caveat", () => {
+    expect(prompt).toMatch(/version: 4/);
+    const entry = changelog.split("\n").find((l) => l.includes("**tutor-system.v4.md**"));
     expect(entry).toBeDefined();
-    for (const phrase of ["#41", "FR-10", "FR-8", "usual_setup", "get_repertoire_context"]) expect(entry).toContain(phrase);
+    for (const phrase of ["#44", "FR-21", "FR-10", "FR-23", "exchange_on_square", "claims check", "caveat", "pins, checks"]) expect(entry).toContain(phrase);
   });
 
-  it("evals default to v3 (#41)", () => {
+  it("evals default to v4 (#44)", () => {
     const config = readFileSync(`${root}evals/src/config.ts`, "utf8");
-    expect(config).toContain(`"tutor-system.v3.md"`);
+    expect(config).toContain(`"tutor-system.v4.md"`);
+  });
+
+  it("says when to call exchange_on_square, to take counts and outcomes only from it, and to add the caveat (#44, FR-21, FR-23)", () => {
+    const tools = prompt.slice(prompt.indexOf("## Tools: when to call which"), prompt.indexOf("## The one rule that matters most"));
+    expect(tools).toContain("`exchange_on_square`");
+    expect(tools).toMatch(/before you say a piece is hanging/);
+    expect(tools).toMatch(/count attackers and defenders/);
+    expect(tools).toMatch(/judge a trade/);
+    const rule = prompt.slice(prompt.indexOf("### Counts and exchanges"), prompt.indexOf("## Your reply"));
+    expect(rule).toMatch(/only from this turn's `exchange_on_square` result for that square/);
+    expect(rule).toMatch(/ignores pins, checks and threats elsewhere/);
+    expect(rule).toMatch(/never present a count as the full answer/i);
+    expect(rule).toMatch(/`evaluate_move` or `analyze_position` before you call a capture good or bad/);
+    expect(rule).toMatch(/x-ray/);
   });
 
   it("backs the plan after the opponent leaves book, or words it without moves (#41, FR-10, FR-9)", () => {
@@ -58,6 +73,16 @@ describe("prompts/tutor-system.v3.md (release artifact)", () => {
     expect(prompt).toMatch(/to-square is fine/);
     expect(prompt).toMatch(/give a check/);
     expect(prompt).toMatch(/piece/);
+  });
+});
+
+describe("prompts/tutor-system.v3.md stays on disk unchanged", () => {
+  it("is still version 3, without exchange_on_square, and still logged", () => {
+    expect(v3).toMatch(/version: 3/);
+    expect(v3).toContain("usual_setup");
+    expect(v3).not.toContain("exchange_on_square");
+    const entry = changelog.split("\n").find((l) => l.includes("**tutor-system.v3.md**"));
+    for (const phrase of ["#41", "FR-10", "FR-8", "usual_setup", "get_repertoire_context"]) expect(entry).toContain(phrase);
   });
 });
 

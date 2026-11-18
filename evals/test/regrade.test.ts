@@ -83,6 +83,15 @@ describe("classifyCorrection", () => {
     expect(classifyCorrection("Your last reply was not accepted: reveal mentions Nxe5, which is not legal in any position you were shown.")).toEqual(["illegal_move"]);
     expect(classifyCorrection("Your last reply was not accepted: reveal quotes the evaluation \"+2.1\", which matches no score in this turn's tool results or the key-moment data.")).toEqual(["unbacked_eval"]);
     expect(classifyCorrection("Your last reply was not accepted: Your reply was not valid JSON.")).toEqual(["invalid_reply"]);
+    // #44: the texts come from packages/tutor exchange-claims.ts.
+    expect(
+      classifyCorrection(
+        'Your last reply was not accepted: message says "attacked twice" (a count of attackers on e5), but no exchange_on_square result for e5 backs it this turn.',
+      ),
+    ).toEqual(["unbacked_exchange"]);
+    expect(classifyCorrection('Your last reply was not accepted: reveal says "wins a knight" about the exchange on e5, but exchange_on_square gives a result of +1 for White.')).toEqual([
+      "unbacked_exchange",
+    ]);
     expect(classifyCorrection("Your last reply was not accepted: revealMove \"e2e5\" is not a legal move in the position where the player moves.")).toEqual(["reveal_move"]);
     expect(
       classifyCorrection("Your last reply was not accepted: message mentions d5, which does not appear in this turn's tool results. message names dxe5, which gives the answer away: keep it for reveal."),

@@ -14,4 +14,5 @@ export {
   type TutorUsage,
 } from "./contract.ts";
 export { moverOf, nowFramed } from "./claims.ts";
+export { exchangeBacks, findExchangeClaims, type ExchangeClaim } from "./exchange-claims.ts";
 export { createTutorSession } from "./session.ts";

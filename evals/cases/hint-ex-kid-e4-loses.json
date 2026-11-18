@@ -1,0 +1,28 @@
+{
+  "id": "hint-ex-kid-e4-loses",
+  "kind": "hint",
+  "playerColor": "b",
+  "history": [
+    "d2d4",
+    "g8f6",
+    "c2c4",
+    "g7g6",
+    "b1c3",
+    "f8g7",
+    "e2e4",
+    "d7d6",
+    "g1f3",
+    "e8g8",
+    "f1e2",
+    "e7e5",
+    "e1g1",
+    "b8c6",
+    "d4d5"
+  ],
+  "fen": "r1bq1rk1/ppp2pbp/2np1np1/3Pp3/2P1P3/2N2N2/PP2BPPP/R1BQ1RK1 b - - 0 8",
+  "moment": null,
+  "attemptFen": "r1bq1rk1/ppp2pbp/2np1np1/3Pp3/2P1P3/2N2N2/PP2BPPP/R1BQ1RK1 b - - 0 8",
+  "engineBest": "c6e7",
+  "engineBestCp": -57,
+  "source": "KID Classical: after d5 the tempting ...Nxe4 loses a piece for a pawn to Nxe4 (#44 exchange case)"
+}

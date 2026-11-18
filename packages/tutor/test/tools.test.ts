@@ -1,3 +1,4 @@
+import { EXCHANGE_CAVEAT, exchangeOnSquare } from "@chess-tutor/chess-core";
 import { describe, expect, it } from "vitest";
 import { Evidence } from "../src/evidence.ts";
 import { TOOL_DEFINITIONS, runTool, toolLabel, type ToolContext } from "../src/tools.ts";
@@ -20,12 +21,13 @@ function ctx(over: Partial<ToolContext> = {}): ToolContext {
 }
 
 describe("tool definitions", () => {
-  it("are four strict tools in a fixed order with closed schemas", () => {
+  it("are five strict tools in a fixed order with closed schemas; exchange_on_square is appended last (IR-6, #44)", () => {
     expect(TOOL_DEFINITIONS.map((t) => t.name)).toEqual([
       "analyze_position",
       "evaluate_move",
       "opening_explorer",
       "get_repertoire_context",
+      "exchange_on_square",
     ]);
     for (const tool of TOOL_DEFINITIONS) {
       expect(tool.strict).toBe(true);
@@ -303,6 +305,49 @@ describe("get_repertoire_context (FR-19)", () => {
   });
 });
 
+describe("exchange_on_square (FR-21, #44)", () => {
+  // 1.d4 d5 2.Bf4 Nc6 3.e3 e5: e5 is attacked by d4 and Bf4, defended by Nc6; dxe5 wins a pawn.
+  const fen = "r1bqkbnr/ppp2ppp/2n5/3pp3/3P1B2/4P3/PPP2PPP/RN1QKBNR w KQkq - 0 4";
+
+  it("is strict, closed and needs fen and square", () => {
+    const tool = TOOL_DEFINITIONS[4]!;
+    expect(tool.name).toBe("exchange_on_square");
+    expect(tool.strict).toBe(true);
+    expect(tool.input_schema.additionalProperties).toBe(false);
+    expect(tool.input_schema.required).toEqual(["fen", "square"]);
+    expect(Object.keys(tool.input_schema.properties as object)).toEqual(["fen", "square"]);
+    // The description says it is a static count and to confirm with the engine (FR-23).
+    expect(tool.description).toMatch(/pins/);
+    expect(tool.description).toMatch(/engine/);
+  });
+
+  it("returns chess-core's exchangeOnSquare result and records it as evidence for that position and square", async () => {
+    const c = ctx();
+    const r = await runTool("exchange_on_square", { fen, square: "e5" }, c);
+    expect(r).toEqual(exchangeOnSquare(fen, "e5"));
+    const result = r as ReturnType<typeof exchangeOnSquare>;
+    expect(result.attackers.map((p) => p.square)).toEqual(["d4", "f4"]);
+    expect(result.defenders.map((p) => p.square)).toEqual(["c6"]);
+    expect(result.result).toBe(1);
+    expect(result.caveat).toBe(EXCHANGE_CAVEAT);
+    expect(c.evidence.exchangesOn("e5")).toEqual([result]);
+    expect(c.evidence.exchangesOn("d4")).toEqual([]);
+    // The capture sequence is not move evidence: a capture is judged by the engine (FR-10).
+    expect(c.evidence.backsMove(fen, "d4e5")).toBe(false);
+  });
+
+  it("accepts an upper-case square", async () => {
+    const r = (await runTool("exchange_on_square", { fen, square: "E5" }, ctx())) as ReturnType<typeof exchangeOnSquare>;
+    expect(r.square).toBe("e5");
+  });
+
+  it("throws for an invalid square or FEN (the loop turns that into is_error)", async () => {
+    await expect(runTool("exchange_on_square", { fen, square: "z9" }, ctx())).rejects.toThrow(/square/);
+    await expect(runTool("exchange_on_square", { fen: "not a fen", square: "e5" }, ctx())).rejects.toThrow(/FEN/);
+    await expect(runTool("exchange_on_square", { fen }, ctx())).rejects.toThrow(/input/);
+  });
+});
+
 describe("toolLabel (NFR-1)", () => {
   it("names each tool in plain words, evaluate_move with the move in SAN", () => {
     expect(toolLabel("evaluate_move", { fen: FEN, move: "b1c3" })).toBe("Checking Nc3…");
@@ -311,6 +356,8 @@ describe("toolLabel (NFR-1)", () => {
     expect(toolLabel("analyze_position", { fen: FEN })).toBe("Looking at the engine lines…");
     expect(toolLabel("opening_explorer", { fen: FEN })).toBe("Checking what players usually play…");
     expect(toolLabel("get_repertoire_context", { fen: FEN })).toBe("Checking your repertoire…");
+    expect(toolLabel("exchange_on_square", { fen: FEN, square: "e5" })).toBe("Counting attackers and defenders on e5…");
+    expect(toolLabel("exchange_on_square", { fen: FEN })).toBe("Counting attackers and defenders…");
     expect(toolLabel("nope", {})).toBe("Thinking…");
   });
 });

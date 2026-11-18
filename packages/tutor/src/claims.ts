@@ -2,6 +2,7 @@ import type { Color } from "@chess-tutor/chess-core";
 import type { Chess } from "chess.js";
 import { boardOf, isUci, normalizeSan, playSan, playUci, sideToMove, uciOf } from "./chess-util.ts";
 import { positionKey, type Evidence } from "./evidence.ts";
+import { exchangeClaimProblems } from "./exchange-claims.ts";
 import type { EvalEntry, TutorDraft } from "./schema.ts";
 
 /**
@@ -309,6 +310,11 @@ const CHECK_NOUN =
  * same rounding (FR-10 A2): "That cost you 1.6 pawns". A change never backs an entry or a signed
  * number ("You are -1.6" is an evaluation).
  *
+ * Exchanges (#44, FR-21): a count of attackers or defenders on a square, or the outcome of the
+ * exchange there, in message or reveal (findExchangeClaims, exchange-claims.ts) must agree with
+ * this turn's exchange_on_square result for that square (Evidence.exchangesOn); with no result
+ * for the square it is rejected. The result's capture sequence never backs a move.
+ *
  * Give-aways (FR-8, #28), when revealMove is set: the message names the move; an arrow is the
  * move or starts on its from-square (it shows the piece); or the answer gives check and the
  * message names its piece together with a check ("can your queen give a check?").
@@ -386,6 +392,7 @@ export function checkClaims(reply: TutorDraft, evidence: Evidence, revealFen: st
           `in the text a signed number (+1.5, -0.4) is read from White's point of view.${delta}`,
       );
     }
+    problems.push(...exchangeClaimProblems(field, text, (square) => evidence.exchangesOn(square), playerColor));
   }
 
   if (reply.revealMove !== null) {

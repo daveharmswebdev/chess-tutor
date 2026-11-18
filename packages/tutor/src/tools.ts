@@ -1,5 +1,5 @@
 import type Anthropic from "@anthropic-ai/sdk";
-import { MATE_CP, scoreToCp, type Analysis, type Color, type Repertoire, type Score } from "@chess-tutor/chess-core";
+import { MATE_CP, exchangeOnSquare, scoreToCp, type Analysis, type Color, type Repertoire, type Score } from "@chess-tutor/chess-core";
 import { z } from "zod";
 import {
   boardOf,
@@ -16,10 +16,12 @@ import type { TutorConfig, TutorEngine, TutorExplorer } from "./contract.ts";
 import type { Evidence } from "./evidence.ts";
 
 /**
- * The tutor's four tools (FR-16 to FR-19). Definitions are fixed in name, order and schema:
- * they sit at the front of every request, so any change invalidates the prompt cache (IR-6)
- * and the strict-tool grammar cache (spike 003). Results are compact JSON with moves in SAN
- * and UCI. Every move a tool reports is also recorded in the request's Evidence (FR-10).
+ * The tutor's five tools (FR-16 to FR-19, and exchange_on_square for FR-21, #44). Definitions
+ * are fixed in name, order and schema: they sit at the front of every request, so any change
+ * invalidates the prompt cache (IR-6) and the strict-tool grammar cache (spike 003); a new
+ * tool is appended last. Results are compact JSON with moves in SAN and UCI. Every move a tool
+ * reports is also recorded in the request's Evidence (FR-10); exchange_on_square's result is
+ * recorded as exchange evidence (its capture sequence is not move evidence).
  */
 
 const fenProp = { type: "string", description: "Position in FEN." } as const;
@@ -72,6 +74,21 @@ export const TOOL_DEFINITIONS: Anthropic.Tool[] = [
     input_schema: { type: "object", properties: { fen: fenProp }, required: ["fen"], additionalProperties: false },
     strict: true,
   },
+  {
+    name: "exchange_on_square",
+    description:
+      "Counts the attackers and defenders of one square (x-rays included, cheapest piece first) and works out the " +
+      "captures there if both sides keep recapturing: the material result in pawns for the attacking side. A static count " +
+      "with no engine search: it ignores pins, checks and threats elsewhere, so confirm a capture with the engine. Use it " +
+      "before you say a piece is hanging, count attackers and defenders, or judge a trade.",
+    input_schema: {
+      type: "object",
+      properties: { fen: fenProp, square: { type: "string", description: 'The square, e.g. "e5".' } },
+      required: ["fen", "square"],
+      additionalProperties: false,
+    },
+    strict: true,
+  },
 ];
 
 export interface ToolContext {
@@ -94,6 +111,7 @@ function throwIfAborted(ctx: ToolContext): void {
 const FenInput = z.object({ fen: z.string() });
 const AnalyzeInput = FenInput.extend({ depth: z.number().int().nullish(), multi_pv: z.number().int().nullish() });
 const EvaluateInput = FenInput.extend({ move: z.string() });
+const ExchangeInput = FenInput.extend({ square: z.string() });
 
 /** Shown in the browser while the tool runs (NFR-1). */
 export function toolLabel(name: string, input: unknown): string {
@@ -110,6 +128,10 @@ export function toolLabel(name: string, input: unknown): string {
       return "Checking what players usually play…";
     case "get_repertoire_context":
       return "Checking your repertoire…";
+    case "exchange_on_square": {
+      const square = String((input as { square?: unknown })?.square ?? "").trim().toLowerCase();
+      return /^[a-h][1-8]$/.test(square) ? `Counting attackers and defenders on ${square}…` : "Counting attackers and defenders…";
+    }
     default:
       return "Thinking…";
   }
@@ -126,6 +148,8 @@ export async function runTool(name: string, input: unknown, ctx: ToolContext): P
       return openingExplorer(parse(FenInput, input, name), ctx);
     case "get_repertoire_context":
       return repertoireContext(parse(FenInput, input, name), ctx);
+    case "exchange_on_square":
+      return exchange(parse(ExchangeInput, input, name), ctx);
     default:
       throw new Error(`unknown tool "${name}"`);
   }
@@ -226,6 +250,20 @@ async function evaluateMove(input: z.infer<typeof EvaluateInput>, ctx: ToolConte
     reply_line: replyLine,
     game_over_after_move: board.isGameOver(),
   };
+}
+
+/**
+ * exchange_on_square (#44, FR-21): chess-core's static exchange on one square, returned as is
+ * (the ExchangeResult contract, with its caveat). Recorded as exchange evidence for this position
+ * and square, which backs counts and outcomes in the reply (FR-10). The capture sequence is not
+ * registered as move evidence: a static count ignores pins and checks, so it must not back
+ * "Bxe5" or a revealMove; the engine does that.
+ */
+function exchange(input: z.infer<typeof ExchangeInput>, ctx: ToolContext) {
+  requireFen(input.fen);
+  const result = exchangeOnSquare(input.fen, input.square.trim().toLowerCase());
+  ctx.evidence.addExchange(input.fen, result);
+  return result;
 }
 
 const EXPLORER_MOVES = 8;

@@ -244,6 +244,7 @@ describe("TutorSession.ask: the tool loop", () => {
       "evaluate_move",
       "opening_explorer",
       "get_repertoire_context",
+      "exchange_on_square",
     ]);
     expect(p.tools!.every((t) => (t as Anthropic.Tool).strict === true)).toBe(true);
     expect(p.tool_choice).toEqual({ type: "auto" });

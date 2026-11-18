@@ -1,0 +1,19 @@
+{
+  "id": "hint-ex-london-e5-wins",
+  "kind": "hint",
+  "playerColor": "w",
+  "history": [
+    "d2d4",
+    "d7d5",
+    "c1f4",
+    "b8c6",
+    "e2e3",
+    "e7e5"
+  ],
+  "fen": "r1bqkbnr/ppp2ppp/2n5/3pp3/3P1B2/4P3/PPP2PPP/RN1QKBNR w KQkq - 0 4",
+  "moment": null,
+  "attemptFen": "r1bqkbnr/ppp2ppp/2n5/3pp3/3P1B2/4P3/PPP2PPP/RN1QKBNR w KQkq - 0 4",
+  "engineBest": "d4e5",
+  "engineBestCp": 109,
+  "source": "London: ...e5 leaves the e5 pawn attacked twice (d4, Bf4) and defended once (Nc6): dxe5 wins a pawn (#44 exchange case)"
+}

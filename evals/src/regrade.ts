@@ -29,6 +29,7 @@ const BUCKETS: [string, RegExp][] = [
   ["illegal_move", /not legal in any position/],
   ["unbacked_move", /does not appear in this turn's tool results|is not backed by this turn's tool results/],
   ["unbacked_eval", /quotes the evaluation/],
+  ["unbacked_exchange", /exchange_on_square/],
   ["reveal_move", /revealMove "/],
   ["invalid_reply", /not valid JSON|did not match the schema|kind must be|must go from one square/],
 ];

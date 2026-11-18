@@ -1,4 +1,4 @@
-import type { Color, Score } from "@chess-tutor/chess-core";
+import type { Color, ExchangeResult, Score } from "@chess-tutor/chess-core";
 import { boardOf, playUci, uciOf, type MovePair } from "./chess-util.ts";
 import type { EvalEntry } from "./schema.ts";
 
@@ -25,6 +25,9 @@ export function positionKey(fen: string): string {
  * - deltas: centipawn changes, not standings (evaluate_move's cp_loss, the key moment's cpLoss
  *   and gainCp). They never back an evals entry or a signed number; an unsigned size quoted in
  *   prose may match one (FR-10 A2, "That cost you 1.6 pawns").
+ * - exchanges (#44): exchange_on_square results, keyed by position and square. They back a
+ *   count of attackers or defenders on that square and the exchange's outcome there
+ *   (exchange-claims.ts), never a move: the capture sequence is not move evidence.
  */
 export class Evidence {
   private readonly positions = new Map<string, string>(); // key -> full FEN
@@ -36,6 +39,18 @@ export class Evidence {
   private readonly cps = new Set<number>();
   private readonly mates = new Set<number>();
   private readonly deltas = new Set<number>();
+  private readonly exchanges = new Map<string, ExchangeResult>(); // positionKey|square -> result
+
+  /** An exchange_on_square result (#44) for `fen` and its square. The same position and square keep one result. */
+  addExchange(fen: string, result: ExchangeResult): void {
+    this.addPosition(fen);
+    this.exchanges.set(`${positionKey(fen)}|${result.square}`, result);
+  }
+
+  /** This turn's exchange_on_square results for `square`, in any position. */
+  exchangesOn(square: string): ExchangeResult[] {
+    return [...this.exchanges.values()].filter((r) => r.square === square);
+  }
 
   addPosition(fen: string): void {
     const board = boardOf(fen);

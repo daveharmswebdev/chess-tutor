@@ -51,6 +51,8 @@ export function toRow(r: CaseResult): CaseRow {
         ...g.schema.problems,
         ...g.moves.illegal.map((m) => `illegal move "${m}"`),
         ...g.evals.quotes.filter((q) => q.problem).map((q) => `${q.problem} evaluation "${q.raw}"`),
+        // Recordings graded before #44 have no exchanges grade.
+        ...(g.exchanges?.claims ?? []).filter((c) => c.problem).map((c) => `${c.problem} exchange claim "${c.raw}" on ${c.square}`),
         ...g.giveAway.problems,
         ...g.arrows.problems,
         ...g.reveal.problems,
