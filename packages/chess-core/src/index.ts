@@ -19,9 +19,17 @@ export { buildRepertoire } from "./repertoire.ts";
 export { parseRepertoirePgn } from "./repertoire-pgn.ts";
 export { MATE_CP, scoreToCp } from "./score.ts";
 export { sanOf } from "./moves.ts";
-export { createSparringBot } from "./bot.ts";
+export {
+  assertBotStrength,
+  createSparringBot,
+  EXPLORER_RATING_BUCKETS,
+  explorerRatingsFor,
+  weakeningAt,
+} from "./bot.ts";
 export { EXCHANGE_CAVEAT, exchangeOnSquare } from "./exchange.ts";
 export type {
+  BotAnalysis,
+  BotChooseOptions,
   BotConfig,
   BotEngine,
   BotExplorer,
@@ -30,6 +38,9 @@ export type {
   BotFallbackReason,
   BotLookupOptions,
   BotMove,
+  BotWeakeningAnchor,
+  BotWeakeningConfig,
+  BotWeakeningInfo,
   SparringBot,
   SparringBotOptions,
 } from "./bot.ts";
