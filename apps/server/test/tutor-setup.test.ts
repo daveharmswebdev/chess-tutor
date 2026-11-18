@@ -127,7 +127,7 @@ describe("config/tutor.json coaching settings", () => {
     expect(loadTutorConfig("development")).toEqual({
       model: "claude-sonnet-5-5", // pinned after the #10 evals (docs/evals/2026-11-08-q3-model-choice.md)
       effort: "medium",
-      maxToolRounds: 4,
+      maxToolRounds: 5,
       engine: { depth: 18, movetimeCapMs: 1000, multiPv: 3 },
       explorer: { ratings: [1200, 1400], speeds: ["blitz", "rapid"] },
     });
