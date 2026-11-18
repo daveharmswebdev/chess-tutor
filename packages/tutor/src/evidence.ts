@@ -15,6 +15,8 @@ export function positionKey(fen: string): string {
  * - backed moves: (position, UCI) pairs from tool results and the key-moment data. A move is
  *   backed only in the position it is played from, so "O-O" in White's history never backs
  *   Black's O-O, and an engine line's third ply is backed only after its first two.
+ * - plan moves (#41): (position, UCI) pairs of the repertoire's usual setup after the game left
+ *   book. They back a plan mention, never a move to play now and never revealMove.
  * - history moves: (position, UCI) pairs of the game so far. They let the tutor mention a
  *   move already played, but never back a move in the current (focus) position.
  * - scores (#26): engine scores from tool results, signed and White-relative as the engine
@@ -28,6 +30,7 @@ export class Evidence {
   private readonly positions = new Map<string, string>(); // key -> full FEN
   private readonly focus = new Set<string>();
   private readonly backed = new Set<string>();
+  private readonly plan = new Set<string>();
   private readonly history = new Set<string>();
   private readonly historyPlies: { fen: string; uci: string }[] = [];
   private readonly cps = new Set<number>();
@@ -78,8 +81,22 @@ export class Evidence {
     );
   }
 
+  /**
+   * A plan move (#41, review 096): get_repertoire_context's usual_setup, the repertoire's moves,
+   * not engine-checked. Plays `uci` in `fen` and records it as plan evidence there. It never backs
+   * a move (backsMove): a move mention may use it outside a "now" clause (checkClaims), but
+   * revealMove may not. Null when illegal.
+   */
+  addPlanMove(fen: string, uci: string): MovePair | null {
+    return this.play(fen, [uci], this.plan)[0] ?? null;
+  }
+
   backsMove(fen: string, uci: string): boolean {
     return this.backed.has(`${positionKey(fen)}|${uci}`);
+  }
+
+  backsPlan(fen: string, uci: string): boolean {
+    return this.plan.has(`${positionKey(fen)}|${uci}`);
   }
 
   inHistory(fen: string, uci: string): boolean {

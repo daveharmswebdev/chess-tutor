@@ -67,7 +67,8 @@ export const TOOL_DEFINITIONS: Anthropic.Tool[] = [
     name: "get_repertoire_context",
     description:
       "Whether a position from this game is still in the player's repertoire (London System with White, King's Indian " +
-      "with Black), the line's name and the repertoire's next moves, or where the game left it.",
+      "with Black), the line's name and the repertoire's next moves; or, once the game has left it, where it left and the " +
+      "player's usual setup from there (repertoire moves, not engine-checked).",
     input_schema: { type: "object", properties: { fen: fenProp }, required: ["fen"], additionalProperties: false },
     strict: true,
   },
@@ -292,7 +293,68 @@ async function repertoireContext(input: z.infer<typeof FenInput>, ctx: ToolConte
     const { fens, moves } = historyPositions(hist.slice(0, k + 1));
     const left = moves[k] ?? null;
     if (left) ctx.evidence.addMove(fens[k]!, left.uci);
-    return { color, in_repertoire: false, last_book_line: earlier.line, left_book_with: left, move_number: Math.floor(k / 2) + 1 };
+    const setup = sideToMove(input.fen) === ctx.playerColor ? usualSetup(input.fen, hist.slice(0, k), ctx) : [];
+    return {
+      color,
+      in_repertoire: false,
+      last_book_line: earlier.line,
+      left_book_with: left,
+      move_number: Math.floor(k / 2) + 1,
+      usual_setup: setup,
+      usual_setup_note: SETUP_NOTE,
+    };
   }
-  return { color, in_repertoire: false, last_book_line: null, left_book_with: null };
+  return { color, in_repertoire: false, last_book_line: null, left_book_with: null, usual_setup: [] };
+}
+
+const MAX_SETUP_MOVES = 6;
+
+const SETUP_NOTE =
+  "usual_setup: the player's own next moves in last_book_line from the last book position, in order, played from this " +
+  "position with the opponent's replies left out; a move that is illegal here was dropped. It is the repertoire's usual " +
+  "setup, not engine-checked best moves: check a move with evaluate_move or analyze_position before you recommend it now.";
+
+/**
+ * The player's usual setup after the game left book (#41, FR-9): the player's moves of the
+ * last book line (the first repertoire line through `bookHistory`), up to MAX_SETUP_MOVES,
+ * played from `fen` one after another with the turn passed back to the player in between (the
+ * opponent's replies are unknown, so left out). A move that is illegal at its turn is dropped;
+ * the walk stops after a move that gives check (passing the turn would leave the side not to
+ * move in check). Each move is plan evidence (Evidence.addPlanMove) only in the position it is
+ * played from, so "...Bg7" after "...g6" is plan evidence but Bg7 in `fen` is not. Plan evidence
+ * never backs a move (review 096): not even the first setup move, which is legal in `fen`, may
+ * be revealMove or be named as the move to play now without the engine (FR-10, FR-8).
+ */
+function usualSetup(fen: string, bookHistory: string[], ctx: ToolContext): MovePair[] {
+  const own: string[] = [];
+  const line = [...bookHistory];
+  while (own.length < MAX_SETUP_MOVES) {
+    const next = ctx.repertoire!.continuations(line, ctx.playerColor)?.moves[0];
+    if (!next) break;
+    if ((line.length % 2 === 0 ? "w" : "b") === ctx.playerColor) own.push(next.uci); // from the start position
+    line.push(next.uci);
+  }
+  const setup: MovePair[] = [];
+  let at = fen;
+  for (const uci of own) {
+    const pair = ctx.evidence.addPlanMove(at, uci);
+    if (!pair) continue; // illegal in the new position: dropped
+    setup.push(pair);
+    if (/[+#]$/.test(pair.san)) break;
+    const board = boardOf(at)!;
+    playUci(board, pair.uci);
+    const passed = passTurn(board.fen());
+    if (!passed) break;
+    at = passed;
+  }
+  return setup;
+}
+
+/** The same position with the other side to move and no en passant square; null when that is no legal position. */
+function passTurn(fen: string): string | null {
+  const parts = fen.split(" ");
+  parts[1] = parts[1] === "w" ? "b" : "w";
+  parts[3] = "-";
+  const board = boardOf(parts.join(" "));
+  return board ? board.fen() : null;
 }

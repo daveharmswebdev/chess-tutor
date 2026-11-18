@@ -21,7 +21,7 @@
  *   ANTHROPIC_API_KEY  unset or empty => coaching off ("Coaching is off: no API key is set."), the
  *                      game still works. Read by the Anthropic SDK; never logged.
  *   APP_ENV            default "development": picks the tutor model in config/models.json.
- *   TUTOR_PROMPT_PATH  default <repo>/prompts/tutor-system.v2.md; a missing file turns coaching
+ *   TUTOR_PROMPT_PATH  default <repo>/prompts/tutor-system.v3.md; a missing file turns coaching
  *                      off with a reason, never a crash.
  * Usage stats (#60, FR-29, IR-10):
  *   OPS_STATS_TOKEN  unset or blank => GET /ops/daily-stats is off (404). Otherwise callers send
@@ -55,7 +55,7 @@ import { createSqliteGameStore, resolveDbPath, type GameStore } from "./store.ts
 import { NO_KEY_REASON, setupTutor, type TutorSetup } from "./tutor-setup.ts";
 
 export const DEFAULT_PORT = 3001;
-export const DEFAULT_PROMPT_PATH = fileURLToPath(new URL("../../../prompts/tutor-system.v2.md", import.meta.url));
+export const DEFAULT_PROMPT_PATH = fileURLToPath(new URL("../../../prompts/tutor-system.v3.md", import.meta.url));
 
 function parsePort(value: string | undefined): number {
   if (value === undefined || value === "") return DEFAULT_PORT;

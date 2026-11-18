@@ -215,6 +215,27 @@ function describeEntry(e: EvalEntry): string {
   return e.cp !== null ? `{side: "${e.side}", cp: ${e.cp}}` : `{side: "${e.side}", mate: ${e.mate}}`;
 }
 
+/** Clause boundaries: punctuation, and conjunctions that start a new clause (the eval grader's, evals/src/graders.ts). */
+const CLAUSE_BREAK = /[.!?;,:](?=\s|$)|\n|\b(?:so|but|because|since|while|whereas|although|though|now that)\b/gi;
+/** A word that puts a move now, not in a plan: "Put the bishop on g7 now", "Play ...Bg7 right away". */
+const NOW_WORD = /\b(?:now|right\s+away|immediately|this\s+move)\b/i;
+
+/**
+ * Whether the clause around text[start, end) puts the move now (NOW_WORD). Shared with the eval
+ * grader (evals/src/graders.ts), so the claims check and NFR-6 read "now" the same way (#41).
+ */
+export function nowFramed(text: string, start: number, end: number): boolean {
+  let from = 0;
+  for (const m of text.matchAll(CLAUSE_BREAK)) {
+    if (m.index + m[0].length > start) break;
+    from = m.index + m[0].length;
+  }
+  const re = new RegExp(CLAUSE_BREAK.source, "gi");
+  re.lastIndex = end;
+  const next = re.exec(text);
+  return NOW_WORD.test(text.slice(from, next ? next.index : text.length));
+}
+
 const SIDE_WORD = "white|black|your opponent|the opponent|opponent|you";
 
 /** The text of the clause that ends at `index`: after the last sentence break (". ", "; ", "! ", "? ", newline). */
@@ -276,6 +297,8 @@ const CHECK_NOUN =
  *   limits the positions to those where that side moves (when it is legal in any of them).
  *   "you"/"your opponent" need `playerColor`. A copula or a comma in between breaks the link
  *   ("White is fine, so O-O" names no mover).
+ * - A plan move (get_repertoire_context's usual_setup, #41) passes as a plan mention only:
+ *   not in a clause with a "now" word (nowFramed), and never as revealMove (backsMove only).
  *
  * Evaluations (#26): every `evals` entry must be exactly an engine score of this turn for its
  * side (Evidence.backsEntry), and every evaluation-like number in message or reveal (see
@@ -341,7 +364,14 @@ export function checkClaims(reply: TutorDraft, evidence: Evidence, revealFen: st
       const backed =
         legal.some((l) => evidence.backsMove(l.fen, l.uci)) ||
         (!legal.some((l) => isFocus(l.fen)) && legal.some((l) => evidence.inHistory(l.fen, l.uci)));
-      if (!backed) {
+      // A usual_setup move (#41) backs a plan mention only: not in a clause that puts it now.
+      const plan = !backed && legal.some((l) => evidence.backsPlan(l.fen, l.uci));
+      if (plan && nowFramed(text, mention.start, mention.end)) {
+        problems.push(
+          `${field} mentions ${mention.raw} as a move to play now, but it is only in usual_setup (the repertoire's plan, not engine-checked). ` +
+            `Present it as part of the plan, or check it with analyze_position or evaluate_move first.`,
+        );
+      } else if (!backed && !plan) {
         problems.push(`${field} mentions ${mention.raw}, which does not appear in this turn's tool results or the key-moment data.`);
       }
     }
