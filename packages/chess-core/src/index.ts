@@ -20,6 +20,7 @@ export { parseRepertoirePgn } from "./repertoire-pgn.ts";
 export { MATE_CP, scoreToCp } from "./score.ts";
 export { sanOf } from "./moves.ts";
 export { createSparringBot } from "./bot.ts";
+export { EXCHANGE_CAVEAT, exchangeOnSquare } from "./exchange.ts";
 export type {
   BotConfig,
   BotEngine,
