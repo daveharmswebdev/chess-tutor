@@ -1,12 +1,22 @@
 import { Chess, type Move } from "chess.js";
+import { BOT_STRENGTH } from "./api.ts";
 import { playUci, toUci } from "./moves.ts";
+import { scoreToCp } from "./score.ts";
+import type { Score } from "./types.ts";
 
 /*
- * Sparring bot (FR-1, FR-2, FR-3, architecture §3.3).
+ * Sparring bot (FR-1, FR-2, FR-3 as amended by A11, FR-10, architecture §3.3).
  *
  * Pure: the explorer and engine are injected. The interfaces below are
  * structural subsets of @chess-tutor/explorer and @chess-tutor/engine, so the
  * real clients satisfy them without chess-core depending on those packages.
+ *
+ * Strength (#84) is per call, 500 to 2500 in steps of 100 (default 1400):
+ * - in book: Lichess explorer moves from the rating buckets around the strength;
+ * - out of book, strength >= 1320: Stockfish at UCI_Elo = strength;
+ * - out of book, strength < 1320: full-strength MultiPV lines, sampled by
+ *   centipawn loss with a temperature plus a blunder rate (config bot.weakening).
+ * Every move comes from the explorer list or the engine's output and is checked legal.
  */
 
 /** Subset of @chess-tutor/explorer ExplorerMove that the bot reads. */
@@ -35,18 +45,57 @@ export interface BotExplorer {
   lookup(fen: string, options: BotLookupOptions): Promise<BotExplorerResult>;
 }
 
+/** Subset of @chess-tutor/engine Analysis that the bot reads. Scores are White's POV; lines best first. */
+export interface BotAnalysis {
+  bestMove: string;
+  lines: { moves: string[]; score: Score }[];
+}
+
 export interface BotEngine {
   bestMove(fen: string, opts?: { elo?: number }): Promise<string>;
+  /**
+   * Full-strength MultiPV analysis (subset of @chess-tutor/engine Engine.analyze). Needed only
+   * for strengths below BOT_STRENGTH.uciEloMin; optional so engine stubs that only play
+   * at UCI_Elo still type-check. Missing it below 1320 makes chooseMove throw.
+   */
+  analyze?(fen: string, opts?: { multiPv?: number; depth?: number }): Promise<BotAnalysis>;
+}
+
+/** One point of the strength -> weakening curve; values between anchors are interpolated linearly. */
+export interface BotWeakeningAnchor {
+  strength: number;
+  /** Softmax temperature in centipawns: weight of a line is exp(-lossCp / temperatureCp). */
+  temperatureCp: number;
+  /** Probability, in [0, 1], of playing a line that loses at least blunderMinLossCp. */
+  blunderRate: number;
+}
+
+/** The `bot.weakening` block of config/tutor.json (FR-3 as amended by A11). */
+export interface BotWeakeningConfig {
+  /** Lines to ask the engine for (UCI MultiPV). */
+  multiPv: number;
+  /** Search depth for those lines. */
+  depth: number;
+  /** A line losing at least this much against the best line counts as a blunder. */
+  blunderMinLossCp: number;
+  /** Sorted by strength, strictly increasing; at least one. Clamped outside the range. */
+  anchors: BotWeakeningAnchor[];
 }
 
 /** The `bot` block of config/tutor.json. */
 export interface BotConfig {
+  /**
+   * Still validated and read by the server for the tutor's explorer; the bot itself picks
+   * its ratings from the strength (explorerRatingsFor) since #84.
+   */
   explorerRatings: number[];
   explorerSpeeds: string[];
   /** Positions with fewer explorer games than this are out of book. */
   minGames: number;
-  /** Engine strength (UCI_Elo) once out of book. */
+  /** Still validated; the bot plays UCI_Elo = strength out of book since #84. */
   outOfBookElo: number;
+  /** Required for strengths below BOT_STRENGTH.uciEloMin (1320). */
+  weakening?: BotWeakeningConfig;
 }
 
 export type BotFallbackReason =
@@ -55,6 +104,18 @@ export type BotFallbackReason =
   | "no_moves"
   | "lookup_failed"
   | "illegal_explorer_move";
+
+/** How a weakened engine move (strength below 1320) was chosen. */
+export interface BotWeakeningInfo {
+  /** Centipawn loss of the played line against the best legal line, mover's POV (0 = best). */
+  lossCp: number;
+  /** True when the blunder branch chose the line. */
+  blunder: boolean;
+  /** Legal lines sampled from; 0 means analysis.bestMove was played. */
+  candidates: number;
+  temperatureCp: number;
+  blunderRate: number;
+}
 
 export interface BotMove {
   uci: string;
@@ -69,10 +130,17 @@ export interface BotMove {
   explorer?: { games: number; totalGames: number; share: number };
   /** Present when source is "engine": why the explorer was not used. */
   fallbackReason?: BotFallbackReason;
+  /** Present when the engine move came from the weakening path (strength below 1320). */
+  weakening?: BotWeakeningInfo;
+}
+
+export interface BotChooseOptions {
+  /** 500 to 2500 in steps of 100 (BOT_STRENGTH); omitted means 1400. Anything else throws. */
+  strength?: number;
 }
 
 export interface SparringBot {
-  chooseMove(fen: string): Promise<BotMove>;
+  chooseMove(fen: string, opts?: BotChooseOptions): Promise<BotMove>;
 }
 
 export interface SparringBotOptions {
@@ -81,6 +149,91 @@ export interface SparringBotOptions {
   config: BotConfig;
   /** Uniform in [0, 1). Defaults to Math.random; inject for deterministic tests. */
   random?: () => number;
+}
+
+/**
+ * Lichess explorer `ratings` buckets (lower bounds; each runs up to the next).
+ * Source: the Lichess OpenAPI spec (brief 101).
+ */
+export const EXPLORER_RATING_BUCKETS = [0, 1000, 1200, 1400, 1600, 1800, 2000, 2200, 2500] as const;
+
+/** Throws unless strength is a multiple of BOT_STRENGTH.step within [min, max]. */
+export function assertBotStrength(strength: number): void {
+  const { min, max, step } = BOT_STRENGTH;
+  if (!Number.isInteger(strength) || strength < min || strength > max || strength % step !== 0) {
+    throw new Error(`invalid bot strength ${strength}: must be ${min} to ${max} in steps of ${step}`);
+  }
+}
+
+/**
+ * Explorer rating buckets for a bot strength (FR-2, #84): the bucket containing the
+ * strength plus the one below it, if any. 1400 -> [1200, 1400]; 500 -> [0]; 1300 -> [1000, 1200].
+ */
+export function explorerRatingsFor(strength: number): number[] {
+  assertBotStrength(strength);
+  let index = 0;
+  for (let i = 0; i < EXPLORER_RATING_BUCKETS.length; i++) {
+    if (EXPLORER_RATING_BUCKETS[i]! <= strength) index = i;
+  }
+  return index === 0 ? [EXPLORER_RATING_BUCKETS[0]] : [EXPLORER_RATING_BUCKETS[index - 1]!, EXPLORER_RATING_BUCKETS[index]!];
+}
+
+/**
+ * Temperature and blunder rate for a strength: linear between the surrounding anchors,
+ * clamped to the first or last anchor outside them. Anchors must be valid (sorted, non-empty).
+ */
+export function weakeningAt(
+  strength: number,
+  config: Pick<BotWeakeningConfig, "anchors">,
+): { temperatureCp: number; blunderRate: number } {
+  const anchors = config.anchors;
+  const first = anchors[0];
+  if (first === undefined) throw new Error("invalid bot config: weakening.anchors is empty");
+  const pick = (a: BotWeakeningAnchor) => ({ temperatureCp: a.temperatureCp, blunderRate: a.blunderRate });
+  if (strength <= first.strength) return pick(first);
+  for (let i = 1; i < anchors.length; i++) {
+    const lo = anchors[i - 1]!;
+    const hi = anchors[i]!;
+    if (strength === hi.strength) return pick(hi);
+    if (strength < hi.strength) {
+      const t = (strength - lo.strength) / (hi.strength - lo.strength);
+      return {
+        temperatureCp: lo.temperatureCp + (hi.temperatureCp - lo.temperatureCp) * t,
+        blunderRate: lo.blunderRate + (hi.blunderRate - lo.blunderRate) * t,
+      };
+    }
+  }
+  return pick(anchors[anchors.length - 1]!);
+}
+
+function weakeningProblems(w: BotWeakeningConfig): string[] {
+  const problems: string[] = [];
+  if (!Number.isInteger(w.multiPv) || w.multiPv < 1) {
+    problems.push(`weakening.multiPv must be an integer >= 1 (got ${w.multiPv})`);
+  }
+  if (!Number.isInteger(w.depth) || w.depth < 1) {
+    problems.push(`weakening.depth must be an integer >= 1 (got ${w.depth})`);
+  }
+  if (!Number.isFinite(w.blunderMinLossCp) || w.blunderMinLossCp <= 0) {
+    problems.push(`weakening.blunderMinLossCp must be a positive number (got ${w.blunderMinLossCp})`);
+  }
+  if (!Array.isArray(w.anchors) || w.anchors.length === 0) {
+    problems.push("weakening.anchors must be a non-empty array");
+    return problems;
+  }
+  w.anchors.forEach((a, i) => {
+    if (!Number.isFinite(a.strength)) problems.push(`weakening.anchors[${i}].strength must be a number`);
+    if (!Number.isFinite(a.temperatureCp) || a.temperatureCp <= 0) {
+      problems.push(`weakening.anchors[${i}].temperatureCp must be > 0 (got ${a.temperatureCp})`);
+    }
+    if (!Number.isFinite(a.blunderRate) || a.blunderRate < 0 || a.blunderRate > 1) {
+      problems.push(`weakening.anchors[${i}].blunderRate must be in [0, 1] (got ${a.blunderRate})`);
+    }
+    if (i > 0 && !(a.strength > w.anchors[i - 1]!.strength)) {
+      problems.push("weakening.anchors must be sorted by strictly increasing strength");
+    }
+  });
+  return problems;
 }
 
 function validateConfig(config: BotConfig): void {
@@ -97,6 +250,7 @@ function validateConfig(config: BotConfig): void {
   if (!Array.isArray(config.explorerSpeeds) || config.explorerSpeeds.length === 0) {
     problems.push("explorerSpeeds must be a non-empty array");
   }
+  if (config.weakening !== undefined) problems.push(...weakeningProblems(config.weakening));
   if (problems.length > 0) {
     throw new Error(`invalid bot config: ${problems.join("; ")}`);
   }
@@ -133,58 +287,142 @@ function resolveExplorerMove(fen: string, entry: BotExplorerMove): Move | null {
   }
 }
 
-/** Weighted pick by games; candidates must all have games > 0. */
-function pickWeighted(candidates: BotExplorerMove[], random: () => number): number {
-  const total = candidates.reduce((sum, m) => sum + m.games, 0);
+/** The legal move for a UCI string in fen, or null (FR-10). */
+function legalUci(fen: string, uci: string | undefined): Move | null {
+  if (uci === undefined || uci === "") return null;
+  try {
+    return playUci(new Chess(fen), uci);
+  } catch {
+    return null;
+  }
+}
+
+/** Index picked in proportion to weights (all >= 0, sum > 0); target = random() * sum. */
+function pickByWeight(weights: number[], random: () => number): number {
+  const total = weights.reduce((sum, w) => sum + w, 0);
   const target = random() * total;
   let cumulative = 0;
-  for (let i = 0; i < candidates.length; i++) {
-    cumulative += candidates[i]!.games;
+  for (let i = 0; i < weights.length; i++) {
+    cumulative += weights[i]!;
     if (target < cumulative) return i;
   }
-  return candidates.length - 1; // guards float rounding at the top end
+  return weights.length - 1; // guards float rounding at the top end
+}
+
+interface Candidate {
+  move: Move;
+  lossCp: number;
 }
 
 export function createSparringBot(options: SparringBotOptions): SparringBot {
   const { explorer, engine, config } = options;
   const random = options.random ?? Math.random;
   validateConfig(config);
-  const lookupOptions: BotLookupOptions = {
-    ratings: [...config.explorerRatings],
-    speeds: [...config.explorerSpeeds],
-  };
+  const speeds = [...config.explorerSpeeds];
 
-  async function engineMove(fen: string, reason: BotFallbackReason): Promise<BotMove> {
-    const uci = await engine.bestMove(fen, { elo: config.outOfBookElo });
-    let san: string;
-    try {
-      san = playUci(new Chess(fen), uci).san;
-    } catch {
-      throw new Error(`engine returned illegal move "${uci}" in position ${fen}`);
+  async function eloMove(fen: string, strength: number, reason: BotFallbackReason): Promise<BotMove> {
+    const uci = await engine.bestMove(fen, { elo: strength });
+    const move = legalUci(fen, uci);
+    if (move === null) throw new Error(`engine returned illegal move "${uci}" in position ${fen}`);
+    return { uci, san: move.san, source: "engine", fallbackReason: reason };
+  }
+
+  async function weakenedMove(
+    fen: string,
+    strength: number,
+    weakening: BotWeakeningConfig,
+    analyze: NonNullable<BotEngine["analyze"]>,
+    reason: BotFallbackReason,
+  ): Promise<BotMove> {
+    const { temperatureCp, blunderRate } = weakeningAt(strength, weakening);
+    const analysis = await analyze(fen, { multiPv: weakening.multiPv, depth: weakening.depth });
+    const mover = new Chess(fen).turn();
+
+    const legal: { move: Move; cp: number }[] = [];
+    for (const line of analysis.lines) {
+      const move = legalUci(fen, line.moves[0]);
+      if (move === null) continue; // never play an unchecked move (FR-10)
+      legal.push({ move, cp: scoreToCp(line.score, mover, mover) });
     }
-    return { uci, san, source: "engine", fallbackReason: reason };
+
+    if (legal.length === 0) {
+      const move = legalUci(fen, analysis.bestMove);
+      if (move === null) throw new Error(`engine returned illegal move "${analysis.bestMove}" in position ${fen}`);
+      return {
+        uci: toUci(move),
+        san: move.san,
+        source: "engine",
+        fallbackReason: reason,
+        weakening: { lossCp: 0, blunder: false, candidates: 0, temperatureCp, blunderRate },
+      };
+    }
+
+    // Lines come best first, so the best legal line is line 1 unless line 1 was dropped.
+    const best = Math.max(...legal.map((l) => l.cp));
+    const candidates: Candidate[] = legal.map((l) => ({ move: l.move, lossCp: Math.max(0, best - l.cp) }));
+
+    let chosen: Candidate | undefined;
+    let blunder = false;
+    if (random() < blunderRate) {
+      const blunders = candidates.filter((c) => c.lossCp >= weakening.blunderMinLossCp);
+      if (blunders.length > 0) {
+        chosen = blunders[Math.min(Math.floor(random() * blunders.length), blunders.length - 1)]!;
+        blunder = true;
+      }
+    }
+    if (chosen === undefined) {
+      const weights = candidates.map((c) => Math.exp(-c.lossCp / temperatureCp));
+      chosen = candidates[pickByWeight(weights, random)]!;
+    }
+
+    return {
+      uci: toUci(chosen.move),
+      san: chosen.move.san,
+      source: "engine",
+      fallbackReason: reason,
+      weakening: { lossCp: chosen.lossCp, blunder, candidates: candidates.length, temperatureCp, blunderRate },
+    };
   }
 
   return {
-    async chooseMove(fen) {
+    async chooseMove(fen, opts = {}) {
+      const strength = opts.strength ?? BOT_STRENGTH.default;
+      const ratings = explorerRatingsFor(strength); // validates the strength
+      const weakened = strength < BOT_STRENGTH.uciEloMin;
+      const weakening = config.weakening;
+      if (weakened && weakening === undefined) {
+        throw new Error(
+          `bot strength ${strength} is below ${BOT_STRENGTH.uciEloMin} but the bot config has no weakening block`,
+        );
+      }
+      const analyze = engine.analyze?.bind(engine);
+      if (weakened && analyze === undefined) {
+        throw new Error(`bot strength ${strength} is below ${BOT_STRENGTH.uciEloMin} but the engine has no analyze()`);
+      }
       loadPosition(fen);
+
+      const engineMove = (reason: BotFallbackReason): Promise<BotMove> =>
+        weakened ? weakenedMove(fen, strength, weakening!, analyze!, reason) : eloMove(fen, strength, reason);
 
       let result: BotExplorerResult;
       try {
-        result = await explorer.lookup(fen, lookupOptions);
+        result = await explorer.lookup(fen, { ratings, speeds: [...speeds] });
       } catch (err) {
         if (err instanceof Error && err.name === "ExplorerConfigError") throw err;
-        return engineMove(fen, "lookup_failed");
+        return engineMove("lookup_failed");
       }
 
-      if (result.unavailable !== undefined) return engineMove(fen, "unavailable");
-      if (!(result.totalGames >= config.minGames)) return engineMove(fen, "few_games");
+      if (result.unavailable !== undefined) return engineMove("unavailable");
+      if (!(result.totalGames >= config.minGames)) return engineMove("few_games");
 
       const candidates = result.moves.filter((m) => m.games > 0);
-      if (candidates.length === 0) return engineMove(fen, "no_moves");
+      if (candidates.length === 0) return engineMove("no_moves");
 
       while (candidates.length > 0) {
-        const index = pickWeighted(candidates, random);
+        const index = pickByWeight(
+          candidates.map((m) => m.games),
+          random,
+        );
         const picked = candidates[index]!;
         const move = resolveExplorerMove(fen, picked);
         if (move === null) {
@@ -202,7 +440,7 @@ export function createSparringBot(options: SparringBotOptions): SparringBot {
           },
         };
       }
-      return engineMove(fen, "illegal_explorer_move");
+      return engineMove("illegal_explorer_move");
     },
   };
 }

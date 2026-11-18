@@ -8,7 +8,8 @@
   },
   "scripts": {
     "typecheck": "tsc --noEmit",
-    "demo:bot": "node --experimental-strip-types --no-warnings=ExperimentalWarning --env-file-if-exists=../../.env scripts/demo-bot.ts"
+    "demo:bot": "node --experimental-strip-types --no-warnings=ExperimentalWarning --env-file-if-exists=../../.env scripts/demo-bot.ts",
+    "match:bot": "node --experimental-strip-types --no-warnings=ExperimentalWarning scripts/match-bot.ts"
   },
   "dependencies": {
     "chess.js": "^1.4.0"
