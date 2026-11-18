@@ -217,6 +217,7 @@ SQLite through Node's built-in `node:sqlite` (`DatabaseSync`, no native dependen
 | Thresholds, rating band, bot Elo, effort per route | `config/tutor.json` | yes |
 | System prompts | `prompts/*.vN.md` + `CHANGELOG.md` | yes |
 | `ANTHROPIC_API_KEY`, `LICHESS_TOKEN`, `STOCKFISH_PATH` | `.env` / shell environment | **no** |
+| `ENGINE_THREADS` (optional): Stockfish thread count for this deploy, a positive integer that overrides `config/tutor.json` `engine.threads`; blank or unset uses the config value, anything else stops startup (NFR-2, NFR-3, #36) | Render env / shell environment | **no** |
 | Team Claude Code settings | `.claude/settings.json`, `CLAUDE.md` | yes |
 | Personal Claude Code settings | `.claude/settings.local.json`, `CLAUDE.local.md` | **no** |
 
