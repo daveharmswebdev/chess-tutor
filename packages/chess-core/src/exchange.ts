@@ -24,26 +24,22 @@ function byCaptureOrder(a: ExchangePiece, b: ExchangePiece): number {
   return ORDER[a.piece] - ORDER[b.piece] || (a.square < b.square ? -1 : a.square > b.square ? 1 : 0);
 }
 
-/**
- * The pieces of `color` that bear on `square`, in capture order. Each step takes the cheapest
- * piece that attacks now, then lifts it off the board so a friendly piece behind it is found
- * (an x-ray). Enemy pieces are never lifted, so an x-ray through an enemy piece does not count.
- */
-function bearing(fen: string, square: Square, color: Color): ExchangePiece[] {
+/** A board with `lifted` squares emptied: the pieces that have already captured on the square. */
+function boardWithout(fen: string, lifted: readonly string[]): Chess {
   const board = new Chess(fen);
-  const direct = new Set(board.attackers(square, color));
-  const out: ExchangePiece[] = [];
-  for (;;) {
-    const now: ExchangePiece[] = board.attackers(square, color).map((sq) => {
+  for (const sq of lifted) board.remove(sq as Square);
+  return board;
+}
+
+/** `color`'s pieces attacking `square` on `board` now, cheapest first. */
+function attackingNow(board: Chess, square: Square, color: Color, direct: Set<string>): ExchangePiece[] {
+  return board
+    .attackers(square, color)
+    .map((sq) => {
       const p = board.get(sq)!;
       return { square: sq, piece: p.type, color, value: VALUE[p.type], xray: !direct.has(sq) };
-    });
-    if (now.length === 0) return out;
-    now.sort(byCaptureOrder);
-    const next = now[0]!;
-    out.push(next);
-    board.remove(next.square as Square);
-  }
+    })
+    .sort(byCaptureOrder);
 }
 
 export function exchangeOnSquare(fen: string, square: string): ExchangeResult {
@@ -62,40 +58,61 @@ export function exchangeOnSquare(fen: string, square: string): ExchangeResult {
   const occupant = on ? { piece: on.type, color: on.color } : null;
   const attackingSide: Color = occupant ? other(occupant.color) : board.turn();
   const attackerToMove = board.turn() === attackingSide;
+  const defendingSide = other(attackingSide);
+  // What attacks the square on the original board; anything found later is an x-ray.
+  const direct: Record<Color, Set<string>> = {
+    w: new Set(board.attackers(sq, "w")),
+    b: new Set(board.attackers(sq, "b")),
+  };
 
-  const attackers = bearing(fenNorm, sq, attackingSide);
-  const defenders = bearing(fenNorm, sq, other(attackingSide));
+  // Play the exchange out on the real board, capture by capture: the side to capture takes with
+  // its cheapest piece that attacks the square now, and that piece leaves its square, which can
+  // open a line for a slider of either colour behind it. Pieces behind an enemy piece that never
+  // captures here stay blocked. The square's occupant does not block attacks on its own square.
+  const lists: Record<Color, ExchangePiece[]> = { w: [], b: [] };
+  const played: ExchangePiece[] = [];
+  const real = new Chess(fenNorm);
+  for (let side = attackingSide; ; side = other(side)) {
+    const by = attackingNow(real, sq, side, direct[side])[0];
+    if (!by) break;
+    if (by.piece === "k") {
+      // The king captures only when the other side then no longer attacks the square.
+      real.remove(by.square as Square);
+      const stillAttacked = real.attackers(sq, other(side)).length > 0;
+      real.put({ type: "k", color: side }, by.square as Square);
+      if (stillAttacked) break;
+    }
+    played.push(by);
+    lists[side].push(by);
+    real.remove(by.square as Square);
+  }
+
+  // When one side runs out (or its king may not capture), the other side's remaining pieces, and
+  // anything behind its king, still bear on the square: list them, lifting only that side's own
+  // pieces, so an enemy piece still standing keeps its line blocked.
+  const lifted = played.map((p) => p.square);
+  for (const side of [attackingSide, defendingSide]) {
+    const rest = boardWithout(fenNorm, lifted);
+    for (;;) {
+      const next = attackingNow(rest, sq, side, direct[side])[0];
+      if (!next) break;
+      lists[side].push(next);
+      rest.remove(next.square as Square);
+    }
+  }
+  const attackers = lists[attackingSide];
+  const defenders = lists[defendingSide];
 
   const sequence: ExchangeCapture[] = [];
   // Nothing to capture on an empty square, and a king is never captured.
   if (occupant && occupant.piece !== "k") {
-    const lists: Record<Color, ExchangePiece[]> = {
-      [attackingSide]: attackers,
-      [other(attackingSide)]: defenders,
-    } as Record<Color, ExchangePiece[]>;
-    const used: Record<Color, number> = { w: 0, b: 0 };
-    const lastRank = square[1] === "8" ? "w" : square[1] === "1" ? "b" : null;
+    const lastRank: Color | null = square[1] === "8" ? "w" : square[1] === "1" ? "b" : null;
     let onSquare: PieceType = occupant.piece;
-    let side = attackingSide;
-    // The real board as the exchange goes on: each capturing piece leaves its square.
-    const real = new Chess(fenNorm);
-    for (let n = 1; ; n++) {
-      const by = lists[side][used[side]];
-      if (!by) break;
-      if (by.piece === "k") {
-        // The king captures only when the other side then no longer attacks the square.
-        real.remove(by.square as Square);
-        const stillAttacked = real.attackers(sq, other(side)).length > 0;
-        real.put({ type: "k", color: side }, by.square as Square);
-        if (stillAttacked) break;
-      }
-      const promotion = by.piece === "p" && lastRank === side;
-      sequence.push({ n, by, captured: onSquare, promotion });
-      real.remove(by.square as Square);
-      used[side]++;
+    played.forEach((by, i) => {
+      const promotion = by.piece === "p" && lastRank === by.color;
+      sequence.push({ n: i + 1, by, captured: onSquare, promotion });
       onSquare = promotion ? "q" : by.piece;
-      side = other(side);
-    }
+    });
   }
 
   // Material won by each capture, for the side making it.

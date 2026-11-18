@@ -70,14 +70,83 @@ describe("exchangeOnSquare", () => {
     expect(r.bestLength).toBe(3);
   });
 
-  it("an x-ray through an enemy piece does not count", () => {
-    // White Ra1 stands behind Black's Ra3 on the a-file: it does not bear on a6.
-    const r = exchangeOnSquare("6k1/8/p7/8/1N6/r7/8/R5K1 w - - 0 1", "a6");
-    expect(labels(r.attackers)).toEqual(["Nb4"]);
-    expect(labels(r.defenders)).toEqual(["Ra3"]);
-    expect(captures(r)).toEqual(["1. Nb4xp", "2. Ra3xn"]);
-    expect(r.fullResult).toBe(-2);
+  it("an enemy slider behind the capturing piece recaptures (review 103)", () => {
+    // Qxd5 takes the queen off d6, so Black's Rd8 now sees d5: Rxd5 wins the queen.
+    const r = exchangeOnSquare("3r2k1/8/3Q4/3n4/8/8/8/6K1 w - - 0 1", "d5");
+    expect(labels(r.attackers)).toEqual(["Qd6"]);
+    expect(labels(r.defenders)).toEqual(["Rd8 (x-ray)"]);
+    expect(r.defenders[0]).toEqual({ square: "d8", piece: "r", color: "b", value: 5, xray: true });
+    expect(captures(r)).toEqual(["1. Qd6xn", "2. Rd8xq"]);
+    expect(r.fullResult).toBe(-6);
     expect(r.result).toBe(0);
+    expect(r.bestLength).toBe(0);
+  });
+
+  it("a defender in front of an enemy rook recaptures and opens the line for it", () => {
+    // Nxa6 Rxa6 lets White's Ra1 through: Rxa6. +1 -3 +5, so Black should not recapture.
+    const r = exchangeOnSquare("6k1/8/p7/8/1N6/r7/8/R5K1 w - - 0 1", "a6");
+    expect(labels(r.attackers)).toEqual(["Nb4", "Ra1 (x-ray)"]);
+    expect(labels(r.defenders)).toEqual(["Ra3"]);
+    expect(captures(r)).toEqual(["1. Nb4xp", "2. Ra3xn", "3. Ra1xr"]);
+    expect(r.fullResult).toBe(3);
+    expect(r.result).toBe(1);
+    expect(r.bestLength).toBe(1);
+  });
+
+  it("an enemy piece that never captures on the square keeps the line blocked", () => {
+    // Black's Na3 does not attack a6, so White's Ra1 behind it never reaches a6.
+    const r = exchangeOnSquare("6k1/8/p7/8/1N6/n7/8/R5K1 w - - 0 1", "a6");
+    expect(labels(r.attackers)).toEqual(["Nb4"]);
+    expect(r.defenders).toEqual([]);
+    expect(captures(r)).toEqual(["1. Nb4xp"]);
+    expect(r.fullResult).toBe(1);
+    expect(r.result).toBe(1);
+  });
+
+  it("pawn, bishop and queen on one diagonal: both back pieces are x-rays", () => {
+    const r = exchangeOnSquare("6k1/8/3p4/4n3/3P4/2B5/1Q6/6K1 w - - 0 1", "e5");
+    expect(labels(r.attackers)).toEqual(["Pd4", "Bc3 (x-ray)", "Qb2 (x-ray)"]);
+    expect(labels(r.defenders)).toEqual(["Pd6"]);
+    expect(captures(r)).toEqual(["1. Pd4xn", "2. Pd6xp", "3. Bc3xp"]);
+    expect(r.fullResult).toBe(3);
+    expect(r.result).toBe(3);
+  });
+
+  it("a queen in front of a rook must capture first, even though it is dearer", () => {
+    // Qxd5 Rxd5 Rxd5: +3 -9 +5.
+    const r = exchangeOnSquare("3r2k1/8/8/3n4/8/8/3Q4/3R2K1 w - - 0 1", "d5");
+    expect(labels(r.attackers)).toEqual(["Qd2", "Rd1 (x-ray)"]);
+    expect(labels(r.defenders)).toEqual(["Rd8"]);
+    expect(captures(r)).toEqual(["1. Qd2xn", "2. Rd8xq", "3. Rd1xr"]);
+    expect(r.fullResult).toBe(-1);
+    expect(r.result).toBe(0);
+    expect(r.bestLength).toBe(0);
+  });
+
+  it("a king on the square is never captured", () => {
+    const r = exchangeOnSquare("8/8/8/4k3/8/5N2/8/6K1 w - - 0 1", "e5");
+    expect(r.occupant).toEqual({ piece: "k", color: "b" });
+    expect(labels(r.attackers)).toEqual(["Nf3"]);
+    expect(r.sequence).toEqual([]);
+    expect(r.result).toBe(0);
+  });
+
+  it("a promotion, then a recapture by an x-ray piece", () => {
+    // exd8=Q (+13) Bxd8 (-9) Rxd8 (+3) Qxd8 (-5): Black's Qb6 stands behind Bc7.
+    const r = exchangeOnSquare("3r3k/2b1P3/1q6/8/8/8/8/3R3K w - - 0 1", "d8");
+    expect(labels(r.attackers)).toEqual(["Pe7", "Rd1"]);
+    expect(labels(r.defenders)).toEqual(["Bc7", "Qb6 (x-ray)"]);
+    expect(r.sequence.map((c) => [c.captured, c.promotion])).toEqual([
+      ["r", true],
+      ["q", false],
+      ["b", false],
+      ["r", false],
+    ]);
+    expect(r.sequence[3]!.by).toEqual({ square: "b6", piece: "q", color: "b", value: 9, xray: true });
+    expect(r.fullResult).toBe(2);
+    // White stops after exd8=Q Bxd8: Rxd8 Qxd8 would give a rook for a bishop.
+    expect(r.result).toBe(4);
+    expect(r.bestLength).toBe(2);
   });
 
   describe("the king captures only when the square is safe", () => {
@@ -107,6 +176,26 @@ describe("exchangeOnSquare", () => {
       expect(labels(r.attackers)).toEqual(["Ke4"]);
       expect(r.sequence).toEqual([]);
       expect(r.result).toBe(0);
+    });
+
+    it("stops when an earlier capture reveals a rook that would then see the square", () => {
+      // Not in check at the start. Rxd5 Rxd5, and now Kxd5 is impossible: Rd8 sees d5.
+      const r = exchangeOnSquare("3r2k1/3r4/2K5/3p4/8/8/8/3R4 w - - 0 1", "d5");
+      expect(labels(r.attackers)).toEqual(["Rd1", "Kc6"]);
+      expect(labels(r.defenders)).toEqual(["Rd7", "Rd8 (x-ray)"]);
+      expect(captures(r)).toEqual(["1. Rd1xp", "2. Rd7xr"]);
+      expect(r.fullResult).toBe(-4);
+      expect(r.result).toBe(0);
+      expect(r.bestLength).toBe(0);
+    });
+
+    it("a defending king recaptures when nothing else attacks the square", () => {
+      const r = exchangeOnSquare("8/8/5k2/4p3/8/5N2/8/6K1 w - - 0 1", "e5");
+      expect(labels(r.defenders)).toEqual(["Kf6"]);
+      expect(captures(r)).toEqual(["1. Nf3xp", "2. Kf6xn"]);
+      expect(r.fullResult).toBe(-2);
+      expect(r.result).toBe(0);
+      expect(r.bestLength).toBe(0);
     });
 
     it("comes last, once the defenders are gone", () => {
