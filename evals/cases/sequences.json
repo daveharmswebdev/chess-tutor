@@ -1455,5 +1455,66 @@
       "h3"
     ],
     "source": "KID vs London: castle"
+  },
+  {
+    "id": "hint-ex-london-e5-wins",
+    "kind": "hint",
+    "playerColor": "w",
+    "san": [
+      "d4",
+      "d5",
+      "Bf4",
+      "Nc6",
+      "e3",
+      "e5"
+    ],
+    "source": "London: ...e5 leaves the e5 pawn attacked twice (d4, Bf4) and defended once (Nc6): dxe5 wins a pawn (#44 exchange case)"
+  },
+  {
+    "id": "hint-ex-kid-e4-loses",
+    "kind": "hint",
+    "playerColor": "b",
+    "san": [
+      "d4",
+      "Nf6",
+      "c4",
+      "g6",
+      "Nc3",
+      "Bg7",
+      "e4",
+      "d6",
+      "Nf3",
+      "O-O",
+      "Be2",
+      "e5",
+      "O-O",
+      "Nc6",
+      "d5"
+    ],
+    "source": "KID Classical: after d5 the tempting ...Nxe4 loses a piece for a pawn to Nxe4 (#44 exchange case)"
+  },
+  {
+    "id": "hint-ex-london-h7-xray",
+    "kind": "hint",
+    "playerColor": "w",
+    "san": [
+      "d4",
+      "d5",
+      "Bf4",
+      "Nf6",
+      "e3",
+      "e6",
+      "Nf3",
+      "Bd6",
+      "Bd3",
+      "O-O",
+      "Nbd2",
+      "c5",
+      "c3",
+      "Nc6",
+      "Qc2",
+      "Qc7"
+    ],
+    "source": "London: Bd3 and Qc2 (x-ray) hit h7, but Nf6 and the king defend it, so Bxh7+ loses the bishop (#44 exchange case)"
   }
 ]

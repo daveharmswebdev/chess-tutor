@@ -48,7 +48,7 @@ chess-tutor/
 │   ├── chess-core/          shared types, KeyMomentDetector, Repertoire (pure, no I/O)
 │   ├── explorer/            Lichess explorer client + cache
 │   └── tutor/               TutorAgent, tools, schemas (zod), prompt loader, ledger
-├── prompts/                 tutor-system.v3.md, chat-system.v1.md (+ CHANGELOG.md)
+├── prompts/                 tutor-system.v4.md, chat-system.v1.md (+ CHANGELOG.md)
 ├── repertoire/              london.pgn, kid.pgn                     (Q-4)
 ├── config/                  models.json (model ID pinned per env), tutor.json (thresholds)
 ├── evals/                   cases/*.json, graders/, run.ts
@@ -162,7 +162,7 @@ const TutorReply = z.object({
 
 That makes FR-8 cheap and instant.
 
-**Tools (FR-16 to FR-19)** wrap `AnalysisEngine`, `ExplorerClient`, and `Repertoire`. Tool results are compact JSON, with moves given in both SAN and UCI notation. Explorer data is third-party content, so it reaches the model only inside `tool_result`.
+**Tools (FR-16 to FR-19, FR-21)** wrap `AnalysisEngine`, `ExplorerClient`, `Repertoire`, and chess-core's static `exchangeOnSquare` (`exchange_on_square`: attackers, defenders and the exchange on one square, no engine search). Tool results are compact JSON, with moves given in both SAN and UCI notation. Explorer data is third-party content, so it reaches the model only inside `tool_result`.
 
 ### 3.6 Streaming and the UI, covering NFR-1 and IR-5
 

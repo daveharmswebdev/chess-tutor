@@ -1,0 +1,29 @@
+{
+  "id": "hint-ex-london-h7-xray",
+  "kind": "hint",
+  "playerColor": "w",
+  "history": [
+    "d2d4",
+    "d7d5",
+    "c1f4",
+    "g8f6",
+    "e2e3",
+    "e7e6",
+    "g1f3",
+    "f8d6",
+    "f1d3",
+    "e8g8",
+    "b1d2",
+    "c7c5",
+    "c2c3",
+    "b8c6",
+    "d1c2",
+    "d8c7"
+  ],
+  "fen": "r1b2rk1/ppq2ppp/2nbpn2/2pp4/3P1B2/2PBPN2/PPQN1PPP/R3K2R w KQ - 3 9",
+  "moment": null,
+  "attemptFen": "r1b2rk1/ppq2ppp/2nbpn2/2pp4/3P1B2/2PBPN2/PPQN1PPP/R3K2R w KQ - 3 9",
+  "engineBest": "f4d6",
+  "engineBestCp": 19,
+  "source": "London: Bd3 and Qc2 (x-ray) hit h7, but Nf6 and the king defend it, so Bxh7+ loses the bishop (#44 exchange case)"
+}

@@ -1,5 +1,5 @@
-import type { Color, KeyMoment } from "@chess-tutor/chess-core";
-import { moverOf, nowFramed, TutorReply } from "@chess-tutor/tutor";
+import type { Color, ExchangeResult, KeyMoment } from "@chess-tutor/chess-core";
+import { exchangeBacks, findExchangeClaims, moverOf, nowFramed, TutorReply } from "@chess-tutor/tutor";
 import { board, findMentions, flipTurn, historyFens, isSquare, playUci, resolve, uciOf, type Mention } from "./notation.ts";
 
 /**
@@ -991,6 +991,54 @@ function sideOf(text: string, at: number, len: number, player: Color, sign: stri
   return { side, direction };
 }
 
+export interface ExchangeClaimGrade {
+  field: "message" | "reveal";
+  raw: string;
+  square: string;
+  /** unbacked: no exchange_on_square result of this ask for the square; mismatch: none agrees. */
+  problem: "unbacked" | "mismatch" | null;
+}
+export interface ExchangesGrade {
+  pass: boolean;
+  claims: ExchangeClaimGrade[];
+}
+
+/** This ask's exchange_on_square results (errored or unreadable calls back nothing). */
+function exchangeResults(toolResults: ToolResultRecord[]): ExchangeResult[] {
+  const out: ExchangeResult[] = [];
+  for (const t of toolResults) {
+    if (t.isError || t.name !== "exchange_on_square") continue;
+    try {
+      const r = JSON.parse(t.content) as ExchangeResult;
+      if (typeof r?.square === "string" && Array.isArray(r.attackers) && Array.isArray(r.defenders) && typeof r.result === "number") out.push(r);
+    } catch {
+      // not JSON: nothing to read
+    }
+  }
+  return out;
+}
+
+/**
+ * NFR-6, exchange claims (#44, FR-21, FR-10): a count of attackers or defenders on a square, or an
+ * exchange outcome there, must match an exchange_on_square result of this ask for that square.
+ * Claims are read with the tutor's own recogniser (findExchangeClaims) and matched with its
+ * exchangeBacks, so the claims check and this grader agree.
+ */
+export function gradeExchanges(input: Pick<GradeInput, "reply" | "toolResults" | "playerColor">): ExchangesGrade {
+  const results = exchangeResults(input.toolResults);
+  const claims: ExchangeClaimGrade[] = [];
+  for (const field of ["message", "reveal"] as const) {
+    const text = input.reply[field];
+    if (!text) continue;
+    for (const c of findExchangeClaims(text, input.playerColor)) {
+      const on = results.filter((r) => r.square === c.square);
+      const problem = on.length === 0 ? "unbacked" : on.some((r) => exchangeBacks(c, r)) ? null : "mismatch";
+      claims.push({ field, raw: c.raw, square: c.square, problem });
+    }
+  }
+  return { pass: claims.every((c) => c.problem === null), claims };
+}
+
 export interface RevealGrade {
   pass: boolean;
   /** revealMove is legal where the attempt is graded. */
@@ -1026,12 +1074,14 @@ export interface ReplyGrades {
   schema: SchemaGrade;
   moves: MovesGrade;
   evals: EvalsGrade;
+  /** Exchange counts and outcomes (#44); part of nfr6Evals. */
+  exchanges: ExchangesGrade;
   giveAway: GiveAwayGrade;
   arrows: ArrowsGrade;
   reveal: RevealGrade;
   /** NFR-6: every move named is legal and revealMove (when given) is legal at the attempt position. */
   nfr6Moves: boolean;
-  /** NFR-6: every quoted evaluation is backed. */
+  /** NFR-6: every quoted evaluation is backed, and every exchange count or outcome (#44). */
   nfr6Evals: boolean;
   /** NFR-7: nothing gives the answer away before the reveal. */
   nfr7: boolean;
@@ -1045,6 +1095,7 @@ export function gradeReply(input: GradeInput): ReplyGrades {
   if (parsed.success && parsed.data.kind !== input.kind) schemaProblems.push(`kind ${parsed.data.kind}, expected ${input.kind}`);
   const moves = gradeMoves(input);
   const evals = gradeEvals(input);
+  const exchanges = gradeExchanges(input);
   const giveAway = gradeGiveAway(input);
   const arrows = gradeArrows(input.reply);
   const reveal = gradeReveal(input);
@@ -1052,11 +1103,12 @@ export function gradeReply(input: GradeInput): ReplyGrades {
     schema: { pass: schemaProblems.length === 0, problems: schemaProblems },
     moves,
     evals,
+    exchanges,
     giveAway,
     arrows,
     reveal,
     nfr6Moves: moves.pass && (input.reply.revealMove === null || reveal.legal),
-    nfr6Evals: evals.pass,
+    nfr6Evals: evals.pass && exchanges.pass,
     nfr7: giveAway.pass,
     pointsAtAnswer: giveAway.nudges.length > 0,
   };
