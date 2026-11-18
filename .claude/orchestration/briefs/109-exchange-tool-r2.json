@@ -1,0 +1,37 @@
+{
+  "brief_id": "109-exchange-tool-r2",
+  "agent": "tutor-agent",
+  "issue": 44,
+  "base_sha": "979072c",
+  "scratch_dir": "/private/tmp/claude-501/-Users-daveharms-personal-workspace-chess-tutor/1b636cb0-e61e-40ed-9be9-7c722c16e67b/scratchpad/109-exchange-tool-r2",
+  "objective": "Round 2 of #44's tutor half on your existing branch (head 979072c: your 0ef4d51 rebased onto main 34a2c46 plus the coordinator's fixup 979072c, which points apps/server DEFAULT_PROMPT_PATH at v4 and updates docs/architecture.md; leave that commit alone). Fix review 108's blocking and major findings, and the listed minors, so that a true 'capturing on X loses a piece for a pawn' is accepted, a false 'breaks even' for a losing capture is rejected, and the natural capture/take phrasings are checked. Success: the rubric's tests pass and the gate is clean.",
+  "requirements": [
+    "FR-21",
+    "FR-10",
+    "FR-23",
+    "NFR-6",
+    "NFR-10"
+  ],
+  "contract": "Review 108 (reviewer, NO-SHIP) findings to fix:\nBLOCKING exchange-claims.ts:204: exchangeBacks compares outcomes only with result (best stopping; 0 when bestLength is 0, never negative). True 'loses' claims are rejected: on hint-ex-kid-e4-loses {attackers [Nf6], defenders [Nc3], fullResult -2, result 0, bestLength 0} 'The trade on e4 loses a piece for a pawn.' is rejected with 'a result of 0 for Black'; on hint-ex-london-h7-xray (fullResult -8, result 0) 'The exchange on h7 loses the bishop for a pawn.' and 'Trading on h7 costs you material.' are rejected; 'The exchange on e4 breaks even.' is accepted. The correction text steers the model to the false 'result of 0'.\nCOORDINATOR DECISION (the contract gap): an outcome claim ('wins/loses/costs/breaks even/comes out ahead' on a square) is about what happens IF the attacker starts capturing there. Compare it against startResult = gain[0] - best[1], i.e. the material for the attacking side when the attacker makes the first capture and from then on each side stops at its best moment (the same negamax as result, with the attacker forced to make capture 1). When bestLength > 0, startResult === result. When the sequence is empty, there is no outcome to back (reject outcome claims; 0 is not a capture). Compute startResult in packages/tutor from ExchangeResult.sequence and the piece values (pawn 1, knight 3, bishop 3, rook 5, queen 9; promotion gain 8 and a promoted piece worth 9), a pure helper with its own tests that checks result === max(0, startResult) as a self-consistency guard on the cases you test. The exchange_on_square tool result becomes the ExchangeResult plus one field, startResult (pawns, attacking side), documented in the tool description and prompt v4 ('startResult: what the first capture leads to, if the other side then recaptures well'). Do NOT change packages/chess-core (types.ts stays as is): the extended tool result is the tutor's own type. Update the CHANGELOG entry for v4 to describe this. Correction messages must state startResult in words (e.g. 'capturing first on e4 loses 2 pawns' worth for Black'), never 'a result of 0' for a losing capture.\nMAJOR exchange-claims.ts:78: EXCHANGE_WORD accepts only plural 'captures'/'recaptures'. Must also accept capture, captured, capturing, take, takes, taking, took (as a verb), recapture(s/d/ing), and a SAN capture onto the square (Nxe4, exd5, Bxe5+) as the exchange word for that square. Phrasings that must be recognised: 'Capturing on e4 loses a piece for a pawn.', 'Taking on e4 loses a knight for a pawn.', 'If you capture on e4, you lose a piece for a pawn.' (note the comma: the outcome may sit in the next clause of the same sentence after an 'if ...,' clause, so carry the square/exchange word across that comma), 'Nxe4 drops a piece on e4.', 'Bxe5 wins a piece on e5.', 'After the exchanges on e4 Black is a piece down.' (is/are/ends up/finishes N up/down/ahead/behind), 'e4 is attacked by one knight and defended by one knight.' (by one|a single <piece> = 1; 'by two pawns' etc: count the pieces named).\nMAJOR exchange-claims.test.ts:140 pins the defect ('The trade on e5 breaks even' after 1.e4 e5 2.Nf3 Nc6 accepted). Fix the test: that claim must now be rejected (startResult -2), and 'Taking on e5 loses a knight for a pawn' accepted.\nMINORS to fix: (a) 'once' as a conjunction ('attacks e5 once Black moves', 'defended once you play Nf3') must not count: treat once as a count only at clause end, before punctuation, or before and/but/only/more/now/here/so far. (b) A later clause in the same sentence that refers back with 'it'/'that square'/'the pawn' or has no square inherits the square of the previous clause when it starts with but/and/while/whereas or follows a comma ('e5 is attacked twice but defended only once' reads both; 'Nc6 defends e5 once, the bishop attacks it twice' reads both). Not fixed this round (leave them, mention in the return): matching by square across positions (evidence.ts:51), the empty-square side-to-move rule, caveat enforcement.\nKeep the recogniser's false-positive rate low. The reviewer scanned 1168 recorded texts (evals/results in the main checkout at /Users/daveharms/personal-workspace/chess-tutor/evals/results plus evals/test/fixtures) and found 19 with count claims and 0 false positives. Re-run that scan after your changes and report both numbers; new false positives from the broader exchange words (e.g. 'take your time', 'takes the initiative', 'capture the centre') must be zero: the exchange word only counts when a square or a SAN capture onto that square is in the same clause.\nGate at 979072c (run by the coordinator): pnpm test -> Test Files 66 passed, Tests 1522 passed; typecheck clean.",
+  "scope": [
+    "packages/tutor/**",
+    "prompts/**",
+    "evals/**"
+  ],
+  "negative": [
+    "Do not edit files outside scope, docs, config, .github, root files or the lockfile.",
+    "No new dependencies.",
+    "Do not change packages/chess-core; the extended tool result is a tutor type.",
+    "Do not edit apps/server or the coordinator's commit 979072c.",
+    "Do not reorder or change the four existing tool definitions. You may extend the fifth tool's description.",
+    "No live API calls."
+  ],
+  "rubric": [
+    "Tests first (red then green): the reviewer's probes as tests (kid e4 and h7: true loses claims accepted, 'breaks even' rejected; 1.e4 e5 2.Nf3 Nc6 e5: 'breaks even' rejected, 'Taking on e5 loses a knight for a pawn' accepted); startResult helper on at least 5 sequences, including a defender who should stop early, a promotion and an empty sequence; each of the 7 phrasings in the MAJOR finding recognised and checked correctly; the 'once' conjunction cases produce no claim; both clause-carry cases read both counts; at least 3 negative cases for the new exchange words ('take your time', 'takes over the centre', 'capture the initiative').",
+    "Report the scan over the recorded texts: texts, claims, false positives.",
+    "pnpm test and pnpm typecheck clean from the repo root.",
+    "files_changed lists every file changed in 979072c..your head. Commit message references the requirement IDs and #44 and review 108."
+  ],
+  "concurrency": "No other spoke is running. Don't rebase; the coordinator does that at ship.",
+  "round": 2
+}

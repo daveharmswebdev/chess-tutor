@@ -398,3 +398,26 @@
 {"ts":"2026-11-18T02:34:09.063Z","event":"return_valid","agent_id":"a5aed1c9b291be767","agent_type":"core-agent","via":"handback"}
 {"ts":"2026-11-18T02:35:01.683Z","event":"coordinator_verdict","brief_id":"104-exchange-on-square-r2","agent":"core-agent","verdict":"accepted","reason":"files match, 1418 passed at ae9d30b, coordinator probes (review FEN -6/0, a6 +1, Nf3xe5 -2, exd5 0) correct; no re-review","tokens":62958,"duration_ms":185364}
 {"ts":"2026-11-18T02:41:49.606Z","event":"shipped","issue":44,"pr":86,"partial":true}
+{"ts":"2026-11-18T03:15:06.790Z","event":"shipped","issue":41,"pr":79,"note":"maxToolRounds 4->5 by owner decision; 2 clean lb-kid eval runs"}
+{"ts":"2026-11-18T11:56:18.458Z","event":"dispatch","subagent_type":"tutor-agent","brief_id":"105-exchange-tool-r1","base_sha":"03f355b","spoke":true}
+{"ts":"2026-11-18T11:56:25.791Z","event":"dispatch","subagent_type":"core-agent","brief_id":"106-bot-strength-r1","base_sha":"03f355b","spoke":true}
+{"ts":"2026-11-18T11:56:26.026Z","event":"agent_complete","subagent_type":"tutor-agent","brief_id":"105-exchange-tool-r1","agent_id":"a3b14413e084adee0","status":"async_launched","contract":"pending"}
+{"ts":"2026-11-18T11:56:26.073Z","event":"agent_complete","subagent_type":"core-agent","brief_id":"106-bot-strength-r1","agent_id":"aa044019485232495","status":"async_launched","contract":"pending"}
+{"ts":"2026-11-18T12:05:21.288Z","event":"return_valid","agent_id":"aa044019485232495","agent_type":"core-agent","via":"handback"}
+{"ts":"2026-11-18T12:06:21.383Z","event":"coordinator_verdict","brief_id":"106-bot-strength-r1","agent":"core-agent","verdict":"accepted","reason":"6 files match, in scope, 1496 passed at e0ecf75, typecheck clean; analyze optional accepted (server stub)","tokens":93913,"duration_ms":535649}
+{"ts":"2026-11-18T12:06:42.277Z","event":"dispatch","subagent_type":"reviewer","brief_id":"107-review-bot-strength-r1","base_sha":"e0ecf75","spoke":true}
+{"ts":"2026-11-18T12:06:42.515Z","event":"agent_complete","subagent_type":"reviewer","brief_id":"107-review-bot-strength-r1","agent_id":"a300a307c7e9683af","status":"async_launched","contract":"pending"}
+{"ts":"2026-11-18T12:08:45.270Z","event":"return_valid","agent_id":"a300a307c7e9683af","agent_type":"reviewer","via":"handback"}
+{"ts":"2026-11-18T12:08:55.010Z","event":"coordinator_verdict","brief_id":"107-review-bot-strength-r1","agent":"reviewer","verdict":"review","reason":"SHIP, 4 minor"}
+{"ts":"2026-11-18T12:11:36.596Z","event":"return_valid","agent_id":"a3b14413e084adee0","agent_type":"tutor-agent","via":"handback"}
+{"ts":"2026-11-18T12:12:50.643Z","event":"shipped","issue":84,"pr":88,"partial":true}
+{"ts":"2026-11-18T12:14:11.400Z","event":"coordinator_verdict","brief_id":"105-exchange-tool-r1","agent":"tutor-agent","verdict":"accepted","reason":"23 files match, rebased 0ef4d51 on 34a2c46 + coordinator fixup 979072c (server v4, architecture), 1522 passed, typecheck clean","tokens":198281,"duration_ms":910953}
+{"ts":"2026-11-18T12:14:17.120Z","event":"dispatch","subagent_type":"reviewer","brief_id":"108-review-exchange-tool-r1","base_sha":"979072c","spoke":true}
+{"ts":"2026-11-18T12:14:17.489Z","event":"agent_complete","subagent_type":"reviewer","brief_id":"108-review-exchange-tool-r1","agent_id":"a7ba4d42abce2b603","status":"async_launched","contract":"pending"}
+{"ts":"2026-11-18T12:19:16.745Z","event":"return_valid","agent_id":"a7ba4d42abce2b603","agent_type":"reviewer","via":"handback"}
+{"ts":"2026-11-18T12:20:05.689Z","event":"coordinator_verdict","brief_id":"108-review-exchange-tool-r1","agent":"reviewer","verdict":"review","reason":"NO-SHIP: 1 blocking (loses claims vs result), 2 major, 5 minor"}
+{"ts":"2026-11-18T12:31:55.201Z","event":"return_invalid","agent_id":"a3b14413e084adee0","agent_type":"tutor-agent","attempt":1,"errors":["/tests_run: a 'gate' check failed, so this is not a success"]}
+{"ts":"2026-11-18T12:32:22.408Z","event":"return_valid","agent_id":"a3b14413e084adee0","agent_type":"tutor-agent","via":"handback"}
+{"ts":"2026-11-18T12:32:44.036Z","event":"coordinator_verdict","brief_id":"109-exchange-tool-r2","agent":"tutor-agent","verdict":"re-delegated","reason":"files match, 1540 passed per spoke; brief defect: SAN capture as exchange word flags engine-backed tactics (102 of 138 recorded claims); round 3 narrows it"}
+{"ts":"2026-11-18T12:35:26.909Z","event":"return_valid","agent_id":"a3b14413e084adee0","agent_type":"tutor-agent","via":"handback"}
+{"ts":"2026-11-18T12:36:25.070Z","event":"coordinator_verdict","brief_id":"110-exchange-tool-r3","agent":"tutor-agent","verdict":"accepted","reason":"5 files match, 1542 passed at 661c52c, coordinator probes (reviewer 108 cases) correct; no re-review","tokens":312013,"duration_ms":910978}

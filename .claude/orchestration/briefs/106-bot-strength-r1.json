@@ -1,0 +1,39 @@
+{
+  "brief_id": "106-bot-strength-r1",
+  "agent": "core-agent",
+  "issue": 84,
+  "base_sha": "03f355b",
+  "scratch_dir": "/private/tmp/claude-501/-Users-daveharms-personal-workspace-chess-tutor/1b636cb0-e61e-40ed-9be9-7c722c16e67b/scratchpad/106-bot-strength-r1",
+  "objective": "Make chess-core's sparring bot play at a per-game strength from 500 to 2500 (#84, FR-1/FR-2/FR-3 as amended by A11): `chooseMove(fen, opts?: { strength?: number })` picks the explorer rating buckets from the strength, plays UCI_Elo = strength out of book from 1320 up, and below 1320 applies the code-controlled weakening from config `bot.weakening` (MultiPV sampling by centipawn loss with a temperature, plus a blunder rate). Every move still comes from the explorer or the engine and is checked legal (FR-10). Success: the rubric's tests pass with a fake engine and injected random, and the gate is clean.",
+  "requirements": [
+    "FR-1",
+    "FR-2",
+    "FR-3",
+    "FR-10",
+    "NFR-3"
+  ],
+  "contract": "Owner-approved design (#84, config committed at 03f355b, config/tutor.json):\n\"bot\": { \"explorerRatings\": [1200, 1400], \"explorerSpeeds\": [\"blitz\",\"rapid\"], \"minGames\": 20, \"outOfBookElo\": 1400,\n  \"weakening\": { \"multiPv\": 5, \"depth\": 10, \"blunderMinLossCp\": 200,\n    \"anchors\": [ { \"strength\": 500, \"temperatureCp\": 250, \"blunderRate\": 0.25 }, { \"strength\": 900, \"temperatureCp\": 150, \"blunderRate\": 0.10 }, { \"strength\": 1300, \"temperatureCp\": 60, \"blunderRate\": 0.02 } ] } }\n- BOT_STRENGTH in packages/chess-core/src/api.ts (inlined below): min 500, max 2500, step 100, default 1400, uciEloMin 1320. A strength that is not an integer multiple of 100 within [500, 2500] throws an Error. Omitted strength = 1400.\n- Opening (FR-2): Lichess explorer `ratings` buckets are exactly 0, 1000, 1200, 1400, 1600, 1800, 2000, 2200, 2500 (confirmed from the Lichess OpenAPI spec, brief 101); each is a lower bound up to the next. Ratings for strength S = the bucket containing S plus the one below it (if any). 1400 -> [1200, 1400] (same as today); 500 -> [0]; 1000 -> [0, 1000]; 1300 -> [1000, 1200]; 2500 -> [2200, 2500]. Export this mapping as a pure function (e.g. `explorerRatingsFor(strength)`) so the server can reuse it.\n- Out of book, S >= 1320: engine.bestMove(fen, { elo: S }) as today.\n- Out of book, S < 1320: engine.analyze(fen, { multiPv: weakening.multiPv, depth: weakening.depth }) on full strength. Interpolate temperatureCp and blunderRate linearly between the anchors (clamp outside them). Compute each line's loss in cp vs line 1 from the mover's point of view (scores are White's POV; use chess-core's scoreToCp for mates). With probability blunderRate, play a line whose loss >= blunderMinLossCp if one exists among the lines (uniform among them); otherwise (or if none) sample lines with weight exp(-loss / temperatureCp). The move is the line's first move, checked legal via playUci; an illegal or empty line is dropped; if nothing remains fall back to analysis.bestMove, and if that is illegal, throw as today.\n- Add to BotMove an optional `weakening` field when this path is used (e.g. { lossCp, blunder: boolean, candidates: number }) so logs and the PR check can see it. Keep source \"engine\".\n- BotEngine gains `analyze(fen, opts?: { multiPv?: number; depth?: number }): Promise<{ bestMove: string; lines: { moves: string[]; score: Score }[] }>` (a structural subset of @chess-tutor/engine's Engine.analyze; see packages/engine/src/types.ts: Score is {kind:\"cp\"|\"mate\", value}, White's POV; lines best first). The real StockfishEngine already satisfies it; no engine change.\n- BotConfig: add `weakening?: BotWeakeningConfig` (OPTIONAL, because apps/server/test/startup.test.ts:85 builds a BotConfig literal without it and the server is not yours). Validate it when present (anchors sorted by strength, at least one, temperatureCp > 0, blunderRate in [0,1], multiPv >= 1). A strength below 1320 with no weakening config throws a clear Error at chooseMove. Keep `explorerRatings` and `outOfBookElo` in BotConfig unchanged and still validated (the server uses explorerRatings for the tutor's explorer, apps/server/src/config.ts:133); the bot itself no longer reads them for play once strength drives it. The server round (next) wires per-game strength; the coordinator removes the old keys later.\n- apps/server/src/games.ts:1198 calls bot.chooseMove(fen) with one argument; that must keep working (= 1400, identical behaviour to today: ratings [1200,1400], elo 1400).\n- packages/chess-core/scripts/demo-bot.ts uses the bot; keep it compiling, and optionally let it take a strength argument.\n- Rough check (#84 Done when, recorded later in the PR): if cheap, add a script under packages/chess-core/scripts/ that plays N games between the bot at strength X and Stockfish UCI_Elo 1320 using the real engine; do NOT run long matches in tests. Optional; say whether you did it.\nGate at base 03f355b (run by the coordinator): pnpm test -> Test Files 64 passed, Tests 1442 passed (1442); pnpm typecheck clean.",
+  "contract_files": [
+    "packages/chess-core/src/api.ts",
+    "packages/engine/src/types.ts"
+  ],
+  "scope": [
+    "packages/chess-core/**",
+    "repertoire/**"
+  ],
+  "negative": [
+    "Do not edit files outside scope, docs, config, .github, root files or the lockfile.",
+    "No new dependencies.",
+    "Do not change packages/chess-core/src/api.ts or types.ts (the contract); report gaps in contract_gaps.",
+    "Do not touch apps/server, apps/web or packages/engine (server and web rounds come next, other spokes).",
+    "Never let a move come from anywhere but the explorer list or the engine's lines, and always check legality (FR-10).",
+    "No real engine in unit tests: use a fake BotEngine and injected random."
+  ],
+  "rubric": [
+    "Tests first (red then green) in packages/chess-core/test/bot.test.ts: explorer ratings mapping for 500, 1000, 1300, 1400, 2500; invalid strengths (450, 1450, 2600, 1400.5) throw; chooseMove(fen) with no strength behaves exactly as before (ratings [1200,1400], bestMove elo 1400); S=1800 out of book calls bestMove with elo 1800 and never analyze; S=800 out of book calls analyze with multiPv 5 depth 10 and never bestMove; interpolation at 500, 700, 900, 1100, 1300 and clamping; with random forcing the blunder branch a line losing >= 200 cp is played, and with none available it falls back to temperature sampling; temperature sampling picks the expected line for chosen random values; mate scores handled; illegal lines dropped; below 1320 with no weakening config throws.",
+    "pnpm test and pnpm typecheck clean from the repo root (the server must still compile and pass unchanged).",
+    "files_changed lists every file changed in 03f355b..your head. Commit message references the requirement IDs and #84."
+  ],
+  "concurrency": "#44 runs at the same time in another worktree (tutor-agent: packages/tutor/**, prompts/**, evals/**). No file overlap with you. Don't rebase; the coordinator does that at ship.",
+  "round": 1
+}

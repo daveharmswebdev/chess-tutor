@@ -1,0 +1,34 @@
+{
+  "brief_id": "110-exchange-tool-r3",
+  "agent": "tutor-agent",
+  "issue": 44,
+  "base_sha": "1a95b96",
+  "scratch_dir": "/private/tmp/claude-501/-Users-daveharms-personal-workspace-chess-tutor/1b636cb0-e61e-40ed-9be9-7c722c16e67b/scratchpad/110-exchange-tool-r3",
+  "objective": "Round 3 (last) of #44's tutor half on your branch (head 1a95b96). Fix the brief defect you reported: a SAN capture alone must not make an outcome sentence an exchange claim. Success: engine-backed tactic sentences such as 'Bxd6 wins the queen.' and 'after Nd7, Qxb4 wins the knight' produce no exchange claim, while the brief-109 phrasings stay recognised, and the gate is clean.",
+  "requirements": [
+    "FR-21",
+    "FR-10",
+    "NFR-6"
+  ],
+  "contract": "Coordinator decision (brief 109 was wrong to make every SAN capture an exchange word): a SAN capture onto a square counts as the exchange word ONLY when the same clause also names that square explicitly with on/at/onto <square> ('Nxe4 drops a piece on e4.', 'Bxe5 wins a piece on e5.' stay claims). A SAN capture with no explicit 'on <square>' ('Bxd6 wins the queen.', 'Qxb4 wins the knight', 'Nxa8 wins the rook') is NOT an exchange claim: it is a move mention, checked as today by the FR-10 move evidence and the engine. The real exchange words (exchang*, trad*, swap*, (re)captur*, take/takes/taking/took, come out) and STANDING keep working as in round 2. Update prompt v4 and its CHANGELOG line to say this (a gain from a tactic is quoted from the engine line; an exchange outcome on a square comes from exchange_on_square).\nYour round-2 scan: texts 819, claims 138, of which outcome-san-only 102. After this change re-run it and report texts, claims by kind, and wrong readings (expected: outcome-san-only near 0; any remaining must have an explicit 'on <square>').\nGate at 1a95b96 (spoke-reported): Test Files 68 passed, Tests 1540 passed; typecheck clean.",
+  "scope": [
+    "packages/tutor/**",
+    "prompts/**",
+    "evals/**"
+  ],
+  "negative": [
+    "Do not edit files outside scope, docs, config, .github, root files or the lockfile.",
+    "No new dependencies.",
+    "Do not change packages/chess-core, apps/server or commit 979072c.",
+    "Do not change the four existing tool definitions.",
+    "No live API calls."
+  ],
+  "rubric": [
+    "Tests first (red then green): 'Bxd6 wins the queen.', 'Black has to deal with the check, for example with Nd7, and then Qxb4 wins the knight.' and 'after Kd7, Nxa8 wins the rook' give no exchange claim; 'Nxe4 drops a piece on e4.' and 'Bxe5 wins a piece on e5.' are still claims and checked against startResult; all other brief-109 tests still pass.",
+    "Report the re-run scan numbers.",
+    "pnpm test and pnpm typecheck clean from the repo root.",
+    "files_changed lists every file changed in 1a95b96..your head. Commit message references #44 and review 108."
+  ],
+  "concurrency": "No other spoke is running. Don't rebase.",
+  "round": 3
+}

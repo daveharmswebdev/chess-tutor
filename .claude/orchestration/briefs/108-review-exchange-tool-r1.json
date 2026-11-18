@@ -1,0 +1,27 @@
+{
+  "brief_id": "108-review-exchange-tool-r1",
+  "agent": "reviewer",
+  "issue": 44,
+  "base_sha": "979072c",
+  "scratch_dir": "/private/tmp/claude-501/-Users-daveharms-personal-workspace-chess-tutor/1b636cb0-e61e-40ed-9be9-7c722c16e67b/scratchpad/108-review-exchange-tool-r1",
+  "objective": "Review #44 tutor round: `git diff 34a2c46..979072c` (tutor-agent commit 0ef4d51: packages/tutor tools.ts, evidence.ts, claims.ts, new exchange-claims.ts, index.ts and tests; prompts/tutor-system.v4.md and CHANGELOG; evals config, graders, regrade, report, 3 new hint-ex-* cases; plus coordinator fixup 979072c: apps/server/src/main.ts DEFAULT_PROMPT_PATH v4, docs/architecture.md). Judge against FR-21, FR-10, FR-23, NFR-6, NFR-10 in docs/requirements.md. Focus: (1) tool definition appended fifth, strict, unchanged four before it (IR-6 cache prefix); runTool returns exchangeOnSquare's result, errors become is_error; (2) Evidence: exchange results keyed per position+square; the capture sequence deliberately NOT registered as move evidence: confirm no path lets an exchange result back a move mention or revealMove; (3) exchange-claims.ts recogniser: false negatives (count/outcome claims that slip through, e.g. 'attacked by two pieces', 'two defenders', 'wins a piece on e5', different word orders) and false positives on ordinary tutor prose (run findExchangeClaims over the recorded replies in evals/results and evals/test/fixtures in a scratch script and inspect what it flags), point-of-view resolution for outcomes (attacking side vs 'you' vs named colour), rounding of result to whole pawns, x-rays counted; (4) the NFR-6 grader and the claims check use the same functions so they agree; (5) prompt v4 vs v3 diff: correct tool guidance, FR-23 caveat wording, no give-away regressions (FR-8); (6) the 3 new eval cases are meaningful (capture wins, loses, x-ray) and their FENs/expected values correct; (7) whether stricter checks will make the live eval fail more often (unbacked_exchange retries): estimate from the recorded replies.",
+  "requirements": [
+    "FR-21",
+    "FR-10",
+    "FR-23",
+    "NFR-6",
+    "NFR-10"
+  ],
+  "contract": "Contract: ExchangeResult in packages/chess-core/src/types.ts (normative doc comment). Spoke's recogniser design (from its return): clause needs a bare square (not inside SAN), clauses break at . ! ? ; , : and so/but/because/since/while/whereas/although/though/now that; passive counts 'attacked/defended/protected/guarded once|twice|thrice|N times|by N [pieces]' (not 'by two pawns'), nearest square before else first after; active 'attacks/hits/defends/protects/guards <sq> N times'; nouns 'N|no|a single attackers/defenders' unless followed by except/but/other than/apart from/besides. Outcomes need an exchange word (exchange, trade, swap, captures, recaptures, come out) with wins/gains/nets/picks up X, loses/drops/costs/gives up X, comes out [X] ahead/up/behind/down, breaks even/even trade; X material(sign only)/pawn(s)/piece/minor=3/rook 5/queen 9/the exchange 2, optional 'for Y' subtracted; compared to Math.round(result); POV = object side ('costs you'), else 'for White', else last side named before the verb, else attackingSide; 'you' = player. Spoke scanned evals/results: 795 texts, 14 with claims (counts the tutor stated without the tool). Not caught by design: 'hanging', 'undefended', 'only X defends it', 'more attackers than defenders'; caveat wording not enforced by the check.\nCoordinator re-ran the gate at 979072c: Test Files 66 passed, Tests 1522 passed; typecheck clean. The coordinator runs the live eval on the PR.",
+  "scope": [],
+  "negative": [
+    "Read-only: do not edit, commit, or run anything that writes to the repo.",
+    "Do not run anything that calls the Claude API or the network."
+  ],
+  "rubric": [
+    "Each finding cites file:line and evidence; reproduce blocking/major with a scratch script outside the repo (in your scratch dir).",
+    "Severities: blocking / major / minor. Summary ends SHIP or NO-SHIP."
+  ],
+  "concurrency": "No other spoke is running. Read the reviewed code with git diff / git show 979072c:<path>.",
+  "round": 1
+}

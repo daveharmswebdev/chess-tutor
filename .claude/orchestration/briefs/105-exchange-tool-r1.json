@@ -1,0 +1,41 @@
+{
+  "brief_id": "105-exchange-tool-r1",
+  "agent": "tutor-agent",
+  "issue": 44,
+  "base_sha": "03f355b",
+  "scratch_dir": "/private/tmp/claude-501/-Users-daveharms-personal-workspace-chess-tutor/1b636cb0-e61e-40ed-9be9-7c722c16e67b/scratchpad/105-exchange-tool-r1",
+  "objective": "Give the tutor a fifth tool, `exchange_on_square(fen, square)`, backed by chess-core's existing `exchangeOnSquare` (already exported from @chess-tutor/chess-core with `EXCHANGE_CAVEAT`), and extend the FR-10 claims check so the tutor can state attacker/defender counts and exchange outcomes only when this turn's exchange_on_square result for that square backs them. Ship it as prompt version tutor-system.v4.md with a prompts/CHANGELOG.md entry and new eval cases. Success: the rubric's tests pass, the gate is clean, and the evals default to v4.",
+  "requirements": [
+    "FR-21",
+    "FR-10",
+    "FR-23",
+    "NFR-6",
+    "NFR-10"
+  ],
+  "contract": "Issue #44 Done when (tutor part; the chess-core function shipped in PR #86):\n- The tutor can call it as `exchange_on_square(fen, square)`, and the claims check rejects an attacker or defender count, or exchange outcome, that didn't come from it in that turn (FR-21, FR-10).\n- Prompt and tool-schema changes are versioned with a `prompts/CHANGELOG.md` entry, and the live eval passes on the PR (NFR-10). The coordinator runs the live eval; you run the offline eval tests.\n- Tests pass in CI.\nFrom the issue: static exchange evaluation is a first filter: it ignores pins, checks and threats elsewhere. The result's `caveat` field says so; the prompt must tell the tutor never to present a count as the full answer (FR-23's teaching point), and to confirm with the engine before calling a capture good or bad.\n\nFacts at base 03f355b:\n- chess-core exports `exchangeOnSquare(fen: string, square: string): ExchangeResult` (pure, synchronous, no engine; throws Error on an invalid FEN or square) and `EXCHANGE_CAVEAT`. The ExchangeResult contract with its normative doc comment is inlined below (packages/chess-core/src/types.ts). Results are in pawns for attackingSide.\n- packages/tutor/src/tools.ts: TOOL_DEFINITIONS has four strict tools in fixed order (analyze_position, evaluate_move, opening_explorer, get_repertoire_context). Append the new one LAST (cache prefix, IR-6), strict: true, additionalProperties false, required [fen, square]. Add its toolLabel (e.g. \"Counting attackers and defenders…\") and its runTool case; a thrown Error becomes is_error as for the other tools. Results are compact JSON.\n- claims.ts checkClaims(reply, evidence, revealFen, playerColor) and evidence.ts Evidence hold the FR-10 check; record exchange results in Evidence keyed by positionKey(fen) + square. Moves named inside the exchange result (the capture sequence) may be registered as move evidence only if you can do it without weakening the existing give-away rules; otherwise leave them out and say so.\n- What the claims check must catch (design the exact recogniser; state it in the return): a count of attackers/defenders on a square (\"e5 is attacked twice and defended once\", \"two attackers and one defender on d4\", \"d5 is defended three times\") and an exchange outcome on a square (\"the exchange on e5 wins a pawn\", \"trading on d5 loses material\", \"you come out a knight up on f6\"). Reject when no exchange_on_square result for that square exists this turn, or when the count/outcome disagrees with it (counts = attackers.length / defenders.length, x-rays included; outcome = sign and size of `result`, rounded to whole pawns, from the right side's point of view). Keep false positives low: ordinary sentences without a square, or \"attacks the queen\", must not trip it. Recommended: require a square within the same clause.\n- Prompt: copy prompts/tutor-system.v3.md to prompts/tutor-system.v4.md and add the tool to the tool guidance (when to call it: before saying a piece is hanging, counting attackers and defenders, or judging a trade); count and outcome only from it; always add that the count ignores pins, checks and threats elsewhere. v3 stays on disk.\n- Evals: evals/src/config.ts DEFAULT_PROMPT -> v4. Add at least 3 cases in evals/cases/ (positions with a capture available: one where the capture wins material, one where it loses, one with an x-ray), and update the NFR-6 grader in evals/src/graders.ts if it must know the new claim type. apps/server/src/main.ts DEFAULT_PROMPT_PATH also points at v3: that file is outside your scope; the coordinator updates it at ship. Do not touch it.\n- config/tutor.json tutor.maxToolRounds is 5 (owner decision on PR #79); don't change config.\nGate at base 03f355b (run by the coordinator): pnpm test -> Test Files 64 passed, Tests 1442 passed (1442); pnpm typecheck clean.",
+  "contract_files": [
+    "packages/chess-core/src/types.ts"
+  ],
+  "scope": [
+    "packages/tutor/**",
+    "prompts/**",
+    "evals/**"
+  ],
+  "negative": [
+    "Do not edit files outside scope, docs, config, .github, root files or the lockfile.",
+    "No new dependencies.",
+    "Do not change packages/chess-core (the exchange function and its types are the contract); report problems in contract_gaps.",
+    "Do not edit apps/server (the coordinator updates DEFAULT_PROMPT_PATH to v4 at ship).",
+    "Do not reorder or change the four existing tool definitions; append only.",
+    "Do not edit tutor-system.v1/v2/v3.md.",
+    "No live API calls (the coordinator runs the live eval)."
+  ],
+  "rubric": [
+    "Tests first (red then green) in packages/tutor/test: the tool definition is fifth and strict; runTool returns exchangeOnSquare's result for a FEN and square, and an invalid square yields an error; the claims check rejects a count with no exchange_on_square result this turn, rejects a count that disagrees with the result (e.g. 'attacked twice' when attackers.length is 1), rejects an outcome with the wrong sign, accepts a matching count and outcome, and does not flag sentences without a square or ordinary move talk (at least 3 negative cases).",
+    "prompts/tutor-system.v4.md exists, v3 unchanged, CHANGELOG entry describing the tool, the claims rule and the caveat wording; evals default to v4; at least 3 new eval cases load in evals/test/cases.test.ts.",
+    "pnpm test and pnpm typecheck clean from the repo root.",
+    "files_changed lists every file changed in 03f355b..your head. Commit message references the requirement IDs and #44."
+  ],
+  "concurrency": "#84 runs at the same time in another worktree (core-agent: packages/chess-core/src/bot.ts, packages/chess-core/test/bot.test.ts, packages/chess-core/src/index.ts, possibly packages/chess-core/scripts/demo-bot.ts). No file overlap with you. Don't rebase; the coordinator does that at ship.",
+  "round": 1
+}

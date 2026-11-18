@@ -1,0 +1,26 @@
+{
+  "brief_id": "107-review-bot-strength-r1",
+  "agent": "reviewer",
+  "issue": 84,
+  "base_sha": "e0ecf75",
+  "scratch_dir": "/private/tmp/claude-501/-Users-daveharms-personal-workspace-chess-tutor/1b636cb0-e61e-40ed-9be9-7c722c16e67b/scratchpad/107-review-bot-strength-r1",
+  "objective": "Review #84 chess-core round: `git diff 03f355b..e0ecf75` (core-agent: packages/chess-core/src/bot.ts, src/index.ts, test/bot.test.ts, scripts/demo-bot.ts, scripts/match-bot.ts, package.json) for correctness against FR-1, FR-2, FR-3 (as amended by A11 in docs/requirements.md) and FR-10. Focus: (1) strength validation (multiples of 100 in [500,2500], default 1400) and that chooseMove(fen) with no strength is identical to the old behaviour (ratings [1200,1400], bestMove elo 1400); (2) explorerRatingsFor: bucket containing S plus the one below, buckets 0,1000,1200,1400,1600,1800,2000,2200,2500; (3) the >=1320 path uses UCI_Elo = S and never analyze; (4) the <1320 path: linear interpolation with clamping, loss per line from the MOVER's point of view (White-POV scores; Black to move must flip), mate scores via scoreToCp, blunder branch only among lines losing >= blunderMinLossCp, temperature sampling weights exp(-loss/T), correct use of the injected random (no bias, cumulative sums, float edge), illegal/empty lines dropped, fallback to analysis.bestMove, throw on illegal; (5) every move comes from explorer or engine and is legality-checked (FR-10); (6) config validation of weakening; (7) whether the tests' expected numbers are actually right; (8) match-bot.ts: does it load secrets or call the network (it should not), and is it a fair rough check (alternating colours, game end detection). The server and web rounds are later and out of scope.",
+  "requirements": [
+    "FR-1",
+    "FR-2",
+    "FR-3",
+    "FR-10"
+  ],
+  "contract": "Owner-approved design (config/tutor.json bot.weakening at 03f355b): below 1320, full-strength Stockfish MultiPV 5 depth 10; with probability blunderRate play a line losing >= 200 cp (uniform among them) if any, else sample by exp(-loss/temperatureCp); anchors 500 (250 cp, 0.25), 900 (150, 0.10), 1300 (60, 0.02), linearly interpolated, clamped. From 1320 up: UCI_Elo = strength. Opening: explorer bucket containing S plus the one below. BOT_STRENGTH = {min 500, max 2500, step 100, default 1400, uciEloMin 1320} in packages/chess-core/src/api.ts.\nAccepted contract gaps from the spoke: BotEngine.analyze is optional (server test stub lacks it); below 1320 without analyze or without weakening config throws at chooseMove. Loss is measured vs the best remaining legal line when line 1 is illegal.\nCoordinator re-ran the gate at e0ecf75: Test Files 64 passed, Tests 1496 passed; typecheck clean.",
+  "scope": [],
+  "negative": [
+    "Read-only: do not edit, commit, or run anything that writes to the repo.",
+    "Do not run anything that calls the Claude API or the network."
+  ],
+  "rubric": [
+    "Each finding cites file:line and evidence; reproduce blocking/major with a scratch script outside the repo (in your scratch dir).",
+    "Severities: blocking / major / minor. Summary ends SHIP or NO-SHIP."
+  ],
+  "concurrency": "tutor-agent is building #44 in another worktree (packages/tutor, prompts, evals). Read the reviewed code with git diff / git show e0ecf75:<path>.",
+  "round": 1
+}
