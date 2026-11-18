@@ -1,7 +1,17 @@
 {
   "engine": { "flavor": "full", "threads": 4, "depth": 18, "movetimeCapMs": 1000, "multiPv": 3 },
   "keyMoments": { "blunderCp": 150, "missedWinCp": 150, "punishCp": 150, "stillWinningCp": 500 },
-  "bot": { "explorerRatings": [1200, 1400], "explorerSpeeds": ["blitz", "rapid"], "minGames": 20, "outOfBookElo": 1400 },
+  "bot": {
+    "explorerRatings": [1200, 1400], "explorerSpeeds": ["blitz", "rapid"], "minGames": 20, "outOfBookElo": 1400,
+    "weakening": {
+      "multiPv": 5, "depth": 10, "blunderMinLossCp": 200,
+      "anchors": [
+        { "strength": 500, "temperatureCp": 250, "blunderRate": 0.25 },
+        { "strength": 900, "temperatureCp": 150, "blunderRate": 0.10 },
+        { "strength": 1300, "temperatureCp": 60, "blunderRate": 0.02 }
+      ]
+    }
+  },
   "tutor": { "effort": "medium", "maxToolRounds": 5, "attemptToleranceCp": 50 },
   "budget": { "monthlySoftCapUsd": 25 }
 }
