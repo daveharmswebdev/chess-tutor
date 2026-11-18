@@ -37,8 +37,9 @@ describe("prompts/tutor-system.v4.md (release artifact)", () => {
     expect(tools).toMatch(/`startResult`: what the first capture leads to, if the other side then recaptures well/);
     expect(rule).toMatch(/must match `startResult`/);
     expect(rule).toMatch(/null when nobody can capture/);
-    expect(rule).toMatch(/A capture named with what it wins or loses .* is an exchange claim too/);
-    expect(rule).toMatch(/the count cannot back it/);
+    // Brief 110: an exchange outcome on a square comes from the tool; a tactic's gain from the engine line.
+    expect(rule).toMatch(/An exchange outcome on a square comes from `exchange_on_square`/);
+    expect(rule).toMatch(/A gain from a tactic or a later move .* is quoted from the engine line/);
   });
 
   it("backs the plan after the opponent leaves book, or words it without moves (#41, FR-10, FR-9)", () => {

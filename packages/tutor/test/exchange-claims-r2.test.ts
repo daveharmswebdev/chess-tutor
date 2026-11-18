@@ -74,8 +74,7 @@ describe("capture / take phrasings and SAN captures (review 108 major)", () => {
       ["e4", "attackers", 1],
       ["e4", "defenders", 1],
     ]);
-    // A SAN capture alone names the square; so do took / recaptures.
-    expect(claims("Nxe4 loses a piece for a pawn.")).toEqual([["e4", -1, 2]]);
+    // Brief 110: a SAN capture is the exchange word only with an explicit "on <square>"; recaptures is a word.
     expect(claims("If Black recaptures on e4 Black ends up a piece down.")).toEqual([["e4", -1, 3]]);
   });
 
@@ -113,6 +112,31 @@ describe("capture / take phrasings and SAN captures (review 108 major)", () => {
     ]) {
       expect(findExchangeClaims(text, "w"), text).toEqual([]);
     }
+  });
+});
+
+describe("a SAN capture alone is a move mention, not an exchange claim (brief 110)", () => {
+  it("reads no exchange claim from engine-backed tactic sentences", () => {
+    for (const text of [
+      "Bxd6 wins the queen.",
+      "Black has to deal with the check, for example with Nd7, and then Qxb4 wins the knight.",
+      "after Kd7, Nxa8 wins the rook",
+      "Nxe4 loses a piece for a pawn.",
+      "After Qxg4 you are clearly better, and you have won a whole piece.",
+      "After Bxd6 exd6, you are up a whole queen for a bishop.",
+    ]) {
+      expect(findExchangeClaims(text, "w"), text).toEqual([]);
+    }
+  });
+
+  it("keeps a SAN capture with an explicit 'on <square>' as a claim, checked against startResult", () => {
+    expect(findExchangeClaims("Nxe4 drops a piece on e4.", "b").map((c) => c.square)).toEqual(["e4"]);
+    expect(findExchangeClaims("Bxe5 wins a piece on e5.", "w").map((c) => c.square)).toEqual(["e5"]);
+    expect(black("Nxe4 drops a piece on e4.", kid())).toHaveLength(1); // startResult -2, not -3
+    expect(black("Nxe4 drops a piece for a pawn on e4.", kid())).toEqual([]);
+    expect(problemsFor("Bxe5 wins a piece on e5.", evidenceWith(FREE_E5, "e5"))).toEqual([]);
+    // The explicit square must be the capture's own square.
+    expect(findExchangeClaims("Nxe4 wins the pawn on d5.", "w")).toEqual([]);
   });
 });
 

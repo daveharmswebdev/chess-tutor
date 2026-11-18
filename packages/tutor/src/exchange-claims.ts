@@ -7,8 +7,9 @@ import type { Color, ExchangeResult, PieceType } from "@chess-tutor/chess-core";
  *
  * Clauses break at . ! ? ; , : and at so / but / because / since / while / whereas / although /
  * though / now that. Every claim needs a square in its clause: a bare square ("e5"; a square inside
- * a move such as "Bf4" is not one) or, for an outcome, a SAN capture onto it ("Nxe4", "exd5",
- * "Bxe5+"). A clause with no square of its own keeps the previous clause's square (and its
+ * a move such as "Bf4" is not one). A SAN capture ("Nxe4", "exd5", "Bxe5+") is an exchange word
+ * only when the clause also names its square with "on / at / onto <square>" (brief 110): "Nxe4
+ * drops a piece on e4" is a claim, "Bxd6 wins the queen" is a move mention. A clause with no square of its own keeps the previous clause's square (and its
  * exchange word) when it follows a comma or starts with but / while / whereas, within one
  * sentence: "e5 is attacked twice but defended only once", "If you capture on e4, you lose a piece
  * for a pawn", "Nc6 defends e5 once, the bishop attacks it twice". Without a square there is no
@@ -244,10 +245,15 @@ export function findExchangeClaims(text: string, playerColor?: Color): ExchangeC
 
     // The exchange word and its square: a SAN capture's own square, else the first "on <square>" after
     // the word, else the last one before it ("captured by the d6 pawn" names the capturer, not the square).
+    // A SAN capture is an exchange word only when the clause also names its square with "on / at /
+    // onto <square>" (brief 110): "Nxe4 drops a piece on e4" is a claim, "Bxd6 wins the queen" is a
+    // move mention, backed by the engine like any other move.
     const words = [...c.text.matchAll(EXCHANGE_WORD)].map((m) => m.index);
-    const capture = c.anchors.find((a) => a.capture);
+    const onSquares = c.anchors.filter((a) => !a.capture && ON_SQUARE.test(c.text.slice(0, a.index)));
+    const captures = c.anchors.filter((a) => a.capture && onSquares.some((o) => o.square === a.square));
+    const capture = captures[0];
     const first = Math.min(words[0] ?? Infinity, capture?.index ?? Infinity);
-    const placed = c.anchors.filter((a) => a.capture || ON_SQUARE.test(c.text.slice(0, a.index)));
+    const placed = [...captures, ...onSquares].sort((a, b) => a.index - b.index);
     let square: string | null = null;
     if (first !== Infinity) {
       if (capture && capture.index === first) square = capture.square;
