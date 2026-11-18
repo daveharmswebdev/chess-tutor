@@ -92,8 +92,10 @@ export interface DetectorInput {
  * it were.
  * Order: each list is in capture order, cheapest first (pawn 1, knight 3, bishop 3, rook 5, queen 9,
  * king last). An x-ray piece (one that reaches the square only after a piece in front of it on the
- * same line has captured) is listed with `xray: true` and comes no earlier than the piece in front
- * of it. A king captures only when the square is then no longer attacked by the other side.
+ * same line, of either colour, has captured there and so left the line) is listed with `xray: true`
+ * and comes no earlier than the piece in front of it. The sequence is therefore worked out on the
+ * real board, capture by capture, re-asking which pieces attack the square after each one (standard
+ * static exchange evaluation). A king captures only when the square is then no longer attacked by the other side.
  * Promotion: a pawn capturing onto the last rank becomes a queen (gain counted, and it is worth 9
  * when recaptured).
  * Results are in pawns for the attacking side (positive: it wins material), using the values above.
@@ -109,7 +111,12 @@ export interface ExchangePiece {
   color: Color;
   /** 1, 3, 3, 5, 9; the king is 0 here (it never decides the result, it only captures last when safe). */
   value: number;
-  /** True when it attacks the square only through a friendly piece in front of it on the same line. */
+  /**
+   * True when it does not attack the square on the original board, but does once a piece in front
+   * of it on the same line, of either colour, has itself captured on the square and so left the
+   * line. A piece behind an enemy piece that never captures on the square stays blocked and is not
+   * listed (#44, review 103).
+   */
   xray: boolean;
 }
 
