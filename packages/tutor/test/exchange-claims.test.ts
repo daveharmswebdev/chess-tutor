@@ -136,17 +136,22 @@ describe("checkClaims: exchange claims need this turn's exchange_on_square resul
     expect(problemsFor("You come out a pawn up on e5", e, "w")).toEqual([]);
     expect(problemsFor("You come out a pawn up on e5", e, "b")).toHaveLength(1);
     expect(problemsFor("Black comes out a pawn down in the exchange on e5", e)).toEqual([]);
-    const even = evidenceWith([EVEN, "e5"]); // result 0: the attacker should not start
-    expect(problemsFor("The trade on e5 breaks even", even)).toEqual([]);
+    // Review 108: result is 0 here (the attacker should not start), but starting loses a knight for
+    // a pawn (startResult -2). An outcome claim is about starting, so "breaks even" is false.
+    const even = evidenceWith([EVEN, "e5"]);
+    expect(problemsFor("The trade on e5 breaks even", even)).toHaveLength(1);
+    expect(problemsFor("Taking on e5 loses a knight for a pawn", even)).toEqual([]);
     expect(problemsFor("The exchange on e5 wins material", even)).toHaveLength(1);
     expect(problemsFor("The exchange on e5 wins a pawn", new Evidence())).toHaveLength(1);
   });
 
-  it("reports the result in the correction, from the attacking side's view", () => {
+  it("reports what the first capture leads to in the correction, in words, from the attacking side's view", () => {
     const [problem] = problemsFor("Trading on e5 loses material", evidenceWith([WINS, "e5"]));
     expect(problem).toMatch(/exchange_on_square/);
-    expect(problem).toMatch(/White/);
-    expect(problem).toMatch(/\+1/);
+    expect(problem).toMatch(/capturing first on e5 wins 1 pawn's worth for White/);
+    const [losing] = problemsFor("The trade on e5 breaks even", evidenceWith([EVEN, "e5"]));
+    expect(losing).toMatch(/capturing first on e5 loses 2 pawns' worth for White/);
+    expect(losing).not.toMatch(/result of 0/);
   });
 
   it("checks the reveal too, and accepts a backed claim inside a full reply", () => {
@@ -180,7 +185,7 @@ describe("checkClaims: exchange claims need this turn's exchange_on_square resul
       expect(calls).toHaveLength(2);
       const block = (calls[1]!.params.messages.at(-1)!.content as Anthropic.ToolResultBlockParam[])[0]!;
       expect(block.is_error).toBeUndefined();
-      expect(JSON.parse(block.content as string)).toEqual(exchangeOnSquare(WINS, "e5"));
+      expect(JSON.parse(block.content as string)).toEqual({ ...exchangeOnSquare(WINS, "e5"), startResult: 1 });
     });
 
     it("rejects the same count without the tool, and sends is_error for an invalid square", async () => {

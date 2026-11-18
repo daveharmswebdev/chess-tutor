@@ -324,13 +324,13 @@ describe("exchange_on_square (FR-21, #44)", () => {
   it("returns chess-core's exchangeOnSquare result and records it as evidence for that position and square", async () => {
     const c = ctx();
     const r = await runTool("exchange_on_square", { fen, square: "e5" }, c);
-    expect(r).toEqual(exchangeOnSquare(fen, "e5"));
+    expect(r).toEqual({ ...exchangeOnSquare(fen, "e5"), startResult: 1 });
     const result = r as ReturnType<typeof exchangeOnSquare>;
     expect(result.attackers.map((p) => p.square)).toEqual(["d4", "f4"]);
     expect(result.defenders.map((p) => p.square)).toEqual(["c6"]);
     expect(result.result).toBe(1);
     expect(result.caveat).toBe(EXCHANGE_CAVEAT);
-    expect(c.evidence.exchangesOn("e5")).toEqual([result]);
+    expect(c.evidence.exchangesOn("e5")).toEqual([exchangeOnSquare(fen, "e5")]);
     expect(c.evidence.exchangesOn("d4")).toEqual([]);
     // The capture sequence is not move evidence: a capture is judged by the engine (FR-10).
     expect(c.evidence.backsMove(fen, "d4e5")).toBe(false);

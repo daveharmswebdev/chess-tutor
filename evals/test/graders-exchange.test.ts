@@ -53,6 +53,19 @@ describe("gradeExchanges (NFR-6, #44)", () => {
     expect(gradeExchanges(input({ message: "e5 is attacked twice." }, [tool("e5", { isError: true, content: "bad" })])).pass).toBe(false);
   });
 
+  it("checks outcomes against startResult, also for recordings made before the field existed (review 108)", () => {
+    // 1.e4 e5 2.Nf3 Nc6: result 0, but capturing first on e5 loses a knight for a pawn.
+    const even = "r1bqkbnr/pppp1ppp/2n5/4p3/4P3/5N2/PPPP1PPP/RNBQKB1R w KQkq - 2 3";
+    const rec = (withStart: boolean): ToolResultRecord => {
+      const r = exchangeOnSquare(even, "e5");
+      return { name: "exchange_on_square", input: { fen: even, square: "e5" }, content: JSON.stringify(withStart ? { ...r, startResult: -2 } : r), isError: false };
+    };
+    for (const withStart of [true, false]) {
+      expect(gradeExchanges(input({ reveal: "Taking on e5 loses a knight for a pawn." }, [rec(withStart)])).pass).toBe(true);
+      expect(gradeExchanges(input({ reveal: "The trade on e5 breaks even." }, [rec(withStart)])).claims[0]!.problem).toBe("mismatch");
+    }
+  });
+
   it("ignores replies without exchange claims", () => {
     const g = gradeExchanges(input({ message: "Which Black pawn can you take?", reveal: "Your pawn on d4 takes on e5 and opens the f4 bishop." }, []));
     expect(g).toEqual({ pass: true, claims: [] });

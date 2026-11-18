@@ -13,7 +13,7 @@ describe("prompts/tutor-system.v4.md (release artifact)", () => {
     expect(prompt).toMatch(/version: 4/);
     const entry = changelog.split("\n").find((l) => l.includes("**tutor-system.v4.md**"));
     expect(entry).toBeDefined();
-    for (const phrase of ["#44", "FR-21", "FR-10", "FR-23", "exchange_on_square", "claims check", "caveat", "pins, checks"]) expect(entry).toContain(phrase);
+    for (const phrase of ["#44", "FR-21", "FR-10", "FR-23", "exchange_on_square", "claims check", "caveat", "pins, checks", "startResult", "review 108"]) expect(entry).toContain(phrase);
   });
 
   it("evals default to v4 (#44)", () => {
@@ -33,6 +33,12 @@ describe("prompts/tutor-system.v4.md (release artifact)", () => {
     expect(rule).toMatch(/never present a count as the full answer/i);
     expect(rule).toMatch(/`evaluate_move` or `analyze_position` before you call a capture good or bad/);
     expect(rule).toMatch(/x-ray/);
+    // Review 108: outcomes are about the first capture.
+    expect(tools).toMatch(/`startResult`: what the first capture leads to, if the other side then recaptures well/);
+    expect(rule).toMatch(/must match `startResult`/);
+    expect(rule).toMatch(/null when nobody can capture/);
+    expect(rule).toMatch(/A capture named with what it wins or loses .* is an exchange claim too/);
+    expect(rule).toMatch(/the count cannot back it/);
   });
 
   it("backs the plan after the opponent leaves book, or words it without moves (#41, FR-10, FR-9)", () => {

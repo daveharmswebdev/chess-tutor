@@ -14,6 +14,7 @@ import {
 } from "./chess-util.ts";
 import type { TutorConfig, TutorEngine, TutorExplorer } from "./contract.ts";
 import type { Evidence } from "./evidence.ts";
+import { startResult, type TutorExchangeResult } from "./exchange-claims.ts";
 
 /**
  * The tutor's five tools (FR-16 to FR-19, and exchange_on_square for FR-21, #44). Definitions
@@ -78,7 +79,8 @@ export const TOOL_DEFINITIONS: Anthropic.Tool[] = [
     name: "exchange_on_square",
     description:
       "Counts the attackers and defenders of one square (x-rays included, cheapest piece first) and works out the " +
-      "captures there if both sides keep recapturing: the material result in pawns for the attacking side. A static count " +
+      "captures there if both sides keep recapturing: the material result in pawns for the attacking side, and startResult: " +
+      "what the first capture leads to, if the other side then recaptures well (null when nobody can capture). A static count " +
       "with no engine search: it ignores pins, checks and threats elsewhere, so confirm a capture with the engine. Use it " +
       "before you say a piece is hanging, count attackers and defenders, or judge a trade.",
     input_schema: {
@@ -257,13 +259,14 @@ async function evaluateMove(input: z.infer<typeof EvaluateInput>, ctx: ToolConte
  * (the ExchangeResult contract, with its caveat). Recorded as exchange evidence for this position
  * and square, which backs counts and outcomes in the reply (FR-10). The capture sequence is not
  * registered as move evidence: a static count ignores pins and checks, so it must not back
- * "Bxe5" or a revealMove; the engine does that.
+ * "Bxe5" or a revealMove; the engine does that. The result gains startResult (review 108): what
+ * the first capture leads to, which outcome claims are checked against.
  */
-function exchange(input: z.infer<typeof ExchangeInput>, ctx: ToolContext) {
+function exchange(input: z.infer<typeof ExchangeInput>, ctx: ToolContext): TutorExchangeResult {
   requireFen(input.fen);
   const result = exchangeOnSquare(input.fen, input.square.trim().toLowerCase());
   ctx.evidence.addExchange(input.fen, result);
-  return result;
+  return { ...result, startResult: startResult(result) };
 }
 
 const EXPLORER_MOVES = 8;
