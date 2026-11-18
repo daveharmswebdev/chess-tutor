@@ -35,6 +35,9 @@ export type {
 export type {
   ApiError,
   DailyStats,
+  OpsEvent,
+  OpsEventCode,
+  OpsEvents,
   GameEndReason,
   GameEvent,
   GameResult,
@@ -51,3 +54,4 @@ export type {
   TutorStatus,
   UsageCounts,
 } from "./api.ts";
+export { BOT_STRENGTH, OPS_EVENT_CODES } from "./api.ts";

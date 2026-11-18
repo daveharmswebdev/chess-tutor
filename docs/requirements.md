@@ -2,7 +2,7 @@
 
 | | |
 |---|---|
-| Status | Accepted v0.2 (amendments A1 and A2 applied 2026-11-07, A3, A4, A5 and A6 2026-11-15, A7 2026-11-16) |
+| Status | Accepted v0.2 (amendments A1 and A2 applied 2026-11-07, A3, A4, A5 and A6 2026-11-15, A7 2026-11-16, A9 and A11 2026-11-17) |
 | Date | 2026-11-04 |
 | Owner | Dave Harms |
 
@@ -35,9 +35,9 @@ Since A7 (2026-11-16) the app also supports a separate client-transparency dashb
 
 | ID | Requirement | Source |
 |---|---|---|
-| FR-1 | The player can start a game against the sparring bot as White or Black. | BR-1 |
-| FR-2 | During the opening, the bot picks its moves from real human games at a configurable rating band, sampled in proportion to how often each move is played (Lichess opening explorer). That way the bot leaves the book the way real opponents do, not the way an engine would. | BR-1 |
-| FR-3 | Once the position is out of the explorer data (too few games below a threshold), the bot switches to Stockfish at a reduced strength set for the player's level. | BR-1 |
+| FR-1 | The player can start a game against the sparring bot as White or Black, at a strength from 500 to 2500 (Lichess-style ratings, steps of 100, default 1400), saved with the game. *Amended by A11, 2026-11-17 (#84).* | BR-1 |
+| FR-2 | During the opening, the bot picks its moves from real human games at the explorer rating bucket nearest the chosen strength (FR-1), sampled in proportion to how often each move is played (Lichess opening explorer). That way the bot leaves the book the way real opponents do, not the way an engine would. *Amended by A11, 2026-11-17.* | BR-1 |
+| FR-3 | Once the position is out of the explorer data (too few games below a threshold), the bot switches to Stockfish at the chosen strength: its own `UCI_Elo` from 1320 up, and below 1320 a code-controlled weakening of engine moves (moves still come from the engine and the legal-move list, never from Claude; FR-10), shown as approximate. *Amended by A11, 2026-11-17.* | BR-1 |
 | FR-4 | The board enforces legal moves, shows the move list, and supports takebacks during sparring games. | BR-2 |
 | FR-5 | Finished and abandoned games are saved as PGN with the tutor's comments, so the player can look at them later. | BR-1 |
 | FR-20 | During a game, the board shows the pieces each side has captured, next to that side, and the material balance as a number of pawns for the side that is ahead (for example "+2"), counted with standard values (pawn 1, knight and bishop 3, rook 5, queen 9). It updates on every move, including takebacks. This is a plain piece count, not an engine evaluation. *Added by A3, 2026-11-15.* | BR-1 |
@@ -92,6 +92,7 @@ Since A7 (2026-11-16) the app also supports a separate client-transparency dashb
 | FR-28 | Games started by the demo are marked as demo games on the server. The marker needs a secret (IR-10), so a player cannot set it by accident. Usage reporting shows demo games and their Claude spend apart from real usage. (#64) Starting a demo game never ends a player's game in progress, and starting a player game never ends a demo game; each only ends games of its own kind. (#71) | BR-6, BR-4, NFR-14 |
 | FR-29 | `GET /ops/daily-stats` returns counts for a day: games started, tutor replies, tutor latency p50 and p95, errors by category, and Claude spend from the usage ledger (NFR-5), with demo usage reported separately (FR-28). It requires a shared secret (IR-10). (#60) | BR-6, BR-4 |
 | FR-30 | The demo has several scenarios (at least London as White and KID as Black, with different kinds of mistake) chosen by date or explicitly. (#62) | BR-6 |
+| FR-31 | `GET /ops/events?date=` returns that day's events from a fixed list of codes, each with a timestamp and numeric or ID fields only, demo events marked (FR-28). It requires the shared secret (IR-10). (#82) *Added by A9, 2026-11-17.* | BR-6 |
 
 ## 4. Non-functional requirements
 
@@ -111,7 +112,7 @@ Since A7 (2026-11-16) the app also supports a separate client-transparency dashb
 | NFR-12 **Secrets** | The API key is never committed. It comes only from a runtime environment variable or a credential helper. | BR-3 |
 | NFR-13 **Portability** | Runs locally with a single command. All configuration (model ID, thresholds, rating band) comes from versioned config plus environment variables, so the app can be deployed later without code changes. | BR-3 |
 | NFR-14 **Game survival** | A game in progress, with the tutor's messages and chat, survives a page refresh, a server restart and a redeploy. Every move and tutor message is saved before it is acknowledged; on startup the server resumes games still in progress instead of abandoning them. The game's address (`/games/<id>`) reopens it. While the server can't be reached, the UI says it is reconnecting and keeps retrying, and it offers a new game only when the server says the game doesn't exist. *Added by A5, 2026-11-15.* | BR-1 |
-| NFR-15 **Operational privacy** | Anything the app exposes for the dashboard (FR-26, FR-29) holds versions and counts only: no log lines, no PGN or FEN, no chat text, nothing a player typed. *Added by A7, 2026-11-16.* | BR-6, BR-5 |
+| NFR-15 **Operational privacy** | Anything the app exposes for the dashboard (FR-26, FR-29, FR-31) holds versions, counts and events from a fixed list of codes: no log lines, no free text, no PGN or FEN, no chat text, nothing a player typed. *Added by A7, 2026-11-16; amended by A9, 2026-11-17.* | BR-6, BR-5 |
 | NFR-16 **Change and incident visibility** | Every merged PR carries a one-sentence client note in plain language, checked by CI (#61). Every production incident gets an issue with the `incident` label and four plain sections: what happened, who was affected, what was done, what prevents a repeat (#65). *Added by A7, 2026-11-16.* | BR-6 |
 
 ## 5. Infrastructure requirements
@@ -167,4 +168,4 @@ These follow from the functional requirements plus the proposed architecture: a 
 | BR-3 Claude + engine, exam prep | FR-10, 15–19, 21, 23 | NFR-6, 8, 10, 12, 13 | IR-1, 2, 6, 9 |
 | BR-4 Cost | FR-6, 7, 28, 29 | NFR-4, 5, 9 | IR-4, 6 |
 | BR-5 Fair play | — | NFR-11, 15 | — |
-| BR-6 Client transparency | FR-26–30 | NFR-15, 16 | IR-10 |
+| BR-6 Client transparency | FR-26–31 | NFR-15, 16 | IR-10 |

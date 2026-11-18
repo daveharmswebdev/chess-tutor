@@ -137,6 +137,13 @@ export interface GameView {
    * The server always sends it from #53 on (optional only for older servers).
    */
   notes?: TutorNote[];
+  /**
+   * The bot's strength for this game, a Lichess-style rating from 500 to 2500 in steps of 100
+   * (#84: FR-1, FR-2, FR-3 as amended by A11). Saved with the game (NFR-14). Below 1320 the
+   * strength is approximate (code-controlled weakening of engine moves); the UI says so.
+   * The server always sends it from #84 on (optional only for older servers; absent means 1400).
+   */
+  strength?: number;
 }
 
 /** A closed tutor question, kept on a move (#53, FR-25). Shown in the move list (#54). */
@@ -217,7 +224,12 @@ export interface TutorReveal {
 
 export interface NewGameRequest {
   playerColor: Color;
+  /** Bot strength, 500 to 2500 in steps of 100 (#84, FR-1). Omitted means 1400. Anything else: 400. */
+  strength?: number;
 }
+
+/** Bot strength bounds (#84, FR-1, A11). */
+export const BOT_STRENGTH = { min: 500, max: 2500, step: 100, default: 1400, uciEloMin: 1320 } as const;
 
 export interface PlayMoveRequest {
   /** UCI, e.g. "e2e4", "e7e8q"; castling as king two squares ("e1g1"). */
@@ -294,4 +306,43 @@ export interface UsageCounts {
     /** Priced from config/models.json pricingPerMTok for the model that served each ask; USD, 4 decimals. */
     spendUsd: number;
   };
+}
+
+/**
+ * The fixed list of event codes for GET /ops/events (#82: FR-31, NFR-15 as amended by A9).
+ * Other repos (the dashboard's CI) read this list to check every code has client wording
+ * (#83, NFR-18); adding, removing or renaming a code is a contract change.
+ */
+export const OPS_EVENT_CODES = ["deploy.live", "tutor.reply", "tutor.failed", "explorer.unreachable"] as const;
+export type OpsEventCode = (typeof OPS_EVENT_CODES)[number];
+
+/**
+ * One notable thing the app did (#82, FR-31). Codes, numbers, commit hashes and fixed
+ * categories only (NFR-15): no free text, no PGN or FEN, no chat text, nothing a player typed.
+ * `demo` marks events from the daily demo's games (FR-28); events not tied to a game (deploy.live)
+ * have demo false.
+ */
+export type OpsEvent = { at: string; demo: boolean } & (
+  | { code: "deploy.live"; commit: string }
+  /** A tutor ask (key moment or hint) that ended with a validated reply. */
+  | { code: "tutor.reply"; latencyMs: number }
+  /** A tutor ask that failed; `category` is one of DailyStats' error keys (never "cancelled"). */
+  | { code: "tutor.failed"; category: string }
+  /** The opening explorer could not be reached; the bot used the engine. */
+  | { code: "explorer.unreachable" }
+);
+
+/**
+ * GET /ops/events?date=YYYY-MM-DD (#82, FR-31). A contract with the chess-tutor-dashboard repo,
+ * versioned like DailyStats. Same auth and date rules as /ops/daily-stats (IR-10): OPS_STATS_TOKEN
+ * unset or blank -> 404 (off); missing or wrong bearer -> 401; malformed or future date -> 400;
+ * omitted date -> yesterday (UTC). Stored in SQLite (IR-7). Events in time order.
+ */
+export interface OpsEvents {
+  version: 1;
+  /** The UTC day, YYYY-MM-DD. */
+  date: string;
+  /** ISO timestamp when this answer was computed. */
+  generatedAt: string;
+  events: OpsEvent[];
 }
