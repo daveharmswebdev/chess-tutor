@@ -44,6 +44,41 @@ export function gateDecision(m: RunMetrics, gate: boolean, skipped = 0): { exitC
   return { exitCode: lines.length ? 1 : 0, lines };
 }
 
+/**
+ * Failure reasons that mean the ask never got a reply from the model (#90): the API was down or
+ * out of quota, rate limited, refused the key, or the ask threw. Every other reason (invalid_reply,
+ * unsupported_claim, tool_rounds_exceeded, refusal, max_tokens) came from a real reply.
+ */
+export const NOT_REACHED_REASONS: ReadonlySet<string> = new Set(["api_unavailable", "rate_limited", "auth", "threw"]);
+
+/**
+ * The warning for a run where no case reached Claude (every asked case failed with a
+ * NOT_REACHED_REASONS reason, or none started), naming the most common reason and its count;
+ * null when at least one case got a reply from the model.
+ */
+export function noReplyWarning(m: RunMetrics, skipped = 0): string | null {
+  const notReached = Object.entries(m.failureReasons).filter(([k]) => NOT_REACHED_REASONS.has(k));
+  const notReachedCount = notReached.reduce((n, [, v]) => n + v, 0);
+  if (m.cases - notReachedCount > 0) return null;
+  const notStarted = skipped ? `, ${skipped} not started` : "";
+  if (m.cases === 0) {
+    return `No case reached Claude: no case was started (${skipped} not started), so this run measured nothing and fails whether or not --gate is set.`;
+  }
+  const [reason, count] = [...notReached].sort(([a, x], [b, y]) => y - x || a.localeCompare(b))[0]!;
+  return `No case reached Claude: every case failed before the model replied, most often with ${reason} (${count} of ${m.cases} cases${notStarted}), so this run measured nothing and fails whether or not --gate is set.`;
+}
+
+/**
+ * What `pnpm eval` does after the report is written: a run where no case reached Claude exits 1
+ * with the warning first (plus any gate lines under --gate); otherwise exactly gateDecision.
+ */
+export function exitDecision(s: Pick<RunSummary, "metrics" | "skipped">, gate: boolean): { exitCode: 0 | 1; lines: string[] } {
+  const decision = gateDecision(s.metrics, gate, s.skipped.length);
+  const warning = noReplyWarning(s.metrics, s.skipped.length);
+  if (warning === null) return decision;
+  return { exitCode: 1, lines: [warning, ...decision.lines] };
+}
+
 export function toRow(r: CaseResult): CaseRow {
   const g = r.grades;
   const problems = g
@@ -171,7 +206,9 @@ const escape = (s: string) => s.replace(/\|/g, "\\|").replace(/\n/g, " ");
 
 export function renderRunReport(s: RunSummary): string {
   const m = s.metrics;
+  const warning = noReplyWarning(m, s.skipped.length);
   const lines = [
+    ...(warning === null ? [] : [warning, ""]),
     `# Tutor eval: ${s.model}, effort ${s.effort}`,
     "",
     `Prompt ${s.promptFile} (sha256 ${s.promptSha256.slice(0, 12)}). Started ${s.startedAt}, finished ${s.finishedAt}.`,
