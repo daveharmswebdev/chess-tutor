@@ -2,7 +2,8 @@ import { mkdirSync } from "node:fs";
 import { dirname } from "node:path";
 import { fileURLToPath } from "node:url";
 import { DatabaseSync } from "node:sqlite";
-import type { Color, GameEndReason, GameResult, GameStatus } from "@chess-tutor/chess-core";
+import { BOT_STRENGTH, type Color, type GameEndReason, type GameResult, type GameStatus } from "@chess-tutor/chess-core";
+import { isValidStrength } from "./strength.ts";
 
 /**
  * A saved game (FR-5, IR-7, NFR-14). Every game is written from its creation on, and again
@@ -31,6 +32,12 @@ export interface SavedGame {
    * a later save never changes it. Server-side only; not part of GameView.
    */
   source?: GameSource;
+  /**
+   * Schema v5 (#84: FR-1, NFR-14): the bot's strength for this game (BOT_STRENGTH). Set once, on
+   * insert: a later save never changes it. Omitted on save means BOT_STRENGTH.default; rows from
+   * before v5 (NULL) read back as BOT_STRENGTH.default.
+   */
+  strength?: number;
 }
 
 export type GameSource = "player" | "demo";
@@ -80,7 +87,7 @@ export function isUsageLedger(value: unknown): value is UsageLedger {
 }
 
 /** A row as read back: `state` and `source` are always present (null and "player" for old rows). */
-export type StoredGame = SavedGame & { state: string | null; source: GameSource };
+export type StoredGame = SavedGame & { state: string | null; source: GameSource; strength: number };
 
 export interface GameStore {
   /** Insert or replace by id. */
@@ -99,7 +106,7 @@ export function resolveDbPath(env: Record<string, string | undefined>): string {
   return path === undefined || path === "" ? DEFAULT_DB_PATH : path;
 }
 
-export const SCHEMA_VERSION = 4;
+export const SCHEMA_VERSION = 5;
 
 /**
  * SQLite game store (node:sqlite, one connection). Writes are synchronous: when save()
@@ -116,6 +123,8 @@ export const SCHEMA_VERSION = 4;
  *      finished tutor ask and per bot failure (at, game_id, source, kind, ok, reason, ms, the five
  *      token counts, model), indexed on `at`. Read by GET /ops/daily-stats and later BudgetGuard
  *      (#9). Created with CREATE TABLE IF NOT EXISTS; v3 games are untouched.
+ *   5  adds `strength` (INTEGER, the bot's strength for the game; #84, FR-1, NFR-14), written on
+ *      insert only. Migrated by ALTER TABLE; older rows (NULL) read back as BOT_STRENGTH.default.
  * Tutor notes (#53, FR-25, FR-5) live in `state` (its `notes` array, [] when absent) and in the
  * PGN as {...} comments; no separate table and no schema change.
  * A database with a newer version than this code knows is refused.
@@ -131,8 +140,8 @@ export function createSqliteGameStore(path: string): SqliteGameStore {
   }
 
   const upsert = db.prepare(
-    `INSERT INTO games (id, player_color, status, result, end_reason, pgn, created_at, updated_at, state, source)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    `INSERT INTO games (id, player_color, status, result, end_reason, pgn, created_at, updated_at, state, source, strength)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
      ON CONFLICT(id) DO UPDATE SET status = excluded.status, result = excluded.result,
        end_reason = excluded.end_reason, pgn = excluded.pgn, updated_at = excluded.updated_at,
        state = excluded.state`,
@@ -149,7 +158,7 @@ export function createSqliteGameStore(path: string): SqliteGameStore {
 
   return {
     save(g) {
-      upsert.run(g.id, g.playerColor, g.status, g.result, g.endReason, g.pgn, g.createdAt, g.updatedAt, g.state ?? null, g.source ?? "player");
+      upsert.run(g.id, g.playerColor, g.status, g.result, g.endReason, g.pgn, g.createdAt, g.updatedAt, g.state ?? null, g.source ?? "player", g.strength ?? BOT_STRENGTH.default);
     },
     get(id) {
       const row = select.get(id);
@@ -202,7 +211,14 @@ function fromRow(row: Record<string, unknown>): StoredGame {
     updatedAt: String(row["updated_at"]),
     state: state === null || state === undefined ? null : String(state),
     source: row["source"] === "demo" ? "demo" : "player",
+    strength: strengthFromRow(row["strength"]),
   };
+}
+
+/** NULL (a row from before v5) or a damaged value reads back as the default strength. */
+function strengthFromRow(value: unknown): number {
+  const n = typeof value === "bigint" ? Number(value) : value;
+  return isValidStrength(n) ? n : BOT_STRENGTH.default;
 }
 
 function usageFromRow(row: Record<string, unknown>): UsageEvent {
@@ -271,6 +287,8 @@ function migrate(db: DatabaseSync): void {
       )
     `);
     db.exec("CREATE INDEX IF NOT EXISTS usage_events_at ON usage_events (at)");
+    // Version 5 (#84, FR-1): the bot's strength per game; older rows stay NULL (the default).
+    if (!columns.includes("strength")) db.exec("ALTER TABLE games ADD COLUMN strength INTEGER");
     db.exec(`PRAGMA user_version = ${SCHEMA_VERSION}`);
     db.exec("COMMIT");
   } catch (err) {

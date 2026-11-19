@@ -129,6 +129,7 @@ describe("game store", () => {
       updatedAt: "2026-11-07T10:06:00.000Z",
       state: null,
       source: "player",
+      strength: 1400,
     });
     store.save({ ...rec, id: "g2", status: "playing", result: "*", endReason: null, state: '{"v":1}' });
     expect(store.get("g2")?.state).toBe('{"v":1}');

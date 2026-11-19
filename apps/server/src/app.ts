@@ -7,6 +7,7 @@ import type { ApiError, GameEvent, SparringBot } from "@chess-tutor/chess-core";
 import type { CoachingDeps } from "./coaching.ts";
 import { createGameManager, GameError, type GameManager } from "./games.ts";
 import type { HealthProbe } from "./health.ts";
+import { isValidStrength, STRENGTH_RANGE_MESSAGE } from "./strength.ts";
 import { checkWebDist, isApiPath } from "./static.ts";
 import { loadPricing } from "./config.ts";
 import { dailyStatsFromLedger, parseStatsDate, type Pricing } from "./stats.ts";
@@ -230,15 +231,18 @@ export function buildServer(deps: ServerDeps): { app: FastifyInstance; games: Ga
   });
 
   app.post("/api/games", async (request, reply) => {
-    const body = request.body as { playerColor?: unknown } | undefined;
+    const body = request.body as { playerColor?: unknown; strength?: unknown } | undefined;
     const color = body?.playerColor;
     if (color !== "w" && color !== "b") {
       throw new GameError(400, 'playerColor must be "w" or "b"');
     }
+    // #84, FR-1: omitted means the default; anything else must be on the scale (null included).
+    const strength = body?.strength;
+    if (strength !== undefined && !isValidStrength(strength)) throw new GameError(400, STRENGTH_RANGE_MESSAGE);
     const source = demoSource(deps.demoToken, request.headers[DEMO_TOKEN_HEADER]);
     // A wrong token fails loudly (no game, nothing abandoned) rather than count as a player game.
     if (source === null) return reply.status(403).send(apiError("the demo token is not valid"));
-    return reply.status(201).send(games.create(color, { source }));
+    return reply.status(201).send(games.create(color, { source, ...(strength === undefined ? {} : { strength }) }));
   });
 
   app.get<{ Params: { id: string } }>("/api/games/:id", async (request) => {
