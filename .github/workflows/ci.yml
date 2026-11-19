@@ -27,6 +27,18 @@ jobs:
       - name: Unit and integration tests (includes real WASM Stockfish)
         run: pnpm test
 
+  glossary:
+    name: Client wording covers every requirement
+    runs-on: ubuntu-latest
+    timeout-minutes: 2
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+      - name: docs/glossary.json matches requirements.md and the event codes (NFR-18, #83)
+        run: node --no-warnings .claude/scripts/check-glossary.ts
+
   e2e:
     name: E2E (browser plays against the real server)
     runs-on: ubuntu-latest

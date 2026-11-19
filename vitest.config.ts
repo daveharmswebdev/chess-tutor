@@ -16,7 +16,7 @@ export default defineConfig({
       {
         test: {
           name: "unit",
-          include: ["packages/*/test/**/*.test.ts", "apps/*/test/**/*.test.ts", "evals/test/**/*.test.ts", ".claude/hooks/test/**/*.test.ts"],
+          include: ["packages/*/test/**/*.test.ts", "apps/*/test/**/*.test.ts", "evals/test/**/*.test.ts", ".claude/hooks/test/**/*.test.ts", ".claude/scripts/test/**/*.test.ts"],
           exclude: ["**/node_modules/**", ...realEngine],
           sequence: { groupOrder: 0 },
         },

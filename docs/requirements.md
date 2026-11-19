@@ -2,7 +2,7 @@
 
 | | |
 |---|---|
-| Status | Accepted v0.2 (amendments A1 and A2 applied 2026-11-07, A3, A4, A5 and A6 2026-11-15, A7 2026-11-16, A9 and A11 2026-11-17) |
+| Status | Accepted v0.2 (amendments A1 and A2 applied 2026-11-07, A3, A4, A5 and A6 2026-11-15, A7 2026-11-16, A9 and A11 2026-11-17, A10 2026-11-19) |
 | Date | 2026-11-04 |
 | Owner | Dave Harms |
 
@@ -114,6 +114,7 @@ Since A7 (2026-11-16) the app also supports a separate client-transparency dashb
 | NFR-14 **Game survival** | A game in progress, with the tutor's messages and chat, survives a page refresh, a server restart and a redeploy. Every move and tutor message is saved before it is acknowledged; on startup the server resumes games still in progress instead of abandoning them. The game's address (`/games/<id>`) reopens it. While the server can't be reached, the UI says it is reconnecting and keeps retrying, and it offers a new game only when the server says the game doesn't exist. *Added by A5, 2026-11-15.* | BR-1 |
 | NFR-15 **Operational privacy** | Anything the app exposes for the dashboard (FR-26, FR-29, FR-31) holds versions, counts and events from a fixed list of codes: no log lines, no free text, no PGN or FEN, no chat text, nothing a player typed. *Added by A7, 2026-11-16; amended by A9, 2026-11-17.* | BR-6, BR-5 |
 | NFR-16 **Change and incident visibility** | Every merged PR carries a one-sentence client note in plain language, checked by CI (#61). Every production incident gets an issue with the `incident` label and four plain sections: what happened, who was affected, what was done, what prevents a repeat (#65). *Added by A7, 2026-11-16.* | BR-6 |
+| NFR-18 **Requirement catalog** | `docs/glossary.json` holds the client wording for every FR, NFR and dashboard event code (`config/ops-events.json`), or a reason it is excluded. It is written by a person, never generated. CI checks it against `docs/requirements.md` and the event-code list, and fails on a missing, stale or duplicate entry (#83). *Added by A10, 2026-11-19.* | BR-6 |
 
 ## 5. Infrastructure requirements
 
@@ -130,7 +131,7 @@ These follow from the functional requirements plus the proposed architecture: a 
 | IR-7 | Local persistent storage (a single SQLite file) for games, the usage ledger, and a cache of Lichess explorer responses. | FR-5, NFR-5, FR-18 |
 | IR-8 | Outbound HTTPS access to the Lichess explorer API, authenticated with a personal token (`LICHESS_TOKEN`, a runtime secret), with responses cached and respecting Lichess's rate limits. | FR-2, FR-18, NFR-12 |
 | IR-9 | The model ID is set per environment in versioned config and pinned to an exact model ID. | NFR-10, NFR-13 |
-| IR-10 | Dashboard secrets: `OPS_STATS_TOKEN` (FR-29) and `DEMO_TOKEN` (FR-28) are runtime environment variables on the server; a feature whose secret is unset is off. A push to `main` sends a `repository_dispatch` with the merged commit to the dashboard repo, using a token stored only in Actions secrets (#63). *Added by A7, 2026-11-16.* | FR-28, FR-29, NFR-12, NFR-16 |
+| IR-10 | Dashboard secrets: `OPS_STATS_TOKEN` (FR-29) and `DEMO_TOKEN` (FR-28) are runtime environment variables on the server; a feature whose secret is unset is off. A push to `main` sends a `repository_dispatch` with the merged commit to the dashboard repo, using a token stored only in Actions secrets (#63). The merge ping also carries the glossary: the dashboard repo mirrors `docs/glossary.json` at the merged commit (NFR-18). *Added by A7, 2026-11-16; amended by A10, 2026-11-19.* | FR-28, FR-29, NFR-12, NFR-16, NFR-18 |
 
 ## 6. Constraints and assumptions
 
@@ -168,4 +169,4 @@ These follow from the functional requirements plus the proposed architecture: a 
 | BR-3 Claude + engine, exam prep | FR-10, 15–19, 21, 23 | NFR-6, 8, 10, 12, 13 | IR-1, 2, 6, 9 |
 | BR-4 Cost | FR-6, 7, 28, 29 | NFR-4, 5, 9 | IR-4, 6 |
 | BR-5 Fair play | — | NFR-11, 15 | — |
-| BR-6 Client transparency | FR-26–31 | NFR-15, 16 | IR-10 |
+| BR-6 Client transparency | FR-26–31 | NFR-15, 16, 18 | IR-10 |
