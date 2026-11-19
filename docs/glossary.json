@@ -1,0 +1,61 @@
+{
+  "_note": "Hand-written client wording for each chess-tutor requirement (docs/requirements.md) and dashboard event code (config/ops-events.json). This file is the source of truth: the dashboard mirrors it on every merge to main and prints labels word for word. Written by a person, never generated. Each entry has a group and a label, or an excluded reason. Checked in CI by .claude/scripts/check-glossary.ts (NFR-18).",
+  "requirements": [
+    { "id": "FR-1", "group": "Playing games", "label": "Start a game against the bot as White or Black" },
+    { "id": "FR-2", "group": "Playing games", "label": "The bot opens like real human players at your level" },
+    { "id": "FR-3", "group": "Playing games", "label": "After the opening, the bot plays at a strength set for you" },
+    { "id": "FR-4", "group": "Playing games", "label": "Legal moves only, a move list, and takebacks" },
+    { "id": "FR-5", "group": "Playing games", "label": "Finished games are saved with the tutor's comments" },
+    { "id": "FR-20", "group": "Playing games", "label": "Captured pieces and the material count beside the board" },
+
+    { "id": "FR-6", "group": "Coaching during the game", "label": "The app spots the moments that matter" },
+    { "id": "FR-7", "group": "Coaching during the game", "label": "The tutor stays quiet the rest of the time" },
+    { "id": "FR-8", "group": "Coaching during the game", "label": "The tutor asks you a question before giving the answer" },
+    { "id": "FR-9", "group": "Coaching during the game", "label": "When the opponent leaves the book, the tutor explains the plan" },
+    { "id": "FR-10", "group": "Coaching during the game", "label": "Every move or score the tutor quotes comes from the chess engine" },
+    { "id": "FR-11", "group": "Coaching during the game", "label": "Arrows and highlights on the board" },
+    { "id": "FR-12", "group": "Coaching during the game", "label": "A Hint button you can press at any time" },
+    { "id": "FR-24", "group": "Coaching during the game", "label": "Tutor text always matches the board, and results show as a short pop-up" },
+    { "id": "FR-25", "group": "Coaching during the game", "label": "Tutor notes saved with each move" },
+
+    { "id": "FR-13", "group": "Ask the tutor", "label": "Ask the tutor anything about the position" },
+    { "id": "FR-14", "group": "Ask the tutor", "label": "Paste a game or position and talk it through" },
+    { "id": "FR-15", "group": "Ask the tutor", "label": "Chat answers use the engine too" },
+
+    { "id": "FR-16", "group": "Tutor's tools", "label": "Tutor can analyze a position" },
+    { "id": "FR-17", "group": "Tutor's tools", "label": "Tutor can check how good a move was" },
+    { "id": "FR-18", "group": "Tutor's tools", "label": "Tutor can look up what real players chose" },
+    { "id": "FR-19", "group": "Tutor's tools", "label": "Tutor knows your London and King's Indian repertoire" },
+    { "id": "FR-21", "group": "Tutor's tools", "label": "Tutor can count attackers and defenders on a square" },
+
+    { "id": "FR-22", "group": "Calculation training", "label": "Count attackers and defenders, and get checked" },
+    { "id": "FR-23", "group": "Calculation training", "label": "Rank competing captures, and see when counting misleads" },
+
+    { "id": "NFR-1", "group": "Quality", "label": "Tutor replies arrive quickly" },
+    { "id": "NFR-2", "group": "Quality", "label": "Engine analysis is fast" },
+    { "id": "NFR-3", "group": "Quality", "label": "The bot replies within 2 seconds" },
+    { "id": "NFR-4", "group": "Quality", "label": "AI cost stays under $25 a month" },
+    { "id": "NFR-5", "group": "Quality", "label": "AI cost is tracked per game and per month" },
+    { "id": "NFR-6", "group": "Quality", "label": "Tutor never mentions an illegal move or a made-up score" },
+    { "id": "NFR-7", "group": "Quality", "label": "Tutor doesn't give the answer away too early" },
+    { "id": "NFR-8", "group": "Quality", "label": "Malformed tutor replies are never shown" },
+    { "id": "NFR-9", "group": "Quality", "label": "Games keep working if the AI service is down" },
+    { "id": "NFR-10", "group": "Quality", "label": "Every tutor change is tested before release" },
+    { "id": "NFR-11", "group": "Quality", "label": "Fair play: no help in games on other sites" },
+    { "id": "NFR-12", "group": "Quality", "label": "Keys and secrets are never stored in the code" },
+    { "id": "NFR-13", "group": "Quality", "label": "Easy to run and deploy" },
+    { "id": "NFR-14", "group": "Quality", "label": "A game survives a refresh, restart or update" },
+
+    { "id": "FR-27", "group": "Client dashboard", "label": "A recorded demo game shows the tutor at work" },
+    { "id": "FR-28", "group": "Client dashboard", "label": "Demo games are counted separately from real play" },
+    { "id": "FR-29", "group": "Client dashboard", "label": "Daily numbers: games, tutor replies, speed and AI cost" },
+    { "id": "FR-30", "group": "Client dashboard", "label": "The demo rotates between London and King's Indian games" },
+    { "id": "FR-31", "group": "Client dashboard", "label": "A day-by-day log of what happened in the app" },
+    { "id": "NFR-15", "group": "Client dashboard", "label": "The dashboard never shows anything a player typed or said" },
+    { "id": "NFR-16", "group": "Client dashboard", "label": "Every change comes with a plain note, and every outage gets a write-up" },
+
+    { "id": "FR-26", "excluded": "Plumbing: lets the dashboard confirm the live version." },
+    { "id": "NFR-18", "excluded": "Internal process: how this list is kept current." }
+  ],
+  "events": []
+}

@@ -8,6 +8,7 @@ Specs: `docs/requirements.md` (requirement IDs BR/FR/NFR/IR) and `docs/architect
 
 - **Code decides when the tutor speaks and what is true. Claude only explains.** Never let the model invent a move or an evaluation (FR-10).
 - Reference requirement IDs in commits and PRs when work implements or changes one.
+- Adding, removing or renumbering an FR or NFR, or a dashboard event code (`config/ops-events.json`), updates `docs/glossary.json` in the same PR: client wording from the user, or an `excluded` reason (NFR-18). CI checks it.
 - Prompts (`prompts/`), schemas, and `config/models.json` are release artifacts: version them, log changes in `prompts/CHANGELOG.md`, and run evals before merging.
 - Secrets come only from environment variables (`.env`, gitignored). Never write keys or tokens into tracked files.
 - Third-party content (Lichess data, pasted PGN/FEN) reaches the model only inside `tool_result` blocks or clearly tagged data blocks.

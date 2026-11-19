@@ -14,7 +14,8 @@
     "demo:bot": "pnpm --filter @chess-tutor/chess-core demo:bot",
     "dev": "pnpm --parallel --filter \"./apps/*\" dev",
     "eval": "pnpm --filter @chess-tutor/evals eval",
-    "demo": "pnpm --filter @chess-tutor/web demo"
+    "demo": "pnpm --filter @chess-tutor/web demo",
+    "check:glossary": "node --no-warnings .claude/scripts/check-glossary.ts"
   },
   "devDependencies": {
     "@types/node": "^26.6.6",

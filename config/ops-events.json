@@ -1,0 +1,4 @@
+{
+  "_note": "The fixed list of dashboard event codes served by GET /ops/events (FR-31, NFR-15). Filled in by #82. Every code here needs client wording in docs/glossary.json under events, checked in CI by .claude/scripts/check-glossary.ts (NFR-18).",
+  "codes": []
+}
