@@ -12,6 +12,8 @@
  * when NFR-6 move legality < 100%, NFR-6 eval match < 100% or NFR-7 no give-away < 90% (a metric
  * with no graded replies is a miss), or when fewer than 90% of the cases (not-started ones
  * included) were graded. Without --gate the exit code does not depend on the metrics.
+ * Always (#90): a run where no case reached Claude (every case api_unavailable, rate_limited,
+ * auth or threw, or none started) exits 1, with the warning first in report.md and on stderr.
  */
 import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { basename, join, resolve } from "node:path";
@@ -20,7 +22,7 @@ import type { TutorConfig, TutorExplorer } from "@chess-tutor/tutor";
 import { loadCases, selectCases } from "./cases.ts";
 import { CASES_DIR, DEFAULT_PROMPT, loadRepertoire, loadSettings, RESULTS_DIR } from "./config.ts";
 import { regradeDir } from "./regrade.ts";
-import { compareRuns, gateDecision } from "./report.ts";
+import { compareRuns, exitDecision } from "./report.ts";
 import { runEval } from "./runner.ts";
 
 const EFFORTS = ["low", "medium", "high", "xhigh", "max"] as const;
@@ -138,7 +140,7 @@ async function run(args: string[]): Promise<void> {
       `\nok ${p(m.okRate)} | moves legal ${p(m.moveLegalPct)} | evals matched ${p(m.evalMatchPct)} | no give-away ${p(m.noGiveAwayPct)} | spent $${summary.spentUsd.toFixed(3)}${summary.stoppedByBudget ? ` (budget reached, ${summary.skipped.length} not started)` : ""}`,
     );
     console.log(`Wrote ${join(outDir, "report.md")}`);
-    const gate = gateDecision(m, values.gate === true, summary.skipped.length);
+    const gate = exitDecision(summary, values.gate === true);
     for (const line of gate.lines) console.error(line);
     if (gate.exitCode !== 0) process.exitCode = gate.exitCode;
   } finally {
