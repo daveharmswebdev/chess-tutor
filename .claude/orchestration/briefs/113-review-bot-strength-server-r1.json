@@ -1,0 +1,29 @@
+{
+  "brief_id": "113-review-bot-strength-server-r1",
+  "agent": "reviewer",
+  "issue": 84,
+  "base_sha": "00e6668",
+  "scratch_dir": "/private/tmp/claude-501/-Users-daveharms-personal-workspace-chess-tutor/84a502cf-b333-4fa0-870b-1ccf8e975473/scratchpad/113-review-bot-strength-server-r1",
+  "objective": "Review #84 server round: `git diff 8ec5429..00e6668` (server-agent: apps/server/src/app.ts, games.ts, store.ts, new strength.ts; tests bot-strength.test.ts plus small updates to daily-stats, game-survival, games-api, helpers, outcome-pgn-store tests) for correctness against FR-1, FR-2, FR-3 (as amended by A11 in docs/requirements.md) and NFR-14. Focus: (1) POST /api/games strength validation (whole number 500..2500 on a 100 step; omitted = 1400; anything else 400 with no game created and no existing game abandoned, including demo-token paths and the order of the 400 vs the 403 check); (2) every bot.chooseMove call for a game passes that game's strength: first move when the player is Black, the reply after each player move, botRetry, a bot move resumed after a restart; (3) SQLite schema v4 -> v5 migration: an existing v4 database (with rows, in the migrate() path that runs when user_version is 4) gains the column without losing data, old rows read 1400, strength is written on insert only and never changed by later saves, a newer DB is still refused; (4) GameView.strength always present; (5) whether the tests actually prove these (would they fail if the strength were dropped on any path?); (6) the test-file edits to older tests: do they weaken any earlier assertion?",
+  "requirements": [
+    "FR-1",
+    "FR-2",
+    "FR-3",
+    "NFR-14"
+  ],
+  "contract": "api.ts (inlined) defines NewGameRequest.strength, GameView.strength and BOT_STRENGTH = {min 500, max 2500, step 100, default 1400, uciEloMin 1320}. chess-core's SparringBot.chooseMove(fen, { strength }) (PR #88, on main) does the bucket/UCI_Elo/weakening work; out of scope here. Removing explorerRatings/outOfBookElo from config and the web picker are later rounds, out of scope.\nThe spoke's return failed the contract check (schema shape), so the coordinator verified the commit directly: git diff --name-only 8ec5429..00e6668 = the 10 files above, all in apps/server; pnpm test at 00e6668: Test Files 66 passed, Tests 1531 passed; typecheck clean. The spoke saw intermittent sse.test.ts afterEach timeouts under heavy load (another spoke's suite running in parallel, one run 340 s); the coordinator ran sse.test.ts 5x at 8ec5429 and 5x at 00e6668 on a quiet machine: 8/8 every time. Note it if you see a real cause in the diff (e.g. helpers.ts FakeBot change).",
+  "contract_files": [
+    "packages/chess-core/src/api.ts"
+  ],
+  "scope": [],
+  "negative": [
+    "Read-only: do not edit, commit, or run anything that writes to the repo.",
+    "Do not run anything that calls the Claude API or the network."
+  ],
+  "rubric": [
+    "Each finding cites file:line and evidence; reproduce blocking/major with a scratch script outside the repo (in your scratch dir).",
+    "Severities: blocking / major / minor. Summary ends SHIP or NO-SHIP."
+  ],
+  "concurrency": "No implementation spoke is running. Read the reviewed code with git diff / git show 00e6668:<path>.",
+  "round": 1
+}

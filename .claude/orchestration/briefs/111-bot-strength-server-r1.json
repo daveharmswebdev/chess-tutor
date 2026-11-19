@@ -1,0 +1,36 @@
+{
+  "brief_id": "111-bot-strength-server-r1",
+  "agent": "server-agent",
+  "issue": 84,
+  "base_sha": "8ec5429",
+  "scratch_dir": "/private/tmp/claude-501/-Users-daveharms-personal-workspace-chess-tutor/84a502cf-b333-4fa0-870b-1ccf8e975473/scratchpad/111-bot-strength-server-r1",
+  "objective": "Server round of #84: each game has its own bot strength. POST /api/games accepts an optional strength (NewGameRequest.strength), the game saves it in SQLite, GameView.strength always reports it, and every bot move for that game (the bot's first move when the player is Black, the reply after each player move, botRetry, and a bot move resumed after a restart) calls bot.chooseMove(fen, { strength }). Success: a game created with strength 800 passes 800 on every chooseMove call and still reports 800 after a restart; omitted strength gives 1400; an invalid strength answers 400 and creates nothing; the gate is clean.",
+  "requirements": [
+    "FR-1",
+    "FR-2",
+    "FR-3",
+    "NFR-14"
+  ],
+  "contract": "Contract (api.ts is in contract_files; do not change it): NewGameRequest.strength?: number — \"Bot strength, 500 to 2500 in steps of 100 (#84, FR-1). Omitted means 1400. Anything else: 400.\" GameView.strength?: number — \"Saved with the game (NFR-14) ... The server always sends it from #84 on (optional only for older servers; absent means 1400).\" BOT_STRENGTH = { min: 500, max: 2500, step: 100, default: 1400, uciEloMin: 1320 }.\nValidation: valid means typeof number, Number.isInteger, min..max inclusive, and (s - min) % step === 0. Anything else (the string \"800\", 850, 1320, 400, 2600, null, NaN) answers 400 with a plain message naming the allowed range; no game is created and the current game is not abandoned. Use BOT_STRENGTH; do not hard-code the numbers.\nchess-core is already done (PR #88, on main): SparringBot.chooseMove(fen, opts?: BotChooseOptions), with BotChooseOptions.strength?: number defaulting to BOT_STRENGTH.default. It picks the explorer buckets from the strength (explorerRatingsFor), plays UCI_Elo = strength from 1320 up, and below 1320 uses config.weakening with engine.analyze (MultiPV). It throws on an invalid strength, or below 1320 when there is no weakening block or no engine.analyze. The live engine (StockfishEngine, passed at apps/server/src/main.ts:97) has analyze, and config/tutor.json has bot.weakening (03f355b), so main.ts needs no change.\nToday: apps/server/src/app.ts:232 POST /api/games reads only playerColor and calls games.create(color, { source }). apps/server/src/games.ts:1198 calls bot.chooseMove(fen) with no options. GameManager.create(playerColor, opts?: { source?: GameSource }) is at games.ts:89.\nStore: apps/server/src/store.ts has SCHEMA_VERSION = 4 (PRAGMA user_version). Earlier columns were added with ALTER TABLE in migrate() so older rows keep working (see the source column). Add strength the same way as v5: rows from before read back as 1400. A database newer than the code is still refused.\nDemo games (source demo, DEMO_TOKEN) may send a strength too; the same rules apply.\nOut of scope (later rounds or other owners): removing explorerRatings/outOfBookElo from config/tutor.json and BotConfig (config.ts still reads explorerRatings for the tutor's explorer; leave it as it is); the web picker (apps/web); the rough strength match run (the coordinator runs packages/chess-core scripts/match-bot.ts).\nGate at base 8ec5429 (the coordinator just ran it): Test Files 65 passed (65), Tests 1506 passed (1506); pnpm typecheck clean.",
+  "contract_files": [
+    "packages/chess-core/src/api.ts"
+  ],
+  "scope": [
+    "apps/server/**"
+  ],
+  "negative": [
+    "Do not edit files outside scope, docs, config, .github, root files or the lockfile.",
+    "No new dependencies.",
+    "Do not edit apps/server/src/main.ts unless a test proves it is needed (parked PR #89 edits it). If you must, say why in the return.",
+    "Do not change packages/chess-core or the api.ts contract; report a contract gap instead.",
+    "No live API calls; tests use the existing fakes (apps/server/test/helpers.ts)."
+  ],
+  "rubric": [
+    "Tests first (red then green): (a) POST /api/games with strength 800 -> 201, GameView.strength 800, and the fake bot receives { strength: 800 } both on its reply after a player move and on its first move when the player is Black; (b) no strength -> 1400 in GameView and in chooseMove; (c) every invalid value listed in the contract -> 400, no game created, an existing playing game left untouched; (d) botRetry uses the game's strength; (e) restart: a game saved at 800 hydrates with strength 800 and its resumed bot move uses 800; (f) migration: a v4 database row with no strength column reads back as 1400, and the schema version becomes 5.",
+    "Boundaries covered: 500 and 2500 valid, 1300 and 1400 valid, 1320 invalid (not on a step).",
+    "pnpm test and pnpm typecheck clean from the repo root.",
+    "files_changed lists every file changed in 8ec5429..your head. Commit message references FR-1, FR-2, FR-3, NFR-14 and #84."
+  ],
+  "concurrency": "One other spoke runs in parallel: tutor-agent on #90 (brief 112), touching only evals/src/** and evals/test/**. No overlap with apps/server. Parked PR #89 (branch issue-44-exchange-tool) touches apps/server/src/main.ts: stay out of it. Do not rebase.",
+  "round": 1
+}

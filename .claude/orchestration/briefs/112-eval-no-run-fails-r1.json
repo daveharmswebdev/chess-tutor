@@ -1,0 +1,31 @@
+{
+  "brief_id": "112-eval-no-run-fails-r1",
+  "agent": "tutor-agent",
+  "issue": 90,
+  "base_sha": "8ec5429",
+  "scratch_dir": "/private/tmp/claude-501/-Users-daveharms-personal-workspace-chess-tutor/84a502cf-b333-4fa0-870b-1ccf8e975473/scratchpad/112-eval-no-run-fails-r1",
+  "objective": "#90: `pnpm eval` must never pass when no case reached Claude. After the report is written, if no case got a real reply from the model, the run exits 1 whether or not --gate is set, report.md starts with a plain one-paragraph warning saying no case reached Claude and the most common failure reason with its count, and stderr prints the same line. Runs where at least one case reached Claude behave exactly as today. Success: a test runs the summary path with every case api_unavailable and gets exit 1 plus the warning at the top of report.md; the gate is clean.",
+  "requirements": [
+    "NFR-10"
+  ],
+  "contract": "Observed on PR #89 (CI run 44305688159): all 69 cases were `FAIL api_unavailable` in about 0.1 s each (the Anthropic workspace usage limit, \"You will regain access on 2026-12-01\"), and the Tutor evals job was green because evals/src/run.ts sets process.exitCode only from gateDecision(m, values.gate === true, ...), and CI runs without --gate.\nCI (.github/workflows/evals.yml, coordinator-owned; you do not edit it) runs `pnpm eval -- --max-usd 2 --concurrency 2 --out \"$GITHUB_WORKSPACE/evals/results/ci\"`, then appends evals/results/ci/report.md to the job summary under `always()`. So a non-zero exit fails the job, and the top of report.md is the top of the job summary. No workflow change is needed.\nFailure reasons (packages/tutor/src/contract.ts TutorFailureReason): invalid_reply, unsupported_claim, tool_rounds_exceeded, refusal, max_tokens, rate_limited, api_unavailable, auth; evals/src/runner.ts adds \"threw\". Decision: a case DID NOT reach Claude when its reason is api_unavailable, rate_limited, auth or threw. Every other result (ok, or invalid_reply, unsupported_claim, tool_rounds_exceeded, refusal, max_tokens) reached Claude. A run where zero cases started (all skipped by budget) also counts as no case reached Claude.\nWhere: evals/src/run.ts (exit code after the report; see the gateDecision call near line 141), evals/src/report.ts (gateDecision, renderRunReport) and evals/src/runner.ts (writes summary.json and report.md). Keep the pure decision in a function that a test can call (as gateDecision is tested in evals/test/gate.test.ts), and make renderRunReport put the warning first.\nParked PR #89 edits evals/src/report.ts toRow (2 added lines near line 54) and evals/src/config.ts. Keep your edits to report.ts away from toRow so its rebase stays clean; do not touch evals/src/config.ts or evals/cases/**.\nGate at base 8ec5429 (the coordinator just ran it): Test Files 65 passed (65), Tests 1506 passed (1506); pnpm typecheck clean.",
+  "scope": [
+    "evals/src/**",
+    "evals/test/**",
+    "evals/README.md"
+  ],
+  "negative": [
+    "Do not edit files outside scope, docs, config, .github, root files or the lockfile.",
+    "No new dependencies.",
+    "No live API calls; tests use fakes (evals/test/fakes.ts).",
+    "Do not change packages/tutor, prompts, evals/cases or the existing gate thresholds."
+  ],
+  "rubric": [
+    "Tests first (red then green): (a) every case api_unavailable -> exit code 1 without --gate, and report.md starts with the warning naming api_unavailable and the count; (b) a mix of rate_limited, auth and threw with no ok case -> exit 1; (c) zero cases started -> exit 1; (d) one case ok and the rest api_unavailable -> exit 0 without --gate, no warning; (e) one invalid_reply case and the rest api_unavailable -> exit 0 (it reached Claude); (f) --gate behaviour unchanged for runs that reached Claude (existing gate tests still pass).",
+    "evals/README.md says in one or two sentences that a run where no case reached Claude always fails.",
+    "pnpm test and pnpm typecheck clean from the repo root.",
+    "files_changed lists every file changed in 8ec5429..your head. Commit message references NFR-10 and #90."
+  ],
+  "concurrency": "One other spoke runs in parallel: server-agent on #84 (brief 111), touching only apps/server/**. No overlap with evals. Do not rebase.",
+  "round": 1
+}
