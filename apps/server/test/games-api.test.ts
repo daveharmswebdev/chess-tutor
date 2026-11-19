@@ -73,6 +73,7 @@ describe("POST /api/games", () => {
       botThinking: false,
       tutor: { available: false, reason: expect.stringMatching(/^Coaching is off/), thinking: false, question: null, reveal: null },
       notes: [],
+      strength: 1400,
     });
     expect(bot.calls).toHaveLength(0);
   });

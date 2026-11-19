@@ -1,6 +1,7 @@
 import { randomUUID } from "node:crypto";
 import { Chess, type Move } from "chess.js";
 import {
+  BOT_STRENGTH,
   detect,
   type Analysis,
   type Color,
@@ -34,6 +35,7 @@ import {
 import { loadAttemptToleranceCp, loadKeyMomentThresholds } from "./config.ts";
 import { outcomeOf } from "./outcome.ts";
 import { toPgn } from "./pgn.ts";
+import { isValidStrength, STRENGTH_RANGE_MESSAGE } from "./strength.ts";
 import type { GameSource, GameStore, StoredGame, UsageEvent, UsageLedger } from "./store.ts";
 
 /** An error with the HTTP status the contract gives it (400, 404, 409, 503). */
@@ -85,8 +87,11 @@ export interface GameManager {
    * `source` (FR-28, #64) marks a game started by the demo; it defaults to "player", is saved
    * with the game, and is never part of the GameView. A player game and a demo game can be
    * playing at once (FR-28 amended, #71): starting one never ends the other kind.
+   * `strength` (#84, FR-1) is the bot's strength for the game, BOT_STRENGTH.default when omitted;
+   * saved with the game and passed to every bot.chooseMove for it. An invalid strength throws
+   * GameError 400 before anything is created or abandoned.
    */
-  create(playerColor: Color, opts?: { source?: GameSource }): GameView;
+  create(playerColor: Color, opts?: { source?: GameSource; strength?: number }): GameView;
   /**
    * Any game ever created: from memory, or rebuilt from the store (finished, abandoned).
    * Undefined only when the store has no such game; a store read error is thrown (a 500).
@@ -121,6 +126,8 @@ interface Game {
   playerColor: Color;
   /** Who started the game (FR-28): fixed at creation, kept across restarts. */
   source: GameSource;
+  /** The bot's strength (#84, FR-1): fixed at creation, kept across restarts (NFR-14). */
+  strength: number;
   chess: Chess;
   moves: MoveView[];
   /** Parallel to moves: a unique id per played move, so a detection for a taken-back move is dropped. */
@@ -444,6 +451,7 @@ export function createGameManager(opts: GameManagerOptions): GameManager {
       botThinking: g.botThinking,
       tutor: tutorStatus(g),
       notes: g.notes.map(copyNote),
+      strength: g.strength,
     };
   }
 
@@ -494,11 +502,12 @@ export function createGameManager(opts: GameManagerOptions): GameManager {
     return g;
   }
 
-  function newGameRecord(id: string, playerColor: Color, createdAt: Date, source: GameSource): Game {
+  function newGameRecord(id: string, playerColor: Color, createdAt: Date, source: GameSource, strength: number): Game {
     return {
       id,
       playerColor,
       source,
+      strength,
       chess: new Chess(),
       moves: [],
       moveIds: [],
@@ -535,7 +544,7 @@ export function createGameManager(opts: GameManagerOptions): GameManager {
    */
   function hydrate(row: StoredGame): { game: Game; ask: LiveState["tutor"]["ask"] } {
     const createdAt = new Date(row.createdAt);
-    const g = newGameRecord(row.id, row.playerColor, Number.isNaN(createdAt.getTime()) ? now() : createdAt, row.source);
+    const g = newGameRecord(row.id, row.playerColor, Number.isNaN(createdAt.getTime()) ? now() : createdAt, row.source, row.strength);
     const state = parseLiveState(row);
     let moves: LiveState["moves"];
     try {
@@ -645,6 +654,7 @@ export function createGameManager(opts: GameManagerOptions): GameManager {
         createdAt: g.createdAt.toISOString(),
         state: JSON.stringify(liveStateOf(g)),
         source: g.source,
+        strength: g.strength,
       };
       const key = JSON.stringify(row);
       if (key === g.lastSaved) return;
@@ -1195,7 +1205,8 @@ export function createGameManager(opts: GameManagerOptions): GameManager {
     const t0 = performance.now();
     const stale = () => closed || g.version !== version || g.status !== "playing";
 
-    const pending: Promise<void> = bot.chooseMove(fen).then(
+    // Every bot move uses the game's own strength (#84: FR-1, FR-2, FR-3).
+    const pending: Promise<void> = bot.chooseMove(fen, { strength: g.strength }).then(
       (botMove) => {
         const ms = Math.round(performance.now() - t0);
         if (stale()) {
@@ -1257,7 +1268,10 @@ export function createGameManager(opts: GameManagerOptions): GameManager {
   return {
     create(playerColor, opts = {}) {
       const source = opts.source ?? "player";
-      const g = newGameRecord(newId(), playerColor, now(), source);
+      const strength = opts.strength === undefined ? BOT_STRENGTH.default : opts.strength;
+      // Checked before anything is created or abandoned (#84).
+      if (!isValidStrength(strength)) throw new GameError(400, STRENGTH_RANGE_MESSAGE);
+      const g = newGameRecord(newId(), playerColor, now(), source, strength);
       // In the store before anything else changes (#47). If that fails, nothing has: the
       // reply is 500 and the old game stays playing, with no event (reviews 065, 068).
       save(g, { required: true });
@@ -1265,7 +1279,7 @@ export function createGameManager(opts: GameManagerOptions): GameManager {
       // player game in progress, and a player start never abandons a demo game.
       for (const other of games.values()) if (other.status === "playing" && other.source === source) abandon(other);
       games.set(g.id, g);
-      log.info({ gameId: g.id, playerColor, gameSource: source }, "new game");
+      log.info({ gameId: g.id, playerColor, gameSource: source, strength }, "new game");
       if (playerColor === "b") {
         startBot(g);
         save(g); // botThinking (informational: on load the bot is asked whenever it is its turn)

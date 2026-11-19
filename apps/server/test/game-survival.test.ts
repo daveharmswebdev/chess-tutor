@@ -456,13 +456,13 @@ describe("schema v1 database", () => {
     expect(onDisk(id)).toMatchObject({ status: "playing" });
   });
 
-  it("is at schema version 4 (v4: the usage ledger, #60)", () => {
-    expect(SCHEMA_VERSION).toBe(4);
+  it("is at schema version 5 (v4: the usage ledger, #60; v5: strength, #84)", () => {
+    expect(SCHEMA_VERSION).toBe(5);
   });
 });
 
 describe("schema v2 database (FR-28, #64)", () => {
-  it("migrates to the current version (v2 -> v4): old rows read back as player games, in progress and finished; twice is harmless", async () => {
+  it("migrates to the current version (v2 -> v5): old rows read back as player games, in progress and finished; twice is harmless", async () => {
     const db = new DatabaseSync(dbPath);
     db.exec(`
       CREATE TABLE games (
@@ -490,7 +490,7 @@ describe("schema v2 database (FR-28, #64)", () => {
 
     const b = boot("b");
     const check = new DatabaseSync(dbPath);
-    expect((check.prepare("PRAGMA user_version").get() as { user_version: number }).user_version).toBe(4);
+    expect((check.prepare("PRAGMA user_version").get() as { user_version: number }).user_version).toBe(SCHEMA_VERSION);
     const cols = check.prepare("PRAGMA table_info(games)").all() as { name: string; notnull: number; dflt_value: string }[];
     expect(cols.find((c) => c.name === "source")).toMatchObject({ notnull: 1, dflt_value: "'player'" });
     check.close();

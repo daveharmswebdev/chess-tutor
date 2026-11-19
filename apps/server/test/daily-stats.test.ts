@@ -628,8 +628,9 @@ describe("schema v4: the usage ledger (IR-7)", () => {
     s.close();
 
     const check = new DatabaseSync(dbPath);
-    expect(SCHEMA_VERSION).toBe(4);
-    expect((check.prepare("PRAGMA user_version").get() as { user_version: number }).user_version).toBe(4);
+    // Migrations run through to the current version (v5 since #84).
+    expect(SCHEMA_VERSION).toBe(5);
+    expect((check.prepare("PRAGMA user_version").get() as { user_version: number }).user_version).toBe(SCHEMA_VERSION);
     const indexes = check.prepare("PRAGMA index_list(usage_events)").all().map((r) => String(r["name"]));
     expect(indexes).toContain("usage_events_at");
     check.close();

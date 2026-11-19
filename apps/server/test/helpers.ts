@@ -1,5 +1,5 @@
 import { Chess } from "chess.js";
-import type { Analysis, BotMove, Color, GameEvent, GameView, SparringBot } from "@chess-tutor/chess-core";
+import type { Analysis, BotChooseOptions, BotMove, Color, GameEvent, GameView, SparringBot } from "@chess-tutor/chess-core";
 import type {
   TutorFailureReason,
   TutorOutcome,
@@ -17,6 +17,8 @@ import type {
  */
 export interface FakeBot extends SparringBot {
   calls: string[];
+  /** Parallel to calls: the options each search was asked with (#84: the game's strength). */
+  options: (BotChooseOptions | undefined)[];
   /** Hold every search until release() is called. */
   hold(): void;
   release(): void;
@@ -28,12 +30,14 @@ export interface FakeBot extends SparringBot {
 export function createFakeBot(script: string[] = [], delayMs = 0): FakeBot {
   const queue = [...script];
   const calls: string[] = [];
+  const options: (BotChooseOptions | undefined)[] = [];
   let held = false;
   let waiters: (() => void)[] = [];
   let failure: string | null = null;
   let illegal: string | null = null;
   return {
     calls,
+    options,
     hold() {
       held = true;
     },
@@ -49,8 +53,9 @@ export function createFakeBot(script: string[] = [], delayMs = 0): FakeBot {
     illegalNext(uci) {
       illegal = uci;
     },
-    async chooseMove(fen): Promise<BotMove> {
+    async chooseMove(fen, opts): Promise<BotMove> {
       calls.push(fen);
+      options.push(opts === undefined ? undefined : { ...opts });
       if (failure !== null) {
         const message = failure;
         failure = null;
