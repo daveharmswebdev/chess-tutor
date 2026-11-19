@@ -57,5 +57,10 @@
     { "id": "FR-26", "excluded": "Plumbing: lets the dashboard confirm the live version." },
     { "id": "NFR-18", "excluded": "Internal process: how this list is kept current." }
   ],
-  "events": []
+  "events": [
+    { "code": "deploy.live", "label": "A new version of the app went live" },
+    { "code": "tutor.reply", "label": "The tutor answered a question" },
+    { "code": "tutor.failed", "label": "The tutor couldn't answer a question" },
+    { "code": "explorer.unreachable", "label": "The opening database couldn't be reached, so the bot used the engine" }
+  ]
 }
